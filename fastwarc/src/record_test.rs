@@ -13,8 +13,67 @@
 // limitations under the License.
 
 use super::*;
+use crate::stream_io::LimitedBufReadSeek;
+use data_encoding::BASE32;
 use pretty_assertions::assert_eq;
+use sha1::{Digest, Sha1};
 use std::io;
+use std::io::{BufRead, Read, Seek};
+
+#[test]
+fn test_limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
+    let mut limited = LimitedBufReadSeek::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
+
+    assert_eq!(limited.fill_buf()?, b"abcd");
+    limited.consume(2);
+    assert_eq!(limited.stream_position()?, 2);
+    assert_eq!(limited.real_stream_position()?, 2);
+
+    let mut buf = [0u8; 4];
+    assert_eq!(limited.read(&mut buf)?, 2);
+    assert_eq!(&buf[..2], b"cd");
+    assert_eq!(limited.read(&mut buf)?, 0);
+
+    limited.set_limit(3);
+    assert_eq!(limited.stream_position()?, 0);
+
+    let old_reader = limited.replace_reader(Box::new(io::Cursor::new(b"xyz".to_vec())));
+    let mut old_reader = old_reader;
+    assert_eq!(old_reader.stream_position()?, 4);
+
+    assert_eq!(limited.seek(io::SeekFrom::Start(2))?, 2);
+    assert_eq!(limited.read(&mut buf[..2])?, 1);
+    assert_eq!(&buf[..1], b"z");
+
+    Ok(())
+}
+
+#[test]
+fn test_record_type_and_header_map_helpers() {
+    assert_eq!(WarcRecordType::try_from(4u16), Ok(WarcRecordType::Response));
+    assert_eq!(WarcRecordType::try_from("REQUEST"), Ok(WarcRecordType::Request));
+    assert_eq!(WarcRecordType::try_from(b"metadata".as_slice()), Ok(WarcRecordType::Metadata));
+    assert!(WarcRecordType::Response.matches_bitmask(WarcRecordType::AnyType as u16));
+    assert!(WarcRecordType::try_from(3u16).is_err());
+
+    let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
+    headers.set_status_line("HTTP/1.1 204");
+    headers.append("Set-Cookie", "a=1");
+    headers.append("set-cookie", "b=2");
+
+    assert_eq!(headers.status_code(), Some(204));
+    assert_eq!(headers.reason_phrase(), None);
+    assert!(headers.contains_key_bytes(b"SET-cookie"));
+
+    let merged = headers.to_map();
+    assert_eq!(merged.get(&CaseInsensitiveKey::from("set-cookie")), Some(&"a=1,b=2".to_string()));
+
+    headers.remove_bytes(b"set-cookie");
+    assert!(!headers.contains_key("Set-Cookie"));
+    headers.clear();
+    assert!(headers.is_empty());
+    assert_eq!(headers.status_line(), None);
+}
 
 #[test]
 fn test_new_empty_header_map() {
@@ -363,6 +422,78 @@ fn test_parse_http_headers() -> io::Result<()> {
 }
 
 #[test]
+fn test_parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
+    let warc_data = b"garbage before header\r\n\
+                      \r\n\
+                      WARC/1.1\r\n\
+                      WARC-Type: resource\r\n\
+                      Content-Length: 3\r\n\
+                      \r\n\
+                      ABC\r\n\r\nrest"
+        .to_vec();
+
+    let mut strict = WarcRecord::new();
+    strict.attach_reader(Box::new(io::Cursor::new(warc_data.clone())));
+    let err = strict.parse_warc_headers().unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+
+    let mut record = WarcRecord::new();
+    record.attach_reader(Box::new(io::Cursor::new(warc_data)));
+    let bytes_read = record.parse_warc_headers_quirks(true)?;
+    assert!(bytes_read > 0);
+    assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
+    assert_eq!(record.record_type(), WarcRecordType::Resource);
+    assert_eq!(record.content_length(), 3);
+
+    record.set_bytes_payload(b"XYZ".to_vec());
+    assert!(record.is_frozen());
+    assert_eq!(record.content_length(), 3);
+    assert_eq!(record.headers().get("Content-Length").as_deref(), Some("3"));
+
+    let mut payload = Vec::new();
+    record.reader_mut().unwrap().read_to_end(&mut payload)?;
+    assert_eq!(payload, b"XYZ");
+
+    let detached = record.detach_reader().unwrap();
+    let mut detached = detached;
+    assert!(detached.stream_position()? > 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_record_init_headers_http_flags_and_from_bytes() -> io::Result<()> {
+    let record_bytes = b"WARC/1.1\r\n\
+                         WARC-Type: response\r\n\
+                         WARC-Record-ID: <urn:uuid:test-record>\r\n\
+                         Content-Length: 3\r\n\
+                         \r\n\
+                         ABC\r\n\r\n"
+        .to_vec();
+    let record = WarcRecord::from_bytes(record_bytes)?;
+    assert!(record.is_frozen());
+
+    let mut record = WarcRecord::new();
+    record.init_headers(4, Some(WarcRecordType::AnyType), Some(b"urn:uuid:test-init"));
+    assert_eq!(record.record_type(), WarcRecordType::Unknown);
+    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:test-init>"));
+    assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
+    assert_eq!(record.content_length(), 4);
+
+    record.parse_http()?;
+    assert!(!record.is_http_parsed());
+
+    record.set_record_type(WarcRecordType::Request);
+    record.set_is_http(true);
+    assert!(record.is_http());
+    assert_eq!(record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=request"));
+    assert_eq!(record.http_content_type(), None);
+    assert_eq!(record.http_charset(), None);
+
+    Ok(())
+}
+
+#[test]
 fn test_write_headers() -> io::Result<()> {
     let http_data = "HTTP/1.1 200 OK\r\n\
                               Content-Length: 123\r\n\
@@ -380,6 +511,50 @@ fn test_write_headers() -> io::Result<()> {
     let mut buf = Vec::with_capacity(http_data.len());
     headers.write(&mut buf)?;
     assert_eq!(String::from_utf8_lossy(&buf), http_data);
+
+    Ok(())
+}
+
+#[test]
+fn test_verify_digests_and_write_record_roundtrip() -> io::Result<()> {
+    let payload = b"ABC".to_vec();
+    let mut record = WarcRecord::new();
+    record.init_headers(payload.len(), Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-test"));
+    record.set_bytes_payload(payload.clone());
+
+    let digest = BASE32.encode(&Sha1::digest(&payload));
+    record.headers_mut().set("WARC-Block-Digest", format!("sha1:{digest}"));
+
+    assert!(record.verify_block_digest(false).unwrap());
+    // `consume = false` should leave the frozen payload reader rewound for later use.
+    assert_eq!(record.reader_mut().unwrap().stream_position()?, 0);
+
+    record.headers_mut().remove("WARC-Block-Digest");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::Missing(_))));
+
+    record.headers_mut().set("WARC-Block-Digest", "sha999:AAAA");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::Unsupported(_))));
+
+    record.headers_mut().set("WARC-Block-Digest", "bad-format");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
+
+    assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
+
+    let mut writable = WarcRecord::new();
+    writable.init_headers(payload.len(), Some(WarcRecordType::Resource), Some(b"urn:uuid:write-test"));
+    writable.set_bytes_payload(payload);
+
+    let mut serialized = Vec::new();
+    let bytes_written = writable.write_with_checksum_block_size(&mut serialized, true, 2)?;
+    assert_eq!(bytes_written, serialized.len());
+
+    let mut reparsed = WarcRecord::from_reader(Box::new(io::Cursor::new(serialized)))?;
+    assert!(reparsed.headers().contains_key("WARC-Block-Digest"));
+    assert!(reparsed.verify_block_digest(false).unwrap());
+
+    let mut reparsed_payload = Vec::new();
+    reparsed.reader_mut().unwrap().read_to_end(&mut reparsed_payload)?;
+    assert_eq!(reparsed_payload, b"ABC");
 
     Ok(())
 }

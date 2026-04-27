@@ -1277,8 +1277,9 @@ impl WarcRecord {
                 let mut payload_digest = Sha1::new();
                 Digest::update(&mut block_digest, &buf);
                 Digest::update(&mut payload_digest, &buf);
+                let payload_digest = format!("sha1:{}", BASE32.encode(&payload_digest.finalize()));
                 self.headers
-                    .set_bytes(b"WARC-Payload-Digest", BASE32.encode(&payload_digest.finalize()).as_bytes());
+                    .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
             }
 
             loop {
@@ -1287,10 +1288,10 @@ impl WarcRecord {
                 if n == 0 {
                     break;
                 }
-                Digest::update(&mut block_digest, buf);
+                Digest::update(&mut block_digest, &buf[..n]);
             }
-            self.headers
-                .set_bytes(b"WARC-Block-Digest", BASE32.encode(&block_digest.finalize()).as_bytes());
+            let block_digest = format!("sha1:{}", BASE32.encode(&block_digest.finalize()));
+            self.headers.set_bytes(b"WARC-Block-Digest", block_digest.as_bytes());
             reader.rewind()?;
         }
 
@@ -1304,7 +1305,6 @@ impl WarcRecord {
 
         // Write WARC headers
         bytes_written += self.headers.write(writer)?;
-        bytes_written += 2;
 
         // Write HTTP headers if parsed
         if self.http_parsed
@@ -1314,7 +1314,7 @@ impl WarcRecord {
         }
 
         // Write content
-        let mut buf = Vec::with_capacity(chunk_size);
+        let mut buf = vec![0u8; chunk_size];
         loop {
             let n = reader.read(&mut buf)?;
             if n == 0 {
