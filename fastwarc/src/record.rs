@@ -668,14 +668,14 @@ impl HeaderMap {
 pub struct WarcRecord {
     record_type: WarcRecordType,
     headers: HeaderMap,
-    content_length: usize,
+    content_length: u64,
     is_http: bool,
     http_parsed: bool,
     http_charset: Option<String>,
     http_headers: Option<HeaderMap>,
     reader: Option<LimitedBufReadSeek>,
     reader_original: Option<Box<dyn BufReadSeek>>,
-    stream_pos: usize,
+    stream_pos: u64,
     frozen: bool,
 }
 
@@ -816,7 +816,7 @@ impl WarcRecord {
     ///
     /// * `payload` - Body as bytes
     pub fn set_bytes_payload(&mut self, payload: Vec<u8>) {
-        self.content_length = payload.len();
+        self.content_length = payload.len() as u64;
         let bytes_reader = Box::new(io::BufReader::new(io::Cursor::new(payload)));
         if !self.frozen
             && let Some(r) = &mut self.reader
@@ -883,8 +883,8 @@ impl WarcRecord {
             return Ok(());
         }
         let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
-        let mut buf = Vec::with_capacity(self.content_length);
-        self.content_length = reader.read_to_end(&mut buf)?;
+        let mut buf = Vec::with_capacity(self.content_length as usize);
+        self.content_length = reader.read_to_end(&mut buf)? as u64;
         let new_reader = Box::new(io::BufReader::new(io::Cursor::new(buf)));
         self.reader_original = Some(reader.replace_reader(new_reader));
         self.frozen = true;
@@ -899,7 +899,7 @@ impl WarcRecord {
     ///
     /// Number of bytes consumed.
     pub fn consume(&mut self) -> Result<usize, io::Error> {
-        self.consume_n(self.content_length)
+        self.consume_n(self.content_length as usize)
     }
 
     /// Consume up to `n` bytes of the WARC record payload without allocating
@@ -919,10 +919,10 @@ impl WarcRecord {
             && let Some(r) = &mut self.reader
         {
             let pos = r.stream_position()? as usize;
-            if pos >= self.content_length {
+            if pos >= self.content_length as usize {
                 return Ok(0);
             }
-            n = n.min(self.content_length - pos);
+            n = n.min(self.content_length as usize - pos);
             while n > n_consumed {
                 let buf = r.fill_buf()?;
                 if buf.is_empty() {
@@ -982,7 +982,7 @@ impl WarcRecord {
             line.clear();
 
             // Try to find first WARC/* header
-            self.stream_pos = reader.real_stream_position()? as usize;
+            self.stream_pos = reader.real_stream_position()?;
             let n = reader.read_until(b'\n', &mut line)?;
             if n == 0 {
                 return if is_first_line {
@@ -1107,12 +1107,12 @@ impl WarcRecord {
     }
 
     /// Remaining WARC record length in bytes (not necessarily the same as the `Content-Length` header).
-    pub fn content_length(&self) -> usize {
+    pub fn content_length(&self) -> u64 {
         self.content_length
     }
 
     /// WARC record start offset in the original (uncompressed) stream.
-    pub fn stream_pos(&self) -> usize {
+    pub fn stream_pos(&self) -> u64 {
         self.stream_pos
     }
 
@@ -1130,7 +1130,7 @@ impl WarcRecord {
     /// * `record_urn` - WARC-Record-ID as URN without `'<'`, `'>'` (if unset, a random URN will be generated)
     pub fn init_headers(
         &mut self,
-        content_length: usize,
+        content_length: u64,
         record_type: Option<WarcRecordType>,
         record_urn: Option<&[u8]>,
     ) {
@@ -1187,7 +1187,7 @@ impl WarcRecord {
         }
 
         // Update content to skip HTTP headers
-        self.content_length -= bytes_consumed;
+        self.content_length -= bytes_consumed as u64;
         self.http_headers = Some(http_headers);
         self.http_parsed = true;
         Ok(())
@@ -1615,12 +1615,12 @@ pub mod filter {
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
-    pub fn has_content_length_lte(max: usize) -> impl Filter {
+    pub fn has_content_length_lte(max: u64) -> impl Filter {
         move |r: &mut WarcRecord| r.content_length() <= max
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is greater than or equal to `min`.
-    pub fn has_content_length_gte(min: usize) -> impl Filter {
+    pub fn has_content_length_gte(min: u64) -> impl Filter {
         move |r: &mut WarcRecord| r.content_length() >= min
     }
 }

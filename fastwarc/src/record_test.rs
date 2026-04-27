@@ -374,7 +374,7 @@ fn parse_warc_headers() -> io::Result<()> {
     let reader = record1.detach_reader().unwrap();
     let mut record2 = WarcRecord::from_reader(reader)?;
 
-    assert_eq!(record2.stream_pos(), record_data1.len());
+    assert_eq!(record2.stream_pos(), record_data1.len() as u64);
     assert_eq!(record2.content_length(), 6);
     assert_eq!(record2.record_type(), WarcRecordType::Response);
 
@@ -518,7 +518,7 @@ fn write_headers() -> io::Result<()> {
 fn verify_digests_and_write_record_roundtrip() -> io::Result<()> {
     let payload = b"ABC".to_vec();
     let mut record = WarcRecord::new();
-    record.init_headers(payload.len(), Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-test"));
+    record.init_headers(payload.len() as u64, Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-test"));
     record.set_bytes_payload(payload.clone());
 
     let digest = BASE32.encode(&Sha1::digest(&payload));
@@ -540,7 +540,7 @@ fn verify_digests_and_write_record_roundtrip() -> io::Result<()> {
     assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
 
     let mut writable = WarcRecord::new();
-    writable.init_headers(payload.len(), Some(WarcRecordType::Resource), Some(b"urn:uuid:write-test"));
+    writable.init_headers(payload.len() as u64, Some(WarcRecordType::Resource), Some(b"urn:uuid:write-test"));
     writable.set_bytes_payload(payload);
 
     let mut serialized = Vec::new();
@@ -572,7 +572,7 @@ fn archive_iterator() -> io::Result<()> {
     assert_eq!(record1.record_id().unwrap(), "<urn:uuid:record1>");
     let mut record2 = record1.next().unwrap()?;
     assert_eq!(record2.record_id().unwrap(), "<urn:uuid:record2>");
-    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, "ABC").len());
+    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, "ABC").len() as u64);
     assert!(record2.next().is_none());
 
     // ArchiveIterator (without reading payload -> consumed automatically)
@@ -582,7 +582,7 @@ fn archive_iterator() -> io::Result<()> {
     assert_eq!(record1.borrow().stream_pos(), 0);
     let record2 = it.next().unwrap()?;
     assert_eq!(record2.borrow().record_id().unwrap(), "<urn:uuid:record2>");
-    assert_eq!(record2.borrow().stream_pos(), record_data1.len());
+    assert_eq!(record2.borrow().stream_pos(), record_data1.len() as u64);
     assert!(it.next().is_none());
 
     // Explicit loop (with reading payload)
@@ -596,7 +596,7 @@ fn archive_iterator() -> io::Result<()> {
             r.borrow_mut().reader_mut().unwrap().read_to_end(&mut buf)?;
         } else {
             assert_eq!(r.borrow().record_id().unwrap(), "<urn:uuid:record2>");
-            assert_eq!(r.borrow().stream_pos(), record_data1.len());
+            assert_eq!(r.borrow().stream_pos(), record_data1.len() as u64);
             r.borrow_mut().reader_mut().unwrap().read_to_end(&mut buf)?;
         }
         i += 1;

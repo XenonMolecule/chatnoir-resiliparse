@@ -93,16 +93,16 @@ pub trait CompressingStream: io::Write + Sized {
 /// Wraps an existing [`BufReadSeek`] reader, terminating when `limit` is reached.
 pub struct LimitedBufReadSeek {
     pub(crate) reader: Box<dyn BufReadSeek>,
-    pub(crate) limit: usize,
-    pub(crate) pos: usize,
+    pub(crate) limit: u64,
+    pub(crate) pos: u64,
 }
 
 impl LimitedBufReadSeek {
     /// Create a new limited reader from a buffered reader instance.
-    pub fn new(reader: Box<dyn BufReadSeek>, limit: Option<usize>) -> Self {
+    pub fn new(reader: Box<dyn BufReadSeek>, limit: Option<u64>) -> Self {
         Self {
             reader,
-            limit: limit.unwrap_or(usize::MAX),
+            limit: limit.unwrap_or(u64::MAX),
             pos: 0,
         }
     }
@@ -110,7 +110,7 @@ impl LimitedBufReadSeek {
     /// Change the limit of the reader.
     /// Also resets the logical stream position to 0. Use [`Self::real_stream_position()`] to get
     /// the real position on the original stream.
-    pub fn set_limit(&mut self, limit: usize) {
+    pub fn set_limit(&mut self, limit: u64) {
         self.limit = limit;
         self.pos = 0;
     }
@@ -123,7 +123,7 @@ impl LimitedBufReadSeek {
     /// Replace the internal stream with a new one and hand ownership of the previous
     /// stream back to the caller. Resets `limit` and `pos`.
     pub fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek> {
-        self.limit = usize::MAX;
+        self.limit = u64::MAX;
         self.pos = 0;
         mem::replace(&mut self.reader, new_reader)
     }
@@ -132,9 +132,9 @@ impl LimitedBufReadSeek {
 impl io::Read for LimitedBufReadSeek {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let l = buf.len();
-        let buf_limited = &mut buf[..l.min(self.limit - self.pos)];
+        let buf_limited = &mut buf[..(l as u64).min(self.limit - self.pos) as usize];
         let n = self.reader.read(buf_limited)?;
-        self.pos += n;
+        self.pos += n as u64;
         Ok(n)
     }
 }
@@ -142,14 +142,14 @@ impl io::Read for LimitedBufReadSeek {
 impl io::BufRead for LimitedBufReadSeek {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         let buf = self.reader.fill_buf()?;
-        let buf_limited = &buf[..buf.len().min(self.limit - self.pos)];
+        let buf_limited = &buf[..(buf.len() as u64).min(self.limit - self.pos) as usize];
         Ok(buf_limited)
     }
 
     fn consume(&mut self, amount: usize) {
-        let amount = amount.min(self.limit - self.pos);
+        let amount = (amount as u64).min(self.limit - self.pos) as usize;
         self.reader.consume(amount);
-        self.pos += amount;
+        self.pos += amount as u64;
     }
 }
 
@@ -169,8 +169,8 @@ impl io::Seek for LimitedBufReadSeek {
 
         self.reader
             .seek(io::SeekFrom::Current(new_pos as i64 - self.pos as i64))?;
-        self.pos = new_pos as usize;
-        Ok(self.pos as u64)
+        self.pos = new_pos as u64;
+        Ok(self.pos)
     }
 }
 
