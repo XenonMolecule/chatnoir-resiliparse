@@ -1194,7 +1194,11 @@ impl WarcRecord {
     /// Write WARC record onto a stream.
     ///
     /// The default block size is 16384 bytes and no record checksums are calculated.
-    /// Use [`Self::write_with_block_size`] or [`Self::write_with_checksum_block_size`] for more control.
+    /// Use [`Self::write_with_block_size`] or [`Self::write_with_block_size_checksum`] for more control.
+    ///
+    /// Does not explicitly start or end compression members. If you are writing into a
+    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1204,13 +1208,17 @@ impl WarcRecord {
     ///
     /// Number of bytes written
     pub fn write<W: io::Write>(&mut self, writer: &mut W) -> io::Result<usize> {
-        self.write_with_checksum_block_size(writer, false, 16384)
+        self.write_with_block_size_checksum(writer, 16384, false)
     }
 
     /// Write WARC record onto a stream with a given block size.
     ///
-    /// By default, no record checksums are calculated. Use [`Self::write_with_checksum_block_size`] or
+    /// By default, no record checksums are calculated. Use [`Self::write_with_block_size_checksum`] or
     /// `write_with_checksum_block_size` for more control.
+    ///
+    /// Does not explicitly start or end compression members. If you are writing into a
+    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1221,15 +1229,18 @@ impl WarcRecord {
     ///
     /// Number of bytes written
     pub fn write_with_block_size<W: io::Write>(&mut self, writer: &mut W, block_size: usize) -> io::Result<usize> {
-        self.write_with_checksum_block_size(writer, false, block_size)
+        self.write_with_block_size_checksum(writer, block_size, false)
     }
 
     /// Write WARC record onto a stream and calculate SHA-1 record checksums.
     ///
     /// The default block size is 16384 bytes, and SHA-1 checksums are calculated for the
-    /// block and payload data (if available). Use [`Self::write_with_checksum_block_size`]
+    /// block and payload data (if available). Use [`Self::write_with_block_size_checksum`]
     /// for more control.
     ///
+    /// Does not explicitly start or end compression members. If you are writing into a
+    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
     /// # Arguments
     ///
     /// * `writer` - Output stream
@@ -1238,25 +1249,29 @@ impl WarcRecord {
     ///
     /// Number of bytes written
     pub fn write_with_checksum<W: io::Write>(&mut self, writer: &mut W) -> io::Result<usize> {
-        self.write_with_checksum_block_size(writer, true, 16384)
+        self.write_with_block_size_checksum(writer, 16384, true)
     }
 
-    /// Write WARC record onto a stream.
+    /// Write WARC record onto a stream with a given block size and calculate SHA-1 record checksums.
+    ///
+    /// Does not explicitly start or end compression members. If you are writing into a
+    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
     ///
     /// # Arguments
     ///
     /// * `writer` - Output stream
-    /// * `checksum_data` - Whether to write data checksums
     /// * `chunk_size` - Chunk size for writing the record body
+    /// * `checksum_data` - Whether to write data checksums
     ///
     /// # Returns
     ///
     /// Number of bytes written
-    pub fn write_with_checksum_block_size<W: io::Write>(
+    pub fn write_with_block_size_checksum<W: io::Write>(
         &mut self,
         writer: &mut W,
-        checksum_data: bool,
         chunk_size: usize,
+        checksum_data: bool,
     ) -> io::Result<usize> {
         let mut bytes_written = 0usize;
 
@@ -1300,8 +1315,6 @@ impl WarcRecord {
         // Ensure Content-Length is correct
         self.headers
             .set_bytes(b"Content-Length", self.content_length.to_string().as_bytes());
-
-        // TODO: Start and end members on compressing stream
 
         // Write WARC headers
         bytes_written += self.headers.write(writer)?;

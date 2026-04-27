@@ -544,7 +544,7 @@ fn verify_digests_and_write_record_roundtrip() -> io::Result<()> {
     writable.set_bytes_payload(payload);
 
     let mut serialized = Vec::new();
-    let bytes_written = writable.write_with_checksum_block_size(&mut serialized, true, 2)?;
+    let bytes_written = writable.write_with_block_size_checksum(&mut serialized, 2, true)?;
     assert_eq!(bytes_written, serialized.len());
 
     let mut reparsed = WarcRecord::from_reader(Box::new(io::Cursor::new(serialized)))?;
