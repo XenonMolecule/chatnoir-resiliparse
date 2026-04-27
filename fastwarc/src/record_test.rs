@@ -20,8 +20,41 @@ use sha1::{Digest, Sha1};
 use std::io;
 use std::io::{BufRead, Read, Seek};
 
+fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&str>, payload: &str) -> String {
+    format!(
+        "WARC/1.1\r\n\
+         WARC-Type: {}\r\n\
+         WARC-Record-ID: {}\r\n\
+         {}\
+         Content-Length: {}\r\n\
+         \r\n\
+         {}\r\n\r\n",
+        record_type,
+        record_id,
+        content_type
+            .map(|value| format!("Content-Type: {value}\r\n"))
+            .unwrap_or_default(),
+        payload.len(),
+        payload
+    )
+}
+
+fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
+    let http_data = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\
+         Content-Length: {}\r\n\
+         Server: nginx\r\n\
+         \r\n\
+         {}",
+        payload.len(),
+        payload
+    );
+    warc_record_data("response", record_id, Some("application/http; msgtype=response"), &http_data).into_bytes()
+}
+
 #[test]
-fn test_limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
+fn limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
     let mut limited = LimitedBufReadSeek::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
 
     assert_eq!(limited.fill_buf()?, b"abcd");
@@ -49,7 +82,7 @@ fn test_limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> 
 }
 
 #[test]
-fn test_record_type_and_header_map_helpers() {
+fn record_type_and_header_map_helpers() {
     assert_eq!(WarcRecordType::try_from(4u16), Ok(WarcRecordType::Response));
     assert_eq!(WarcRecordType::try_from("REQUEST"), Ok(WarcRecordType::Request));
     assert_eq!(WarcRecordType::try_from(b"metadata".as_slice()), Ok(WarcRecordType::Metadata));
@@ -76,7 +109,7 @@ fn test_record_type_and_header_map_helpers() {
 }
 
 #[test]
-fn test_new_empty_header_map() {
+fn new_empty_header_map() {
     let headers = HeaderMap::new(HeaderEncoding::Unicode);
     assert_eq!(headers.len(), 0);
     assert!(headers.is_empty());
@@ -84,7 +117,7 @@ fn test_new_empty_header_map() {
 }
 
 #[test]
-fn test_set_get_remove_header() {
+fn set_get_remove_header() {
     let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
     headers.set("Content-Type", "text/plain");
     assert_eq!(headers.get("Content-Type").as_deref(), Some("text/plain"));
@@ -116,7 +149,7 @@ fn test_set_get_remove_header() {
 }
 
 #[test]
-fn test_duplicate_header() {
+fn duplicate_header() {
     let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
     assert_eq!(headers.len(), 0);
     assert_eq!(headers.get_multiple("Content-Type"), Vec::<&str>::new());
@@ -147,7 +180,7 @@ fn test_duplicate_header() {
 }
 
 #[test]
-fn test_header_case_insensitive() {
+fn header_case_insensitive() {
     let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
     headers.set("Content-Type", "text/html");
     assert!(headers.keys().any(|k| k == "Content-Type"));
@@ -160,7 +193,7 @@ fn test_header_case_insensitive() {
 }
 
 #[test]
-fn test_iterate_headers() {
+fn iterate_headers() {
     let tuples = [
         ("Content-Type", "text/html"),
         ("Content-Length", "1234"),
@@ -202,7 +235,7 @@ fn test_iterate_headers() {
 }
 
 #[test]
-fn test_header_sanitization() {
+fn header_sanitization() {
     let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
     headers.set("Content-Type:", "text/html; charset=utf-8");
     headers.set("Foo:bar", "bar:baz");
@@ -214,7 +247,7 @@ fn test_header_sanitization() {
 }
 
 #[test]
-fn test_parse_headers_with_continuation_lines() -> io::Result<()> {
+fn parse_headers_with_continuation_lines() -> io::Result<()> {
     let http_data = b"HTTP/1.1 200 OK\r\n\
                               Content-Length: 123\r\n\
                               Content-Encoding     :     gzip    \r\n\
@@ -240,7 +273,7 @@ fn test_parse_headers_with_continuation_lines() -> io::Result<()> {
 }
 
 #[test]
-fn test_new_empty_header_encoding() -> io::Result<()> {
+fn new_empty_header_encoding() -> io::Result<()> {
     let mut headers_unicode = HeaderMap::new(HeaderEncoding::Unicode);
     let mut headers_latin1 = HeaderMap::new(HeaderEncoding::Latin1);
 
@@ -294,20 +327,10 @@ fn test_new_empty_header_encoding() -> io::Result<()> {
 }
 
 #[test]
-fn test_parse_warc_headers() -> io::Result<()> {
-    let record_data1 = "WARC/1.1\r\n\
-                             WARC-Type: request\r\n\
-                             WARC-Record-ID: <urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>\r\n\
-                             Content-Length: 3\r\n\
-                             \r\n\
-                             ABC\r\n\r\n";
-    let record_data2 = "WARC/1.1\r\n\
-                             WARC-Type: response\r\n\
-                             WARC-Record-ID: <urn:uuid:e480bf84-e412-461e-9e24-9081daa79945>\r\n\
-                             Content-Length: 6\r\n\
-                             \r\n\
-                             DEFGHI\r\n\r\n";
-    let warc_data = format!("{}{}", record_data1, record_data2).as_bytes().to_vec();
+fn parse_warc_headers() -> io::Result<()> {
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, "ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, "DEFGHI");
+    let warc_data = format!("{}{}", record_data1, record_data2).into_bytes();
 
     let reader = Box::new(io::Cursor::new(warc_data));
     let mut record1 = WarcRecord::new();
@@ -329,12 +352,9 @@ fn test_parse_warc_headers() -> io::Result<()> {
     assert!(!record1.is_http());
     assert_eq!(headers.get("WARC-Type").as_deref(), Some("request"));
     assert_eq!(headers.get_bytes(b"WARC-Type"), Some(b"request".as_slice()));
-    assert_eq!(record1.record_id().as_deref(), Some("<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>"));
-    assert_eq!(headers.get("WARC-Record-ID").as_deref(), Some("<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>"));
-    assert_eq!(
-        headers.get_bytes(b"WARC-Record-ID"),
-        Some(b"<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>".as_slice())
-    );
+    assert_eq!(record1.record_id().as_deref(), Some("<urn:uuid:record1>"));
+    assert_eq!(headers.get("WARC-Record-ID").as_deref(), Some("<urn:uuid:record1>"));
+    assert_eq!(headers.get_bytes(b"WARC-Record-ID"), Some(b"<urn:uuid:record1>".as_slice()));
     assert_eq!(headers.get("Content-Length").as_deref(), Some("3"));
     assert_eq!(headers.get_bytes(b"Content-Length"), Some(b"3".as_slice()));
 
@@ -366,32 +386,9 @@ fn test_parse_warc_headers() -> io::Result<()> {
 }
 
 #[test]
-fn test_parse_http_headers() -> io::Result<()> {
-    let http_payload = "Hello World";
-    let http_data = format!(
-        "HTTP/1.1 200 OK\r\n\
-            Content-Type: text/plain; charset=utf-8\r\n\
-            Content-Length: {}\r\n\
-            Server: Apache/2.4\r\n\
-            \r\n\
-            {}",
-        http_payload.len(),
-        http_payload
-    );
-
-    let warc_data = format!(
-        "WARC/1.1\r\n\
-            WARC-Type: response\r\n\
-            WARC-Record-ID: <urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>\r\n\
-            Content-Type: application/http; msgtype=response\r\n\
-            Content-Length: {} \r\n\
-            \r\n\
-            {}",
-        http_data.len(),
-        http_data
-    )
-    .as_bytes()
-    .to_vec();
+fn parse_http_headers() -> io::Result<()> {
+    let payload = "Hello World";
+    let warc_data = http_response_warc_data(payload, "<urn:uuid:record-id>");
 
     let reader = Box::new(io::Cursor::new(warc_data));
     let mut record = WarcRecord::new();
@@ -416,13 +413,13 @@ fn test_parse_http_headers() -> io::Result<()> {
 
     let mut buf = Vec::new();
     record.reader_mut().unwrap().read_to_end(&mut buf)?;
-    assert_eq!(String::from_utf8_lossy(&buf), http_payload);
+    assert_eq!(String::from_utf8_lossy(&buf), payload);
 
     Ok(())
 }
 
 #[test]
-fn test_parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
+fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
     let warc_data = b"garbage before header\r\n\
                       \r\n\
                       WARC/1.1\r\n\
@@ -462,21 +459,23 @@ fn test_parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
 }
 
 #[test]
-fn test_record_init_headers_http_flags_and_from_bytes() -> io::Result<()> {
-    let record_bytes = b"WARC/1.1\r\n\
-                         WARC-Type: response\r\n\
-                         WARC-Record-ID: <urn:uuid:test-record>\r\n\
-                         Content-Length: 3\r\n\
-                         \r\n\
-                         ABC\r\n\r\n"
-        .to_vec();
+fn record_init_from_bytes() -> io::Result<()> {
+    let record_bytes =
+        warc_record_data("response", "<urn:uuid:42e5b12c-3396-4b7e-b4b3-c88b7000cf43>", None, "ABC").into_bytes();
     let record = WarcRecord::from_bytes(record_bytes)?;
     assert!(record.is_frozen());
+    assert_eq!(record.record_type(), WarcRecordType::Response);
+    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:42e5b12c-3396-4b7e-b4b3-c88b7000cf43>"));
+    assert_eq!(record.content_length(), 3);
+    Ok(())
+}
 
+#[test]
+fn record_init_headers_http() -> io::Result<()> {
     let mut record = WarcRecord::new();
-    record.init_headers(4, Some(WarcRecordType::AnyType), Some(b"urn:uuid:test-init"));
+    record.init_headers(4, Some(WarcRecordType::AnyType), Some(b"uuid:494749ad-b14a-4f22-b143-0bab4347884b"));
     assert_eq!(record.record_type(), WarcRecordType::Unknown);
-    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:test-init>"));
+    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:494749ad-b14a-4f22-b143-0bab4347884b>"));
     assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
     assert_eq!(record.content_length(), 4);
 
@@ -494,7 +493,7 @@ fn test_record_init_headers_http_flags_and_from_bytes() -> io::Result<()> {
 }
 
 #[test]
-fn test_write_headers() -> io::Result<()> {
+fn write_headers() -> io::Result<()> {
     let http_data = "HTTP/1.1 200 OK\r\n\
                               Content-Length: 123\r\n\
                               Content-Encoding: gzip\r\n\
@@ -516,7 +515,7 @@ fn test_write_headers() -> io::Result<()> {
 }
 
 #[test]
-fn test_verify_digests_and_write_record_roundtrip() -> io::Result<()> {
+fn verify_digests_and_write_record_roundtrip() -> io::Result<()> {
     let payload = b"ABC".to_vec();
     let mut record = WarcRecord::new();
     record.init_headers(payload.len(), Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-test"));
@@ -560,39 +559,29 @@ fn test_verify_digests_and_write_record_roundtrip() -> io::Result<()> {
 }
 
 #[test]
-fn test_archive_iterator() -> io::Result<()> {
-    let record_data1 = "WARC/1.1\r\n\
-                             WARC-Type: request\r\n\
-                             WARC-Record-ID: <urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>\r\n\
-                             Content-Length: 3\r\n\
-                             \r\n\
-                             ABC\r\n\r\n";
-    let record_data2 = "WARC/1.1\r\n\
-                             WARC-Type: response\r\n\
-                             WARC-Record-ID: <urn:uuid:e480bf84-e412-461e-9e24-9081daa79945>\r\n\
-                             Content-Length: 6\r\n\
-                             \r\n\
-                             DEFGHI\r\n\r\n";
-    let warc_data = format!("{}{}", record_data1, record_data2).as_bytes().to_vec();
+fn archive_iterator() -> io::Result<()> {
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, "ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, "DEFGHI");
+    let warc_data = format!("{}{}", record_data1, record_data2).into_bytes();
 
     let reader = Box::new(io::Cursor::new(warc_data));
 
     // Manual iteration
     let mut record1 = WarcRecord::from_reader(reader.clone())?;
     assert_eq!(record1.stream_pos(), 0);
-    assert_eq!(record1.record_id().unwrap(), "<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>");
+    assert_eq!(record1.record_id().unwrap(), "<urn:uuid:record1>");
     let mut record2 = record1.next().unwrap()?;
-    assert_eq!(record2.record_id().unwrap(), "<urn:uuid:e480bf84-e412-461e-9e24-9081daa79945>");
-    assert_eq!(record2.stream_pos(), record_data1.len());
+    assert_eq!(record2.record_id().unwrap(), "<urn:uuid:record2>");
+    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, "ABC").len());
     assert!(record2.next().is_none());
 
     // ArchiveIterator (without reading payload -> consumed automatically)
     let mut it = ArchiveIterator::new(reader.clone());
     let record1 = it.next().unwrap()?;
-    assert_eq!(record1.borrow().record_id().unwrap(), "<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>");
+    assert_eq!(record1.borrow().record_id().unwrap(), "<urn:uuid:record1>");
     assert_eq!(record1.borrow().stream_pos(), 0);
     let record2 = it.next().unwrap()?;
-    assert_eq!(record2.borrow().record_id().unwrap(), "<urn:uuid:e480bf84-e412-461e-9e24-9081daa79945>");
+    assert_eq!(record2.borrow().record_id().unwrap(), "<urn:uuid:record2>");
     assert_eq!(record2.borrow().stream_pos(), record_data1.len());
     assert!(it.next().is_none());
 
@@ -602,11 +591,11 @@ fn test_archive_iterator() -> io::Result<()> {
     for r in ArchiveIterator::new(reader.clone()) {
         let r = r?;
         if i == 0 {
-            assert_eq!(r.borrow().record_id().unwrap(), "<urn:uuid:259bd4e8-b820-4a11-b14b-8f25e573f071>");
+            assert_eq!(r.borrow().record_id().unwrap(), "<urn:uuid:record1>");
             assert_eq!(r.borrow().stream_pos(), 0);
             r.borrow_mut().reader_mut().unwrap().read_to_end(&mut buf)?;
         } else {
-            assert_eq!(r.borrow().record_id().unwrap(), "<urn:uuid:e480bf84-e412-461e-9e24-9081daa79945>");
+            assert_eq!(r.borrow().record_id().unwrap(), "<urn:uuid:record2>");
             assert_eq!(r.borrow().stream_pos(), record_data1.len());
             r.borrow_mut().reader_mut().unwrap().read_to_end(&mut buf)?;
         }

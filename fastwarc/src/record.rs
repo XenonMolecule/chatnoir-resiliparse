@@ -1135,7 +1135,7 @@ impl WarcRecord {
     ) {
         let urn = match record_urn {
             Some(urn) => urn.to_vec(),
-            None => format!("urn:uuid:{}", Uuid::new_v4()).into_bytes(),
+            None => format!("uuid:{}", Uuid::new_v4()).into_bytes(),
         };
 
         self.record_type = match record_type {
@@ -1152,7 +1152,7 @@ impl WarcRecord {
         let date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         self.headers._append_bytes_no_sanitize(b"WARC-Date", date.as_bytes());
 
-        let record_id = format!("<{}>", String::from_utf8_lossy(&urn));
+        let record_id = format!("<urn:{}>", String::from_utf8_lossy(&urn));
         self.headers
             ._append_bytes_no_sanitize(b"WARC-Record-ID", record_id.as_bytes());
 
