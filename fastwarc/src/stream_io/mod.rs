@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::any::Any;
 use std::io;
 use std::mem;
 
@@ -26,11 +25,11 @@ pub mod gzip;
 // Global trait definitions
 // ===========================================================
 
-pub trait ReadSeek: io::Read + io::Seek + Any {}
-impl<T: io::Read + io::Seek + Any + ?Sized> ReadSeek for T {}
+pub trait ReadSeek: io::Read + io::Seek {}
+impl<T: io::Read + io::Seek + ?Sized> ReadSeek for T {}
 
-pub trait BufReadSeek: io::BufRead + io::Seek + Any {}
-impl<T: io::BufRead + io::Seek + Any + ?Sized> BufReadSeek for T {}
+pub trait BufReadSeek: io::BufRead + io::Seek {}
+impl<T: io::BufRead + io::Seek + ?Sized> BufReadSeek for T {}
 
 // ===========================================================
 // Compressing / decompressing stream
