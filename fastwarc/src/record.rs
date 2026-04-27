@@ -24,6 +24,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::io::{BufRead, Read, Seek};
+use std::ops::Deref;
 use std::rc::Rc;
 use uuid::Uuid;
 
@@ -1474,16 +1475,49 @@ pub struct ArchiveIterator {
     cur: Rc<RefCell<WarcRecord>>,
 }
 
+/// WARC record filter predicate. Can be used with [`ArchiveIterator::with_filter()`].
+pub trait Filter: Fn(&mut WarcRecord) -> bool {}
+impl<T> Filter for T where T: Fn(&mut WarcRecord) -> bool {}
+
+/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
+/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
+pub struct FilteredArchiveIterator<F: Filter> {
+    inner: ArchiveIterator,
+    pred: F,
+}
+
 impl ArchiveIterator {
     /// Create a new WARC record iterator from a buffered WARC stream reader.
     ///
     /// # Arguments
     ///
-    /// * `reader` buffered reader instance to attach to records
+    /// * `reader` - buffered reader instance to attach to records
     pub fn new(reader: Box<dyn BufReadSeek>) -> Self {
         let empty = Rc::new(RefCell::new(WarcRecord::new()));
         empty.borrow_mut().attach_reader(reader);
         Self { cur: empty }
+    }
+
+    /// Create a new WARC record iterator with a filter predicate.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - buffered reader instance to attach to records
+    /// * `filter` - boolean filter predicate (must take a [`&WarcRecord`] as parameter)
+    pub fn with_filter<F: Filter>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIterator<F> {
+        FilteredArchiveIterator {
+            inner: ArchiveIterator::new(reader),
+            pred: filter,
+        }
+    }
+
+    /// Unwrap [`ArchiveIterator`] and return the reader instance.
+    ///
+    /// # Returns
+    ///
+    /// Reader instances originally attached to this iterator.
+    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek>> {
+        self.cur.take().detach_reader()
     }
 }
 
@@ -1499,6 +1533,95 @@ impl Iterator for ArchiveIterator {
             }
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<F: Filter> Iterator for FilteredArchiveIterator<F> {
+    type Item = Result<Rc<RefCell<WarcRecord>>, io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let next = self.inner.next()?;
+            return match next {
+                Ok(n) => {
+                    if !(self.pred)(&mut n.borrow_mut()) {
+                        continue;
+                    }
+                    Some(Ok(n))
+                }
+                Err(e) => Some(Err(e)),
+            };
+        }
+    }
+}
+
+impl<F: Filter> Deref for FilteredArchiveIterator<F> {
+    type Target = ArchiveIterator;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+/// Filter predicates to be used with [`ArchiveIterator::with_filter()`].
+pub mod filter {
+    use super::{Filter, WarcRecord, WarcRecordType};
+
+    /// Filter predicate for checking if a record is a WARC/1.0 record.
+    pub fn is_warc_10(record: &mut WarcRecord) -> bool {
+        record.headers().status_line_bytes().is_some_and(|s| s == b"WARC/1.0")
+    }
+
+    /// Filter predicate for checking if a record is a WARC/1.1 record.
+    pub fn is_warc_11(record: &mut WarcRecord) -> bool {
+        record.headers().status_line_bytes().is_some_and(|s| s == b"WARC/1.1")
+    }
+
+    /// Filter predicate for checking if a record has a block digest.
+    pub fn has_block_digest(record: &mut WarcRecord) -> bool {
+        record.headers().contains_key_bytes(b"WARC-Block-Digest")
+    }
+
+    /// Filter predicate for checking if a record's WARC-Block-Digest is valid.
+    /// This is a mutating filter that freezes the record!
+    pub fn has_valid_block_digest(record: &mut WarcRecord) -> bool {
+        record.verify_block_digest(false).unwrap_or(false)
+    }
+
+    /// Filter predicate for checking if a record has a payload digest.
+    pub fn has_payload_digest(record: &mut WarcRecord) -> bool {
+        record.headers().contains_key_bytes(b"WARC-Payload-Digest")
+    }
+
+    /// Filter predicate for checking if a record's WARC-Payload-Digest is valid.
+    /// This is a mutating filter that freezes the record!
+    pub fn has_valid_payload_digest(record: &mut WarcRecord) -> bool {
+        record.verify_payload_digest(false).unwrap_or(false)
+    }
+
+    /// Filter predicate for checking if a record is an HTTP record.
+    pub fn is_http(record: &mut WarcRecord) -> bool {
+        record.is_http()
+    }
+
+    /// Filter predicate for checking if a record is concurrent to another record.
+    pub fn is_concurrent(record: &mut WarcRecord) -> bool {
+        record.headers().contains_key_bytes(b"WARC-Concurrent-To")
+    }
+
+    /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
+    pub fn has_record_type(record_type: WarcRecordType) -> impl Filter {
+        move |r: &mut WarcRecord| r.record_type() == record_type
+    }
+
+    /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
+    pub fn has_content_length_lte(max: usize) -> impl Filter {
+        move |r: &mut WarcRecord| r.content_length() <= max
+    }
+
+    /// Parameterized filter predicate for checking if a record's Content-Length is greater than or equal to `min`.
+    pub fn has_content_length_gte(min: usize) -> impl Filter {
+        move |r: &mut WarcRecord| r.content_length() >= min
     }
 }
 
