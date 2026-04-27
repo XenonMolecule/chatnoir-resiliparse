@@ -26,6 +26,8 @@ use std::io;
 use std::io::{BufRead, Read, Seek};
 use std::ops::Deref;
 use std::rc::Rc;
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 use uuid::Uuid;
 
 // ===========================================================
@@ -1149,8 +1151,7 @@ impl WarcRecord {
         self.headers.set_status_line_bytes(b"WARC/1.1");
         self.headers
             ._append_bytes_no_sanitize(b"WARC-Type", self.record_type.as_str().as_bytes());
-
-        let date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let date = OffsetDateTime::now_utc().format(&Rfc3339).unwrap();
         self.headers._append_bytes_no_sanitize(b"WARC-Date", date.as_bytes());
 
         let record_id = format!("<urn:{}>", String::from_utf8_lossy(&urn));
