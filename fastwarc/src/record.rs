@@ -129,52 +129,80 @@ impl From<WarcRecordType> for &'static str {
 // WARC / HTTP header map
 // ===========================================================
 
-/// Case-insensitive string key for headers
+/// Case-insensitive Cow String type for header keys
 #[derive(Debug, Eq, Clone)]
-pub struct CaseInsensitiveKey(String);
+pub struct CaseInsensitiveKey<'a>(Cow<'a, str>);
 
-impl CaseInsensitiveKey {
-    fn new(s: impl Into<String>) -> Self {
-        CaseInsensitiveKey(s.into())
-    }
-
-    #[allow(dead_code)]
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    fn to_lowercase(&self) -> String {
-        self.0.to_lowercase()
-    }
+/// Helper shorthand for constructing a [`CaseInsensitiveKey`] from a string slice.
+pub fn ci(s: &'_ str) -> CaseInsensitiveKey<'_> {
+    CaseInsensitiveKey::from(s)
 }
 
-impl PartialEq for CaseInsensitiveKey {
+impl PartialEq for CaseInsensitiveKey<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
-impl From<CaseInsensitiveKey> for String {
-    fn from(key: CaseInsensitiveKey) -> Self {
-        key.0
+impl PartialEq<str> for CaseInsensitiveKey<'_> {
+    fn eq(&self, other: &str) -> bool {
+        self.0.eq_ignore_ascii_case(other)
     }
 }
 
-impl From<String> for CaseInsensitiveKey {
-    fn from(key: String) -> Self {
-        CaseInsensitiveKey::new(key)
+impl PartialEq<&str> for CaseInsensitiveKey<'_> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0.eq_ignore_ascii_case(other)
     }
 }
 
-impl std::hash::Hash for CaseInsensitiveKey {
+impl PartialEq<CaseInsensitiveKey<'_>> for str {
+    fn eq(&self, other: &CaseInsensitiveKey<'_>) -> bool {
+        self.eq_ignore_ascii_case(&other.0)
+    }
+}
+
+impl PartialEq<CaseInsensitiveKey<'_>> for &str {
+    fn eq(&self, other: &CaseInsensitiveKey<'_>) -> bool {
+        self.eq_ignore_ascii_case(&other.0)
+    }
+}
+
+impl std::hash::Hash for CaseInsensitiveKey<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.to_lowercase().hash(state);
+        self.0.to_ascii_lowercase().hash(state);
     }
 }
 
-impl From<&str> for CaseInsensitiveKey {
-    fn from(s: &str) -> Self {
-        CaseInsensitiveKey(s.to_string())
+impl From<CaseInsensitiveKey<'_>> for String {
+    fn from(key: CaseInsensitiveKey<'_>) -> Self {
+        key.0.to_string()
+    }
+}
+
+impl From<String> for CaseInsensitiveKey<'_> {
+    fn from(key: String) -> Self {
+        Self(Cow::Owned(key))
+    }
+}
+
+impl<'a> From<&'a str> for CaseInsensitiveKey<'a> {
+    fn from(key: &'a str) -> Self {
+        Self(Cow::Borrowed(key))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for CaseInsensitiveKey<'a> {
+    fn from(key: Cow<'a, str>) -> Self {
+        Self(key)
+    }
+}
+
+impl<'a> Deref for CaseInsensitiveKey<'a> {
+    type Target = Cow<'a, str>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -580,8 +608,8 @@ impl HeaderMap {
     }
 
     /// Iterator of header keys.
-    pub fn keys(&self) -> impl Iterator<Item = Cow<'_, str>> {
-        self.headers.iter().map(|(k, _)| self._decode(k))
+    pub fn keys(&'_ self) -> impl Iterator<Item = CaseInsensitiveKey<'_>> {
+        self.headers.iter().map(|(k, _)| CaseInsensitiveKey(self._decode(k)))
     }
 
     /// Zero-copy iterator of header keys as bytes.
@@ -602,10 +630,10 @@ impl HeaderMap {
     /// Return the headers as a [`HashMap`] of Unicode strings.
     ///
     /// If multiple headers have the same key, their values will be concatenated with `","`.
-    pub fn to_map(&self) -> HashMap<CaseInsensitiveKey, String> {
+    pub fn to_map(&'_ self) -> HashMap<CaseInsensitiveKey<'_>, String> {
         let mut map: HashMap<CaseInsensitiveKey, String> = HashMap::new();
         self.items().for_each(|(k, v)| {
-            map.entry(CaseInsensitiveKey::new(k))
+            map.entry(CaseInsensitiveKey(k))
                 .and_modify(|v_| {
                     v_.push(',');
                     v_.push_str(&v);
@@ -856,7 +884,7 @@ impl WarcRecord {
         self.reader.as_mut()
     }
 
-    /// Record type (same as `headers['WARC-Type']`).
+    /// WARC record type.
     pub fn record_type(&self) -> WarcRecordType {
         self.record_type
     }
@@ -1042,7 +1070,7 @@ impl WarcRecord {
         Ok(bytes_read)
     }
 
-    /// Record ID (same as [`Self::headers().get("WARC-Record-ID")`](HeaderMap::get)
+    /// WARC record ID
     pub fn record_id(&self) -> Option<Cow<'_, str>> {
         self.headers.get("WARC-Record-ID")
     }
@@ -1129,7 +1157,7 @@ impl WarcRecord {
     ///
     /// * `content_length` - WARC record body length in bytes
     /// * `record_type` - WARC-Type
-    /// * `record_urn` - WARC-Record-ID as URN without `'<'`, `'>'` (if unset, a random URN will be generated)
+    /// * `record_urn` - WARC-Record-ID as URN without `'<urn:'`, `'>'` (if unset, a random URN will be generated)
     pub fn init_headers(
         &mut self,
         content_length: u64,
@@ -1176,7 +1204,7 @@ impl WarcRecord {
         let bytes_consumed = http_headers.parse(reader, true)?;
 
         // Parse charset if present
-        if let Some(content_type) = http_headers.get("content-type").map(|c| c.to_ascii_lowercase()) {
+        if let Some(content_type) = http_headers.get("Content-Type").map(|c| c.to_ascii_lowercase()) {
             let charset_key = "charset=";
             if let Some(charset_pos) = content_type.find(charset_key) {
                 let charset_start = charset_pos + charset_key.len();
@@ -1432,7 +1460,7 @@ impl WarcRecord {
         }
         if !consume {
             reader
-                .seek(io::SeekFrom::Start(self.stream_pos as u64))
+                .seek(io::SeekFrom::Start(self.stream_pos))
                 .map_err(|e| DigestError::StreamError(format!("Failed to seek stream: {}", e)))?;
         }
 

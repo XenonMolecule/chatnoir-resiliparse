@@ -99,7 +99,7 @@ fn record_type_and_header_map_helpers() {
     assert!(headers.contains_key_bytes(b"SET-cookie"));
 
     let merged = headers.to_map();
-    assert_eq!(merged.get(&CaseInsensitiveKey::from("set-cookie")), Some(&"a=1,b=2".to_string()));
+    assert_eq!(merged.get(&ci("set-cookie")), Some(&"a=1,b=2".to_string()));
 
     headers.remove_bytes(b"set-cookie");
     assert!(!headers.contains_key("Set-Cookie"));
