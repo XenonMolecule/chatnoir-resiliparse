@@ -1,4 +1,4 @@
-name: Build Wheels
+name: Build Packages
 
 on:
   push:
@@ -21,6 +21,32 @@ env:
   MACOSX_DEPLOYMENT_TARGET: "12.0"
 
 jobs:
+  build-rust:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build only FastWARC at this time. Resiliparse needs additional vcpkg dependencies.
+      # TODO: Fix this!
+      - name: Build
+        run: cargo build --verbose --color always --package fastwarc
+
+      - name: Run tests
+        run: cargo test --verbose --color always --package fastwarc
+
   build-wheels:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -48,11 +74,15 @@ jobs:
         id: cache-vcpkg
         if: runner.os == 'macOS' || runner.os == 'Windows'
         with:
-          path: ./vcpkg_installed
-          key: ${{ runner.os }}-vcpkg-21q     # INCREMENT ME!!
+          path: |
+            ~/.cache/vcpkg/archives
+            ~/AppData/Local/vcpkg/archives
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json', '**/vcpkg-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
 
       - name: Install Vcpkg Dependencies
-        if: (runner.os == 'macOS' || runner.os == 'Windows') && steps.cache-vcpkg.outputs.cache-hit != 'true'
+        if: runner.os == 'macOS' || runner.os == 'Windows'
         shell: bash
         run: |
           set -xe
@@ -65,13 +95,13 @@ jobs:
           elif [ "$(uname -s)" == "Darwin" ]; then
             git clone https://github.com/Microsoft/vcpkg
             ./vcpkg/bootstrap-vcpkg.sh
-          
+
             # Use to two install roots and merge manually, otherwise the second install clears out the previous
             ./vcpkg/vcpkg install --triplet=x64-osx
             ./vcpkg/vcpkg install --triplet=arm64-osx --x-install-root vcpkg_installed2
             cp -a vcpkg_installed2/* vcpkg_installed/
             rm -r vcpkg_installed2
-          
+
           else
             echo "Unsupported platform." >&2
             exit 1
