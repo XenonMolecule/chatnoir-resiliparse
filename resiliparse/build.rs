@@ -32,6 +32,7 @@ fn get_vcpkg_dir() -> PathBuf {
             "--x-install-root",
             install_root.as_str(),
         ])
+        .env("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
         .output()
         .expect("Failed to run vcpkg.");
     if !out.status.success() {
