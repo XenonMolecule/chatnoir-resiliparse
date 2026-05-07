@@ -1504,13 +1504,12 @@ pub struct ArchiveIterator {
     cur: Rc<RefCell<WarcRecord>>,
 }
 
-/// WARC record filter predicate. Can be used with [`ArchiveIterator::with_filter()`].
-pub trait Filter: Fn(&mut WarcRecord) -> bool {}
-impl<T> Filter for T where T: Fn(&mut WarcRecord) -> bool {}
-
 /// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
 /// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
-pub struct FilteredArchiveIterator<F: Filter> {
+pub struct FilteredArchiveIterator<F>
+where
+    F: Fn(&mut WarcRecord) -> bool,
+{
     inner: ArchiveIterator,
     pred: F,
 }
@@ -1532,8 +1531,11 @@ impl ArchiveIterator {
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance to attach to records
-    /// * `filter` - boolean filter predicate (must take a [`&WarcRecord`] as parameter)
-    pub fn with_filter<F: Filter>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIterator<F> {
+    /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
+    pub fn with_filter<F>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIterator<F>
+    where
+        F: Fn(&mut WarcRecord) -> bool,
+    {
         FilteredArchiveIterator {
             inner: ArchiveIterator::new(reader),
             pred: filter,
@@ -1565,7 +1567,10 @@ impl Iterator for ArchiveIterator {
     }
 }
 
-impl<F: Filter> Iterator for FilteredArchiveIterator<F> {
+impl<F> Iterator for FilteredArchiveIterator<F>
+where
+    F: Fn(&mut WarcRecord) -> bool,
+{
     type Item = Result<Rc<RefCell<WarcRecord>>, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1584,7 +1589,10 @@ impl<F: Filter> Iterator for FilteredArchiveIterator<F> {
     }
 }
 
-impl<F: Filter> Deref for FilteredArchiveIterator<F> {
+impl<F> Deref for FilteredArchiveIterator<F>
+where
+    F: Fn(&mut WarcRecord) -> bool,
+{
     type Target = ArchiveIterator;
 
     fn deref(&self) -> &Self::Target {
@@ -1594,7 +1602,7 @@ impl<F: Filter> Deref for FilteredArchiveIterator<F> {
 
 /// Filter predicates to be used with [`ArchiveIterator::with_filter()`].
 pub mod filter {
-    use super::{Filter, WarcRecord, WarcRecordType};
+    use super::{WarcRecord, WarcRecordType};
 
     /// Filter predicate for checking if a record is a WARC/1.0 record.
     pub fn is_warc_10(record: &mut WarcRecord) -> bool {
@@ -1639,17 +1647,17 @@ pub mod filter {
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
-    pub fn has_record_type(record_type: WarcRecordType) -> impl Filter {
+    pub fn has_record_type(record_type: WarcRecordType) -> impl Fn(&mut WarcRecord) -> bool {
         move |r: &mut WarcRecord| r.record_type() == record_type
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
-    pub fn has_content_length_lte(max: u64) -> impl Filter {
+    pub fn has_content_length_lte(max: u64) -> impl Fn(&mut WarcRecord) -> bool {
         move |r: &mut WarcRecord| r.content_length() <= max
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is greater than or equal to `min`.
-    pub fn has_content_length_gte(min: u64) -> impl Filter {
+    pub fn has_content_length_gte(min: u64) -> impl Fn(&mut WarcRecord) -> bool {
         move |r: &mut WarcRecord| r.content_length() >= min
     }
 }
