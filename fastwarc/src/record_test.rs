@@ -17,14 +17,27 @@ use crate::stream_io::LimitedBufReadSeek;
 use data_encoding::BASE32;
 use pretty_assertions::assert_eq;
 use sha1::{Digest, Sha1};
+use std::borrow::Cow;
 use std::io;
 use std::io::{BufRead, Read, Seek};
 
 fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&str>, payload: &str) -> String {
+    warc_record_data_with_headers(record_type, record_id, content_type, "", payload)
+}
+
+/// WARC record with headers as string.
+fn warc_record_data_with_headers(
+    record_type: &str,
+    record_id: &str,
+    content_type: Option<&str>,
+    extra_headers: &str,
+    payload: &str,
+) -> String {
     format!(
         "WARC/1.1\r\n\
          WARC-Type: {}\r\n\
          WARC-Record-ID: {}\r\n\
+         {}\
          {}\
          Content-Length: {}\r\n\
          \r\n\
@@ -34,11 +47,13 @@ fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&st
         content_type
             .map(|value| format!("Content-Type: {value}\r\n"))
             .unwrap_or_default(),
+        extra_headers,
         payload.len(),
         payload
     )
 }
 
+/// WARC record of an HTTP response record.
 fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
     let http_data = format!(
         "HTTP/1.1 200 OK\r\n\
@@ -51,6 +66,63 @@ fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
         payload
     );
     warc_record_data("response", record_id, Some("application/http; msgtype=response"), &http_data).into_bytes()
+}
+
+/// WARC records for testing filter predicates.
+fn filter_test_warc_data() -> Vec<u8> {
+    let warc10 =
+        warc_record_data("warcinfo", "<urn:uuid:filter-warc10>", None, "INFO").replacen("WARC/1.1", "WARC/1.0", 1);
+
+    let http_payload = "Hello";
+    let http_data = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\
+         Content-Length: {}\r\n\
+         \r\n\
+         {}",
+        http_payload.len(),
+        http_payload
+    );
+    let payload_digest = BASE32.encode(&Sha1::digest(http_payload.as_bytes()));
+    let http = warc_record_data_with_headers(
+        "response",
+        "<urn:uuid:filter-http>",
+        Some("application/http; msgtype=response"),
+        &format!("WARC-Payload-Digest: sha1:{payload_digest}\r\n"),
+        &http_data,
+    );
+
+    let block_payload = "BLOCK";
+    let block_digest = BASE32.encode(&Sha1::digest(block_payload.as_bytes()));
+    let block = warc_record_data_with_headers(
+        "resource",
+        "<urn:uuid:filter-block>",
+        None,
+        &format!(
+            "WARC-Block-Digest: sha1:{block_digest}\r\n\
+             WARC-Concurrent-To: <urn:uuid:filter-http>\r\n"
+        ),
+        block_payload,
+    );
+
+    let metadata = warc_record_data("metadata", "<urn:uuid:filter-metadata>", None, "LONGER");
+
+    format!("{warc10}{http}{block}{metadata}").into_bytes()
+}
+
+/// Helper for returning IDs of records matching a filter predicate
+fn filtered_record_ids<F>(filter: F) -> io::Result<Vec<String>>
+where
+    F: Fn(&mut WarcRecord) -> bool,
+{
+    let reader = Box::new(io::Cursor::new(filter_test_warc_data()));
+    let mut records = ArchiveIterator::with_filter(reader, filter);
+    let mut ids = Vec::new();
+    for record in records.by_ref() {
+        let record = record?;
+        ids.push(record.borrow().record_id().unwrap().to_string());
+    }
+    Ok(ids)
 }
 
 #[test]
@@ -82,13 +154,36 @@ fn limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
 }
 
 #[test]
-fn record_type_and_header_map_helpers() {
+fn record_type_try_from_helpers() {
     assert_eq!(WarcRecordType::try_from(4u16), Ok(WarcRecordType::Response));
     assert_eq!(WarcRecordType::try_from("REQUEST"), Ok(WarcRecordType::Request));
     assert_eq!(WarcRecordType::try_from(b"metadata".as_slice()), Ok(WarcRecordType::Metadata));
-    assert!(WarcRecordType::Response.matches_bitmask(WarcRecordType::AnyType as u16));
     assert!(WarcRecordType::try_from(3u16).is_err());
+}
 
+#[test]
+fn record_type_from_helpers() {
+    assert_eq!(<&'static str>::from(WarcRecordType::Continuation), "continuation");
+    assert_eq!(<&'static str>::from(WarcRecordType::NoType), "unknown");
+}
+
+#[test]
+fn record_type_bitmask_helpers() {
+    let http_exchange = WarcRecordType::Request as u16 | WarcRecordType::Response as u16;
+    assert!(WarcRecordType::Request.matches_bitmask(http_exchange));
+    assert!(WarcRecordType::Response.matches_bitmask(http_exchange));
+    assert!(!WarcRecordType::Resource.matches_bitmask(http_exchange));
+
+    let metadata_or_revisit = WarcRecordType::Metadata as u16 | WarcRecordType::Revisit as u16;
+    assert!(WarcRecordType::Metadata.matches_bitmask(metadata_or_revisit));
+    assert!(WarcRecordType::Revisit.matches_bitmask(metadata_or_revisit));
+    assert!(!WarcRecordType::Conversion.matches_bitmask(metadata_or_revisit));
+
+    assert!(WarcRecordType::Response.matches_bitmask(WarcRecordType::AnyType as u16));
+}
+
+#[test]
+fn record_type_and_header_map_helpers() {
     let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
     headers.set_status_line("HTTP/1.1 204");
     headers.append("Set-Cookie", "a=1");
@@ -180,7 +275,7 @@ fn duplicate_header() {
 }
 
 #[test]
-fn header_case_insensitive() {
+fn header_case_insensitive_key() {
     let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
     headers.set("Content-Type", "text/html");
     assert!(headers.keys().any(|k| k == "Content-Type"));
@@ -190,6 +285,16 @@ fn header_case_insensitive() {
 
     headers.set("CONTENT-TYPE", "text/html");
     assert!(headers.keys().any(|k| k == "CONTENT-TYPE"));
+}
+
+#[test]
+fn header_case_insensitive_key_from_helpers() {
+    let borrowed_key = CaseInsensitiveKey::from("Content-Type");
+    let owned_key = CaseInsensitiveKey::from("content-type".to_string());
+    let cow_key = CaseInsensitiveKey::from(Cow::Borrowed("CONTENT-TYPE"));
+    assert_eq!(borrowed_key, "content-type");
+    assert_eq!("CONTENT-TYPE", owned_key);
+    assert_eq!(String::from(cow_key), "CONTENT-TYPE");
 }
 
 #[test]
@@ -493,6 +598,32 @@ fn record_init_headers_http() -> io::Result<()> {
 }
 
 #[test]
+fn debug_format_includes_http_details_only_for_http_records() -> io::Result<()> {
+    let mut non_http = WarcRecord::new();
+    non_http.init_headers(3, Some(WarcRecordType::Resource), Some(b"urn:uuid:debug-resource"));
+    non_http.set_bytes_payload(b"ABC".to_vec());
+
+    let non_http_debug = format!("{non_http:?}");
+    assert!(non_http_debug.contains("WarcRecord"));
+    assert!(non_http_debug.contains("record_type: Resource"));
+    assert!(non_http_debug.contains("content_length: 3"));
+    assert!(non_http_debug.contains("is_http: false"));
+    assert!(!non_http_debug.contains("http_charset"));
+    assert!(!non_http_debug.contains("http_headers"));
+
+    let mut http = WarcRecord::from_bytes(http_response_warc_data("Hello", "<urn:uuid:debug-http>"))?;
+    http.parse_http()?;
+
+    let http_debug = format!("{http:?}");
+    assert!(http_debug.contains("record_type: Response"));
+    assert!(http_debug.contains("is_http: true"));
+    assert!(http_debug.contains("http_charset: Some(\"utf-8\")"));
+    assert!(http_debug.contains("http_headers: Some"));
+
+    Ok(())
+}
+
+#[test]
 fn write_headers() -> io::Result<()> {
     let http_data = "HTTP/1.1 200 OK\r\n\
                               Content-Length: 123\r\n\
@@ -510,6 +641,69 @@ fn write_headers() -> io::Result<()> {
     let mut buf = Vec::with_capacity(http_data.len());
     headers.write(&mut buf)?;
     assert_eq!(String::from_utf8_lossy(&buf), http_data);
+
+    Ok(())
+}
+
+#[test]
+fn write_record_default() -> io::Result<()> {
+    let payload = b"ABCDE".to_vec();
+
+    let mut default_write = WarcRecord::new();
+    default_write.init_headers(payload.len() as u64, Some(WarcRecordType::Resource), Some(b"urn:uuid:write-default"));
+    default_write.set_bytes_payload(payload.clone());
+
+    let mut default_serialized = Vec::new();
+    let default_bytes_written = default_write.write(&mut default_serialized)?;
+    assert_eq!(default_bytes_written, default_serialized.len());
+    assert!(String::from_utf8_lossy(&default_serialized).contains("WARC-Type: resource\r\n"));
+    assert!(default_serialized.ends_with(b"ABCDE\r\n\r\n"));
+    assert!(!String::from_utf8_lossy(&default_serialized).contains("WARC-Block-Digest"));
+
+    Ok(())
+}
+
+#[test]
+fn write_record_with_block_size() -> io::Result<()> {
+    let payload = b"ABCDE".to_vec();
+
+    let mut chunked_write = WarcRecord::new();
+    chunked_write.init_headers(payload.len() as u64, Some(WarcRecordType::Resource), Some(b"urn:uuid:write-chunked"));
+    chunked_write.set_bytes_payload(payload);
+
+    let mut chunked_serialized = Vec::new();
+    let chunked_bytes_written = chunked_write.write_with_block_size(&mut chunked_serialized, 2)?;
+    assert_eq!(chunked_bytes_written, chunked_serialized.len());
+    assert!(chunked_serialized.ends_with(b"ABCDE\r\n\r\n"));
+    assert!(!String::from_utf8_lossy(&chunked_serialized).contains("WARC-Block-Digest"));
+
+    Ok(())
+}
+
+#[test]
+fn write_record_with_checksum() -> io::Result<()> {
+    let mut checksummed = WarcRecord::from_bytes(http_response_warc_data("Hello", "<urn:uuid:write-checksum>"))?;
+    checksummed.parse_http()?;
+
+    let http_headers = b"HTTP/1.1 200 OK\r\n\
+                         Content-Type: text/plain; charset=utf-8\r\n\
+                         Content-Length: 5\r\n\
+                         Server: nginx\r\n\
+                         \r\n";
+    let expected_payload_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(http_headers)));
+
+    let mut block_data = http_headers.to_vec();
+    block_data.extend_from_slice(b"Hello");
+    let expected_block_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(&block_data)));
+
+    let mut checksummed_serialized = Vec::new();
+    let checksummed_bytes_written = checksummed.write_with_checksum(&mut checksummed_serialized)?;
+    let checksummed_text = String::from_utf8_lossy(&checksummed_serialized);
+    assert_eq!(checksummed_bytes_written, checksummed_serialized.len());
+    assert!(checksummed_text.contains(&format!("WARC-Block-Digest: {expected_block_digest}\r\n")));
+    assert!(checksummed_text.contains(&format!("WARC-Payload-Digest: {expected_payload_digest}\r\n")));
+    assert!(checksummed_text.contains("HTTP/1.1 200 OK\r\n"));
+    assert!(checksummed_serialized.ends_with(b"Hello\r\n\r\n"));
 
     Ok(())
 }
@@ -554,6 +748,49 @@ fn verify_digests_and_write_record_roundtrip() -> io::Result<()> {
     let mut reparsed_payload = Vec::new();
     reparsed.reader_mut().unwrap().read_to_end(&mut reparsed_payload)?;
     assert_eq!(reparsed_payload, b"ABC");
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_filter_predicates() -> io::Result<()> {
+    macro_rules! assert_filtered_ids {
+        ($name:literal, $predicate:expr, $expected:expr) => {
+            assert_eq!(filtered_record_ids($predicate)?, $expected, "{}", $name);
+        };
+    }
+
+    assert_filtered_ids!("is_warc_10", filter::is_warc_10, vec!["<urn:uuid:filter-warc10>"]);
+    assert_filtered_ids!(
+        "is_warc_11",
+        filter::is_warc_11,
+        vec![
+            "<urn:uuid:filter-http>",
+            "<urn:uuid:filter-block>",
+            "<urn:uuid:filter-metadata>",
+        ]
+    );
+    assert_filtered_ids!("has_block_digest", filter::has_block_digest, vec!["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!("has_valid_block_digest", filter::has_valid_block_digest, vec!["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!("has_payload_digest", filter::has_payload_digest, vec!["<urn:uuid:filter-http>"]);
+    assert_filtered_ids!("is_http", filter::is_http, vec!["<urn:uuid:filter-http>"]);
+    assert_filtered_ids!("is_concurrent", filter::is_concurrent, vec!["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!(
+        "has_record_type",
+        filter::has_record_type(WarcRecordType::Metadata),
+        vec!["<urn:uuid:filter-metadata>"]
+    );
+    assert_filtered_ids!("has_content_length_lte", filter::has_content_length_lte(4), vec!["<urn:uuid:filter-warc10>"]);
+    assert_filtered_ids!(
+        "has_content_length_gte",
+        filter::has_content_length_gte(6),
+        vec!["<urn:uuid:filter-http>", "<urn:uuid:filter-metadata>"]
+    );
+    assert_filtered_ids!(
+        "custom_closure",
+        |record: &mut WarcRecord| record.record_id().is_some_and(|id| id.contains("metadata")),
+        vec!["<urn:uuid:filter-metadata>"]
+    );
 
     Ok(())
 }
