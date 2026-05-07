@@ -390,6 +390,7 @@ impl<T: Write> Write for GzipWriter<T> {
 }
 
 impl<T: Write> Drop for GzipWriter<T> {
+    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();
