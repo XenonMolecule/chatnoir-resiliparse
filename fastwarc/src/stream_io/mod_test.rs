@@ -11,3 +11,353 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use super::*;
+
+// ===========================================================
+// Test helpers.
+// ===========================================================
+
+pub(crate) mod helpers {
+    //! (Generic) test helpers for testing common functionality on readers and writers
+    //! implementing [`CompressingStream`] or [`DecompressingStream`].
+
+    use super::*;
+    use std::cell::RefCell;
+    use std::io;
+    use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};
+    use std::rc::Rc;
+
+    /// Test helper simulating an unreliable writer.
+    pub struct ErrorWriter {
+        fail_on_write: bool,
+        fail_on_flush: bool,
+    }
+
+    // ===========================================================
+    // Helper types.
+    // ===========================================================
+
+    impl Write for ErrorWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.fail_on_write && !buf.is_empty() {
+                Err(io::Error::other("injected write failure"))
+            } else {
+                Ok(buf.len())
+            }
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if self.fail_on_flush {
+                Err(io::Error::other("injected flush failure"))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    /// Test helper for testing writer Drop implementations with a shared Vec buffer.
+    #[derive(Clone, Default)]
+    pub struct SharedVecWriter {
+        data: Rc<RefCell<Vec<u8>>>,
+    }
+
+    impl SharedVecWriter {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn data(&self) -> Rc<RefCell<Vec<u8>>> {
+            Rc::clone(&self.data)
+        }
+    }
+
+    impl Write for SharedVecWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.data.borrow_mut().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    // ===========================================================
+    // Test fixtures.
+    // ===========================================================
+
+    pub fn sample_data() -> Vec<u8> {
+        b"The quick brown fox jumps over the lazy dog.\n".repeat(128)
+    }
+
+    // ===========================================================
+    // Test generics.
+    // ===========================================================
+
+    pub fn test_reader_new_read_seek_and_stream_position<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(Cursor<Vec<u8>>) -> S,
+        S: DecompressingStream + BufReadSeek,
+    {
+        let plain = sample_data();
+        let compressed = compress_fn(&plain)?;
+        let mut reader = reader_new_fn(Cursor::new(compressed));
+
+        let mut prefix = [0; 17];
+        assert_eq!(reader.read(&mut prefix)?, prefix.len());
+        assert_eq!(prefix, plain[..prefix.len()]);
+        assert_eq!(reader.stream_position()?, prefix.len() as u64);
+
+        assert_eq!(reader.seek(SeekFrom::Current(11))?, 28);
+        assert_eq!(reader.stream_position()?, 28);
+
+        let mut next = [0; 9];
+        reader.read_exact(&mut next)?;
+        assert_eq!(next, plain[28..37]);
+
+        assert_eq!(reader.seek(SeekFrom::Start(50))?, 50);
+        let mut tail = [0; 12];
+        reader.read_exact(&mut tail)?;
+        assert_eq!(tail, plain[50..62]);
+
+        // Backward seeking is intentionally unsupported because decompression only advances.
+        let err = reader.seek(SeekFrom::Current(-1)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+
+        // Seeking from the end would require scanning the full compressed stream first.
+        let err = reader.seek(SeekFrom::End(0)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+
+        Ok(())
+    }
+
+    pub fn test_reader_with_capacity_fill_buf_consume_and_into_inner<C, R, S, I>(
+        compress_fn: C,
+        reader_with_capacity_fn: R,
+        into_inner_fn: I,
+    ) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(usize, Cursor<Vec<u8>>) -> S,
+        S: DecompressingStream + BufReadSeek,
+        I: Fn(S) -> Cursor<Vec<u8>>,
+    {
+        let plain = sample_data();
+        let compressed = compress_fn(&plain)?;
+        let mut reader = reader_with_capacity_fn(128, Cursor::new(compressed.clone()));
+
+        let buf = reader.fill_buf()?.to_vec();
+        assert!(!buf.is_empty());
+        assert_eq!(buf, plain[..buf.len()]);
+
+        reader.consume(3);
+        assert_eq!(reader.stream_position()?, 3);
+
+        let buf = reader.fill_buf()?.to_vec();
+        assert_eq!(buf, plain[3..3 + buf.len()]);
+
+        let fresh_reader = reader_with_capacity_fn(128, Cursor::new(compressed.clone()));
+        let mut inner = into_inner_fn(fresh_reader);
+        assert_eq!(inner.stream_position()?, 0);
+
+        let mut compressed_roundtrip = Vec::new();
+        inner.read_to_end(&mut compressed_roundtrip)?;
+        assert_eq!(compressed_roundtrip, compressed);
+
+        Ok(())
+    }
+
+    pub fn test_reader_with_tiny_capacity_handles_many_refills<C, R, S>(
+        compress_fn: C,
+        reader_with_capacity_fn: R,
+    ) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(usize, Cursor<Vec<u8>>) -> S,
+        S: DecompressingStream + BufReadSeek,
+    {
+        let plain = sample_data();
+        let compressed = compress_fn(&plain)?;
+        let mut reader = reader_with_capacity_fn(8, Cursor::new(compressed));
+        let mut out = Vec::with_capacity(plain.len());
+
+        loop {
+            let buf = reader.fill_buf()?;
+            if buf.is_empty() {
+                break;
+            }
+
+            // Consume tiny chunks to force repeated refills and cross-buffer bookkeeping.
+            let chunk_len = buf.len().min(5);
+            out.extend_from_slice(&buf[..chunk_len]);
+            reader.consume(chunk_len);
+        }
+
+        assert_eq!(out, plain);
+        assert_eq!(reader.stream_position()?, plain.len() as u64);
+        assert_eq!(reader.read(&mut [0; 1])?, 0);
+
+        Ok(())
+    }
+
+    pub fn test_reader_reads_to_eof_after_external_compression<C, R, S>(
+        compress_fn: C,
+        reader_new_fn: R,
+    ) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(Cursor<Vec<u8>>) -> S,
+        S: DecompressingStream + BufRead,
+    {
+        let plain = sample_data();
+        let compressed = compress_fn(&plain)?;
+        let mut reader = reader_new_fn(Cursor::new(compressed));
+
+        let mut out = Vec::new();
+        reader.read_to_end(&mut out)?;
+        assert_eq!(out, plain);
+        assert_eq!(reader.read(&mut [0; 1])?, 0);
+        assert_eq!(reader.fill_buf()?, b"");
+
+        Ok(())
+    }
+
+    pub fn test_reader_inner_seek_inner_stream_position_and_member_tracking<C, R, S>(
+        compress_fn: C,
+        reader_new_fn: R,
+    ) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(Cursor<Vec<u8>>) -> S,
+        S: DecompressingStream + BufRead,
+    {
+        let first_plain = b"first member data\n".repeat(32);
+        let second_plain = b"second member payload\n".repeat(24);
+        let first_member = compress_fn(&first_plain)?;
+        let second_member = compress_fn(&second_plain)?;
+
+        let mut combined = first_member.clone();
+        combined.extend_from_slice(&second_member);
+
+        let mut reader = reader_new_fn(Cursor::new(combined));
+        let mut first_out = vec![0; first_plain.len()];
+        reader.read_exact(&mut first_out)?;
+        assert_eq!(first_out, first_plain);
+        assert_eq!(reader.member_start_position()?, 0);
+
+        let mut first_byte_second_member = [0; 1];
+        reader.read_exact(&mut first_byte_second_member)?;
+        assert_eq!(first_byte_second_member[0], second_plain[0]);
+        // The member offset should jump once the second gzip header becomes active.
+        assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+        assert!(reader.inner_stream_position()? >= first_member.len() as u64);
+
+        assert_eq!(reader.inner_seek(SeekFrom::Start(first_member.len() as u64))?, first_member.len() as u64);
+        assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+
+        let mut second_out = Vec::new();
+        reader.read_to_end(&mut second_out)?;
+        assert_eq!(second_out, second_plain);
+
+        Ok(())
+    }
+
+    pub fn test_writer_new_write_and_into_inner_roundtrip<D, W, S, I>(
+        decompress_fn: D,
+        writer_new_fn: W,
+        into_inner_fn: I,
+    ) -> io::Result<()>
+    where
+        D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
+        W: Fn(Vec<u8>) -> S,
+        S: CompressingStream,
+        I: Fn(S) -> io::Result<Vec<u8>>,
+    {
+        let plain = sample_data();
+        let mut writer = writer_new_fn(Vec::new());
+
+        assert_eq!(writer.write(&plain[..23])?, 23);
+        writer.write_all(&plain[23..])?;
+
+        let compressed = into_inner_fn(writer)?;
+        assert_eq!(decompress_fn(&compressed, plain.len())?, plain);
+
+        Ok(())
+    }
+
+    pub fn test_writer_drop_finishes_and_flushes_stream<D, W, S>(
+        decompress_fn: D,
+        writer_with_capacity_fn: W,
+    ) -> io::Result<()>
+    where
+        D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
+        W: Fn(usize, SharedVecWriter) -> S,
+        S: CompressingStream,
+    {
+        let plain = sample_data();
+        let inner = SharedVecWriter::new();
+        let shared_data = inner.data();
+
+        {
+            let mut writer = writer_with_capacity_fn(11, inner.clone());
+            writer.write_all(&plain)?;
+        }
+
+        // Drop should behave like finish() + flush() when the writer still owns an inner stream.
+        assert!(!shared_data.borrow().is_empty());
+        assert_eq!(decompress_fn(&shared_data.borrow(), plain.len())?, plain);
+
+        Ok(())
+    }
+
+    pub fn test_writer_propagates_inner_flush_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
+    where
+        W: Fn(usize, ErrorWriter) -> S,
+        S: CompressingStream,
+    {
+        let plain = sample_data();
+        let mut writer = writer_with_capacity_fn(
+            64,
+            ErrorWriter {
+                fail_on_write: false,
+                fail_on_flush: true,
+            },
+        );
+
+        writer.write_all(&plain)?;
+
+        // flush() must forward the inner stream failure after draining buffered output.
+        let err = writer.flush().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert!(err.to_string().contains("injected flush failure"));
+
+        Ok(())
+    }
+
+    pub fn test_writer_propagates_inner_write_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
+    where
+        W: Fn(usize, ErrorWriter) -> S,
+        S: CompressingStream,
+    {
+        let plain = sample_data();
+        let mut writer = writer_with_capacity_fn(
+            8,
+            ErrorWriter {
+                fail_on_write: true,
+                fail_on_flush: false,
+            },
+        );
+
+        let mut res = writer.write_all(&plain);
+        if res.is_ok() {
+            res = writer.finish();
+        }
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert!(err.to_string().contains("injected write failure"));
+        Ok(())
+    }
+}

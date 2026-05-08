@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::compress_test_common::*;
+use crate::stream_io::mod_test::helpers::*;
 use std::io::{Cursor, Read};
 use zlib_rs::{
     DeflateConfig, DeflateFlush, InflateConfig, ReturnCode, compress_bound, compress_slice, decompress_slice,

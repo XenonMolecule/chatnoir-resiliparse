@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::compress_test_common::*;
 use super::*;
+use crate::stream_io::mod_test::helpers::*;
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io::Read;
 
