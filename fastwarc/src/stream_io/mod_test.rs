@@ -240,6 +240,7 @@ pub(crate) mod helpers {
 
         let mut combined = first_member.clone();
         combined.extend_from_slice(&second_member);
+        let combined_len = combined.len();
 
         // Read everything but the last byte of the first member.
         let mut reader = reader_new_fn(Cursor::new(combined));
@@ -280,10 +281,13 @@ pub(crate) mod helpers {
         assert_eq!(reader.stream_position()?, 1);
         assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
-        // Read the rest.
+        // Read the rest (member_start_position() should not increase at EOF).
         let mut rest = Vec::with_capacity(second_plain.len() - 1);
         reader.read_to_end(&mut rest)?;
         assert_eq!(rest, second_plain[1..]);
+        assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+        assert_eq!(reader.stream_position()?, second_plain.len() as u64);
+        assert_eq!(reader.inner_stream_position()?, combined_len as u64);
 
         Ok(())
     }

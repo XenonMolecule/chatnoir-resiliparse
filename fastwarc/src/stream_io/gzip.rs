@@ -175,13 +175,14 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             let total_out = self.deflate.total_out();
             let total_in = self.deflate.total_in();
 
-            // New member
-            if total_in == 0 {
-                self.member_pos = self.inner.stream_position()?;
-            }
-
+            let inner_pos = self.inner.stream_position()?;
             let in_buf = self.inner.fill_buf()?;
             let in_buf_len = in_buf.len();
+
+            // New member and not EOF
+            if total_in == 0 && in_buf_len > 0 {
+                self.member_pos = inner_pos;
+            }
 
             let status = self
                 .deflate
