@@ -15,8 +15,7 @@
 use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io;
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
-
+use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 // ===========================================================
 // Lz4Reader
 // ===========================================================
@@ -24,6 +23,8 @@ use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 /// Reader for LZ4-compressed streams.
 pub struct Lz4Reader<T: ReadSeek> {
     inner: Option<FrameDecoder<BufReader<T>>>,
+    stream_pos: u64,
+    member_pos: u64,
 }
 
 impl<T: ReadSeek> Lz4Reader<T> {
@@ -43,9 +44,12 @@ impl<T: ReadSeek> Lz4Reader<T> {
     /// # Arguments
     ///
     /// * `inner` - input (inner) stream to read from
-    pub fn with_capacity(capacity: usize, inner: T) -> Self {
+    pub fn with_capacity(capacity: usize, mut inner: T) -> Self {
+        let member_pos = inner.stream_position().unwrap_or(0);
         Self {
             inner: Some(FrameDecoder::new(BufReader::with_capacity(capacity, inner))),
+            stream_pos: 0,
+            member_pos,
         }
     }
 
@@ -78,9 +82,7 @@ impl<T: ReadSeek> Seek for Lz4Reader<T> {
 
     /// Returns the current seek position from the start of the decompressed output stream.
     fn stream_position(&mut self) -> io::Result<u64> {
-        // TODO: implement this
-        // Ok(self.stream_pos)
-        self.seek(SeekFrom::Current(0))
+        Ok(self.stream_pos)
     }
 }
 
@@ -93,13 +95,11 @@ impl<T: ReadSeek> DecompressingStream for Lz4Reader<T> {
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        // TODO: implement this
-        Ok(0)
+        self.inner.as_mut().unwrap().get_mut().stream_position()
     }
 
     fn member_start_position(&mut self) -> io::Result<u64> {
-        // TODO: implement this
-        Ok(0)
+        Ok(self.member_pos)
     }
 }
 
@@ -109,6 +109,7 @@ impl<T: ReadSeek> BufRead for Lz4Reader<T> {
     }
 
     fn consume(&mut self, amount: usize) {
+        self.stream_pos += amount as u64;
         self.inner.as_mut().unwrap().consume(amount);
     }
 }
@@ -118,18 +119,40 @@ impl<T: ReadSeek> BufRead for Lz4Reader<T> {
 // ===========================================================
 
 pub struct Lz4Writer<T: Write> {
-    inner: Option<FrameEncoder<T>>,
+    inner: Option<FrameEncoder<BufWriter<T>>>,
+    frame_started: bool,
 }
 
 impl<T: Write> Lz4Writer<T> {
     /// Create a new [`Lz4Writer`].
     ///
+    /// Maintains a small write buffer to temporarily store compressed data before flushing them
+    /// to the underlying stream. The default buffer size is 8192 bytes. Use [`Self::with_capacity()`]
+    /// for custom buffer sizes.
+    ///
     /// # Arguments
     ///
     /// * `inner` - inner stream to write compressed output to
     pub fn new(inner: T) -> Self {
+        Self::with_capacity(8192, inner)
+    }
+
+    /// Create a new [`Lz4Writer`] a custom write buffer size.
+    ///
+    /// Maintains a small write buffer to temporarily store compressed data before flushing them
+    /// to the underlying stream.
+    ///
+    /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom
+    /// compression levels.
+    ///
+    /// # Arguments
+    ///
+    /// * `capacity` - write buffer size
+    /// * `inner` - inner stream to write compressed output to
+    pub fn with_capacity(capacity: usize, inner: T) -> Self {
         Self {
-            inner: Some(FrameEncoder::new(inner)),
+            inner: Some(FrameEncoder::new(BufWriter::with_capacity(capacity, inner))),
+            frame_started: false,
         }
     }
 
@@ -138,27 +161,35 @@ impl<T: Write> Lz4Writer<T> {
     /// Writes out buffer contents before returning the inner reader.
     pub fn into_inner(mut self) -> io::Result<T> {
         self.finish()?;
-        self.flush()?;
-        Ok(self.inner.take().unwrap().into_inner())
+        let mut writer = self.inner.take().unwrap().into_inner();
+        writer.flush()?;
+        Ok(writer.into_inner()?)
     }
 }
 
 impl<T: Write> CompressingStream for Lz4Writer<T> {
-    fn finish(&mut self) -> io::Result<usize> {
+    fn finish(&mut self) -> io::Result<()> {
+        if !self.frame_started {
+            return Ok(());
+        }
         let inner = self.inner.take().unwrap().finish()?;
+        self.frame_started = false;
         self.inner = Some(FrameEncoder::new(inner));
-        // TODO: implement this
-        Ok(0)
+        Ok(())
     }
 }
 
 impl<T: Write> Write for Lz4Writer<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.frame_started = true;
         self.inner.as_mut().unwrap().write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.as_mut().unwrap().flush()
+        let inner = self.inner.as_mut().unwrap();
+        inner.flush()?;
+        inner.get_mut().flush()?;
+        Ok(())
     }
 }
 
