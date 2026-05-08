@@ -274,17 +274,17 @@ pub(crate) mod helpers {
         assert_eq!(reader.inner_seek(SeekFrom::Start(first_member.len() as u64))?, first_member.len() as u64);
         assert_eq!(reader.member_start_position()?, first_member.len() as u64);
         assert_eq!(reader.stream_position()?, 0);
-        first_byte_second_member = [0; 1];
-        reader.read_exact(&mut first_byte_second_member)?;
-        assert_eq!(first_byte_second_member[0], second_plain[0]);
+        let mut first_two_bytes_second_member = [0; 2];
+        reader.read_exact(&mut first_two_bytes_second_member)?;
+        assert_eq!(first_two_bytes_second_member, second_plain[..2]);
         assert_eq!(reader.member_start_position()?, first_member.len() as u64);
-        assert_eq!(reader.stream_position()?, 1);
+        assert_eq!(reader.stream_position()?, 2);
         assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
         // Read the rest (member_start_position() should not increase at EOF).
-        let mut rest = Vec::with_capacity(second_plain.len() - 1);
+        let mut rest = Vec::with_capacity(second_plain.len() - 2);
         reader.read_to_end(&mut rest)?;
-        assert_eq!(rest, second_plain[1..]);
+        assert_eq!(rest, second_plain[2..]);
         assert_eq!(reader.member_start_position()?, first_member.len() as u64);
         assert_eq!(reader.stream_position()?, second_plain.len() as u64);
         assert_eq!(reader.inner_stream_position()?, combined_len as u64);
