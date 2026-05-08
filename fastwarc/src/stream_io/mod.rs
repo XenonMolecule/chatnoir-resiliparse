@@ -77,12 +77,8 @@ pub trait CompressingStream: io::Write + Sized {
     /// all pending data is safely written.
     ///
     /// The behavior is implementation-specific and may do nothing.
-    ///
-    /// # Returns
-    ///
-    /// Number of bytes written to the stream.
-    fn finish(&mut self) -> io::Result<usize> {
-        Ok(0)
+    fn finish(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 

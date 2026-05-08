@@ -369,9 +369,9 @@ impl<T: Write> GzipWriter<T> {
 }
 
 impl<T: Write> CompressingStream for GzipWriter<T> {
-    fn finish(&mut self) -> io::Result<usize> {
-        let bytes_written = self.write_with_flush_opt(&[], DeflateFlush::Finish)?;
-        Ok(bytes_written)
+    fn finish(&mut self) -> io::Result<()> {
+        self.write_with_flush_opt(&[], DeflateFlush::Finish)?;
+        Ok(())
     }
 }
 
