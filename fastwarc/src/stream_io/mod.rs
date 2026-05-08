@@ -70,7 +70,8 @@ pub trait CompressingStream: io::Write + Sized {
     ///
     /// If the compressor supports multi-member streams, the writer can be
     /// used again after this to start a new member / frame. Otherwise, writing
-    /// further bytes may yield an error.
+    /// further bytes may yield an error. Calling this method without an open
+    /// member / frame is a no-op.
     ///
     /// Does not necessarily flush buffer contents to the inner stream.
     /// Users should call [`io::Write::flush()`] afterward to ensure that

@@ -227,6 +227,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
 pub struct GzipWriter<T: Write> {
     inner: Option<T>,
     deflate: Deflate,
+    member_started: bool,
     buf: Vec<u8>,
     buf_pos: usize,
     level: i32,
@@ -278,6 +279,7 @@ impl<T: Write> GzipWriter<T> {
         Self {
             inner: Some(inner),
             deflate: Deflate::new(level, true, window_bits),
+            member_started: false,
             buf: vec![0; capacity],
             buf_pos: 0,
             level,
@@ -317,6 +319,7 @@ impl<T: Write> GzipWriter<T> {
     pub fn write_with_flush_opt(&mut self, buf: &[u8], flush: DeflateFlush) -> io::Result<usize> {
         let mut consumed = 0usize;
         let inner = self.inner.as_mut().unwrap();
+        self.member_started = true;
 
         loop {
             let total_in = self.deflate.total_in();
@@ -370,7 +373,11 @@ impl<T: Write> GzipWriter<T> {
 
 impl<T: Write> CompressingStream for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
+        if !self.member_started {
+            return Ok(());
+        }
         self.write_with_flush_opt(&[], DeflateFlush::Finish)?;
+        self.member_started = false;
         Ok(())
     }
 }
