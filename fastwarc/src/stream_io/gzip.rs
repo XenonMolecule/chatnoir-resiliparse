@@ -149,6 +149,7 @@ impl<T: ReadSeek> DecompressingStream for GzipReader<T> {
         self.buf_len = 0;
         let new_pos = self.inner.seek(pos)?;
         self.member_pos = new_pos;
+        self.stream_pos = 0;
         Ok(new_pos)
     }
 

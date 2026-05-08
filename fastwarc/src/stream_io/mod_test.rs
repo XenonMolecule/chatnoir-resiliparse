@@ -241,25 +241,49 @@ pub(crate) mod helpers {
         let mut combined = first_member.clone();
         combined.extend_from_slice(&second_member);
 
+        // Read everything but the last byte of the first member.
         let mut reader = reader_new_fn(Cursor::new(combined));
-        let mut first_out = vec![0; first_plain.len()];
+        let mut first_out = vec![0; first_plain.len() - 1];
         reader.read_exact(&mut first_out)?;
-        assert_eq!(first_out, first_plain);
+        assert_eq!(first_out, first_plain[..first_plain.len() - 1]);
         assert_eq!(reader.member_start_position()?, 0);
+        assert_eq!(reader.stream_position()?, first_out.len() as u64);
+        let inner_pos_first = reader.inner_stream_position()?;
+        assert!(inner_pos_first > 0);
 
+        // Read remaining bytes and test that we're still in the first member.
+        let mut one_more_byte = [0; 1];
+        reader.read_exact(&mut one_more_byte)?;
+        assert_eq!(one_more_byte, first_plain[first_plain.len() - 1..]);
+        assert_eq!(reader.member_start_position()?, 0);
+        assert_eq!(reader.stream_position()?, (first_out.len() + 1) as u64);
+        assert!(reader.inner_stream_position()? >= inner_pos_first);
+
+        // Read another byte. The member offset should jump once the second member starts, and
+        // stream_position() keeps counting up beyond member boundaries.
         let mut first_byte_second_member = [0; 1];
         reader.read_exact(&mut first_byte_second_member)?;
         assert_eq!(first_byte_second_member[0], second_plain[0]);
-        // The member offset should jump once the second gzip header becomes active.
         assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+        assert_eq!(reader.stream_position()?, (first_out.len() + 2) as u64);
         assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
+        // Reset the inner stream to the beginning of the second member and decompress again.
+        // This should decompress without errors and reset stream_position() to 0.
         assert_eq!(reader.inner_seek(SeekFrom::Start(first_member.len() as u64))?, first_member.len() as u64);
         assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+        assert_eq!(reader.stream_position()?, 0);
+        first_byte_second_member = [0; 1];
+        reader.read_exact(&mut first_byte_second_member)?;
+        assert_eq!(first_byte_second_member[0], second_plain[0]);
+        assert_eq!(reader.member_start_position()?, first_member.len() as u64);
+        assert_eq!(reader.stream_position()?, 1);
+        assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
-        let mut second_out = Vec::new();
-        reader.read_to_end(&mut second_out)?;
-        assert_eq!(second_out, second_plain);
+        // Read the rest.
+        let mut rest = Vec::with_capacity(second_plain.len() - 1);
+        reader.read_to_end(&mut rest)?;
+        assert_eq!(rest, second_plain[1..]);
 
         Ok(())
     }

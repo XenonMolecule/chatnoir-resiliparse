@@ -64,7 +64,19 @@ impl<T: ReadSeek> Lz4Reader<T> {
 
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.as_mut().unwrap().read(buf)
+        let n = match self.inner.as_mut().unwrap().read(buf) {
+            Ok(0) if !self.inner.as_mut().unwrap().get_mut().buffer().is_empty() => {
+                // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
+                let old_pos = self.stream_pos;
+                self.inner_seek(SeekFrom::Current(0))?;
+                self.stream_pos = old_pos;
+                self.inner.as_mut().unwrap().read(buf)?
+            }
+            Ok(b) => b,
+            Err(e) => return Err(e),
+        };
+        self.stream_pos += n as u64;
+        Ok(n)
     }
 }
 
@@ -92,6 +104,8 @@ impl<T: ReadSeek> DecompressingStream for Lz4Reader<T> {
         let mut inner = self.inner.take().unwrap().into_inner();
         let new_pos = inner.seek(pos)?;
         self.inner = Some(FrameDecoder::new(inner));
+        self.member_pos = new_pos;
+        self.stream_pos = 0;
         Ok(new_pos)
     }
 

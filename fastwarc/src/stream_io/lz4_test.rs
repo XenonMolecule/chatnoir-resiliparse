@@ -34,11 +34,10 @@ fn decompress_frame(data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
 // Generic tests.
 // ===========================================================
 
-// TODO: Fix test
-// #[test]
-// fn lz4_reader_new_read_seek_and_stream_position() -> io::Result<()> {
-//     test_reader_new_read_seek_and_stream_position(compress_frame, Lz4Reader::new)
-// }
+#[test]
+fn lz4_reader_new_read_seek_and_stream_position() -> io::Result<()> {
+    test_reader_new_read_seek_and_stream_position(compress_frame, Lz4Reader::new)
+}
 
 #[test]
 fn lz4_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
@@ -59,11 +58,10 @@ fn lz4_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
     test_reader_reads_to_eof_after_external_compression(compress_frame, Lz4Reader::new)
 }
 
-// TODO: Fix test
-// #[test]
-// fn lz4_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-//     test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_frame, Lz4Reader::new)
-// }
+#[test]
+fn lz4_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_frame, Lz4Reader::new)
+}
 
 #[test]
 fn lz4_writer_new_write_and_into_inner_roundtrip() -> io::Result<()> {
