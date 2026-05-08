@@ -58,18 +58,19 @@ impl<T: ReadSeek> GzipReader<T> {
     /// # Arguments
     ///
     /// * `inner` - input (inner) stream to read from
-    pub fn with_capacity(capacity: usize, inner: T) -> Self {
+    pub fn with_capacity(capacity: usize, mut inner: T) -> Self {
         // Window bits above 15 (MAX_WBITS) enable gzip header decoding:
         // - +16 enables gzip header decoding only,
         // - +32 enables gzip/zlib header autodetection (we don't use this here).
         // This is standard behaviour in zlib, but so far undocumented in zlib-rs.
         let window_bits = 15 + 16;
         let decomp_ratio = 2.0;
+        let member_pos = inner.stream_position().unwrap_or(0);
         Self {
             inner: BufReader::with_capacity(capacity, inner),
             deflate: Inflate::new(true, window_bits),
             stream_pos: 0,
-            member_pos: 0,
+            member_pos,
             buf: vec![0; capacity * decomp_ratio as usize],
             buf_pos: 0,
             buf_len: 0,
