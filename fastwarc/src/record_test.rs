@@ -14,14 +14,25 @@
 
 use super::*;
 use crate::stream_io::LimitedBufReadSeek;
+use crate::stream_io::gzip::GzipReader;
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
 use pretty_assertions::assert_eq;
 use sha1::{Digest, Sha1};
 use sha2::{Sha256, Sha512};
 use std::borrow::Cow;
+use std::fs::File;
 use std::io;
 use std::io::{BufRead, Read, Seek};
+use std::path::PathBuf;
+
+/// Helper for getting path to external test fixture.
+fn get_fixture_path(name: &str) -> PathBuf {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests/fixtures");
+    path.push(name);
+    path
+}
 
 /// Test fixture: WARC record as String.
 fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&str>, payload: &str) -> String {
@@ -1040,6 +1051,42 @@ fn archive_iterator_filter_predicates() -> io::Result<()> {
         |record: &mut WarcRecord| record.record_id().is_some_and(|id| id.contains("metadata")),
         vec!["<urn:uuid:filter-metadata>"]
     );
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
+    let clipped = get_fixture_path("clipped.warc.gz");
+
+    for parse_http in [true, false] {
+        let reader = Box::new(GzipReader::new(File::open(clipped.clone())?));
+        let mut rec_count = 0;
+
+        for r in ArchiveIterator::new(reader) {
+            let r = r?;
+            let mut rb = r.borrow_mut();
+
+            let mut content = Vec::with_capacity(rb.content_length() as usize);
+            rb.reader_mut().unwrap().read_to_end(&mut content)?;
+
+            if parse_http {
+                rb.parse_http()?;
+                assert!(rb.http_headers().is_some());
+            } else {
+                assert!(content.starts_with(b"HTTP/"));
+            }
+            // Content-Length is larger than the actual clipped payload.
+            assert!(rb.content_length() as usize > content.len());
+
+            // Should fail, since we already read the contents.
+            assert!(!rb.verify_block_digest(true).unwrap());
+            rec_count += 1;
+        }
+
+        // Contains exactly one record
+        assert_eq!(rec_count, 1);
+    }
 
     Ok(())
 }
