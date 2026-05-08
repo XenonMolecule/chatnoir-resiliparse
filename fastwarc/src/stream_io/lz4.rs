@@ -16,6 +16,7 @@ use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io;
 use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
+
 // ===========================================================
 // Lz4Reader
 // ===========================================================

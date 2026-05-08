@@ -213,3 +213,7 @@ fn _forward_seek(reader: &mut impl BufReadSeek, pos: io::SeekFrom) -> io::Result
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod mod_test;
+
+#[cfg(test)]
+#[path = "compress_test_common.rs"]
+mod compress_test_common;
