@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::super::mod_test::{ErrorWriter, SharedVecWriter};
 use super::*;
 use crate::stream_io::{CompressingStream, DecompressingStream};
-use std::cell::RefCell;
 use std::io::{self, BufRead, Cursor, Read, Seek, SeekFrom, Write};
-use std::rc::Rc;
 use zlib_rs::{
     DeflateConfig, DeflateFlush, InflateConfig, ReturnCode, compress_bound, compress_slice, decompress_slice,
 };
@@ -39,7 +38,7 @@ fn compress_member(data: &[u8]) -> io::Result<Vec<u8>> {
     Ok(compressed.to_vec())
 }
 
-fn decompress_all(data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
+fn decompress_member(data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
     let config = InflateConfig { window_bits: 15 + 16 };
 
     let mut decompressed_buf = vec![0u8; expected_len];
@@ -224,35 +223,9 @@ fn gzip_writer_new_write_and_into_inner_roundtrip() -> io::Result<()> {
     writer.write_all(&plain[23..])?;
 
     let compressed = writer.into_inner()?;
-    assert_eq!(decompress_all(&compressed, plain.len())?, plain);
+    assert_eq!(decompress_member(&compressed, plain.len())?, plain);
 
     Ok(())
-}
-
-#[derive(Clone, Default)]
-struct SharedVecWriter {
-    data: Rc<RefCell<Vec<u8>>>,
-}
-
-impl SharedVecWriter {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn data(&self) -> Rc<RefCell<Vec<u8>>> {
-        Rc::clone(&self.data)
-    }
-}
-
-impl Write for SharedVecWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.data.borrow_mut().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 #[test]
@@ -287,7 +260,7 @@ fn gzip_writer_with_capacity_flush_and_write_with_flush_opt() -> io::Result<()> 
     writer.finish()?;
     writer.flush()?;
 
-    assert_eq!(decompress_all(&shared_data.borrow(), plain.len())?, plain);
+    assert_eq!(decompress_member(&shared_data.borrow(), plain.len())?, plain);
 
     Ok(())
 }
@@ -329,32 +302,9 @@ fn gzip_writer_drop_finishes_and_flushes_stream() -> io::Result<()> {
 
     // Drop should behave like finish() + flush() when the writer still owns an inner stream.
     assert!(!shared_data.borrow().is_empty());
-    assert_eq!(decompress_all(&shared_data.borrow(), plain.len())?, plain);
+    assert_eq!(decompress_member(&shared_data.borrow(), plain.len())?, plain);
 
     Ok(())
-}
-
-struct ErrorWriter {
-    fail_on_write: bool,
-    fail_on_flush: bool,
-}
-
-impl Write for ErrorWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.fail_on_write && !buf.is_empty() {
-            Err(io::Error::other("injected write failure"))
-        } else {
-            Ok(buf.len())
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        if self.fail_on_flush {
-            Err(io::Error::other("injected flush failure"))
-        } else {
-            Ok(())
-        }
-    }
 }
 
 #[test]
