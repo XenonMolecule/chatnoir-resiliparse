@@ -20,6 +20,7 @@ import sys
 from Cython.Build import cythonize
 from Cython.Distutils.build_ext import new_build_ext as build_ext
 from setuptools import Extension, setup
+from setuptools_rust import Binding, RustExtension
 
 TRACE = bool(int(os.getenv('TRACE', 0)))
 DEBUG = bool(int(os.getenv('DEBUG', 0))) or TRACE
@@ -127,6 +128,13 @@ if os.path.isdir(os.path.join(ROOT_DIR, '..', 'resiliparse-py', 'resiliparse_inc
 
 setup(
     ext_modules=get_ext_modules(),
+    rust_extensions=[
+        RustExtension(
+            target="fastwarc.fastwarc_rs._fastwarc_rs",
+            path="fastwarc/fastwarc_rs/Cargo.toml",
+            binding=Binding.PyO3
+        )
+    ],
     cmdclass=dict(build_ext=resiliparse_build_ext),
     exclude_package_data={
         '': [] if 'sdist' in sys.argv else ['*.pxd', '*.pxi', '*.pyx', '*.h', '*.cpp']

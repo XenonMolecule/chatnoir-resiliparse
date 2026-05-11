@@ -1,0 +1,12 @@
+[package]
+name = "fastwarc-py"
+edition.workspace = true
+
+[lib]
+name = "_fastwarc_rs"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fastwarc = { path = "../../../fastwarc" }
+pyo3 = { workspace = true, features = ["extension-module"] }

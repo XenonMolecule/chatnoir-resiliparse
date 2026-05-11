@@ -1,0 +1,40 @@
+// Copyright 2026 Janek Bevendorff
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+mod stream_io;
+
+use pyo3::prelude::*;
+
+#[pymodule]
+pub mod _fastwarc_rs {
+    use super::*;
+
+    #[pymodule_init]
+    pub fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        Python::attach(|py| {
+            // Register full submodules to make them importable.
+            // https://github.com/PyO3/pyo3/issues/759#issuecomment-2282197848
+            let parent_name: String = m.getattr("__name__")?.extract()?;
+            let sys_modules = py.import("sys")?.getattr("modules")?;
+
+            let stream_io = m.getattr("stream_io")?;
+            sys_modules.set_item(format!("{parent_name}.stream_io"), stream_io)?;
+
+            Ok(())
+        })
+    }
+
+    #[pymodule_export]
+    use crate::stream_io::stream_io;
+}
