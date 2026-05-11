@@ -1116,6 +1116,11 @@ impl WarcRecord {
         self.http_headers.as_ref()
     }
 
+    /// HTTP headers if record is an HTTP record and HTTP headers have been parsed yet (mutable).
+    pub fn http_headers_mut(&mut self) -> Option<&mut HeaderMap> {
+        self.http_headers.as_mut()
+    }
+
     /// Plain HTTP Content-Type without additional fields such as `charset=`.
     pub fn http_content_type(&self) -> Option<String> {
         if !self.http_parsed {
