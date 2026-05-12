@@ -29,6 +29,8 @@ RUN set -x \
       && mv vcpkg_installed/${TRIPLET}/* /opt/libs/) \
   && rm -rf /tmp/build
 
+ENV RUSTUP_HOME=/opt/rust
+ENV CARGO_HOME=/opt/rust
 RUN set -x \
     && curl --proto '=https' --tlsv1.2 -Ssf https://sh.rustup.rs | sh -s -- -y
 
