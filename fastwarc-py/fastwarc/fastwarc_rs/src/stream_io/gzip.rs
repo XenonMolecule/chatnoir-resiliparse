@@ -12,77 +12,75 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{PyReader, PyWriter, io_err_to_py};
+use crate::stream_io::{PyReader, PyWriter};
 use fastwarc::stream_io::CompressingStream;
-use fastwarc::stream_io::gzip::{GzipReader as RustGzipReader, GzipWriter as RustGzipWriter};
+use fastwarc::stream_io::gzip;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
 #[pyclass]
 pub struct GzipReader {
-    inner: Mutex<Option<RustGzipReader<PyReader>>>,
+    inner: Mutex<Option<gzip::GzipReader<PyReader>>>,
 }
 
 #[pymethods]
 impl GzipReader {
     #[new]
     #[pyo3(signature = (raw_stream, buffer_size=4096))]
-    fn __new__(raw_stream: Py<PyAny>, buffer_size: usize) -> Self {
+    pub fn __new_(raw_stream: Py<PyAny>, buffer_size: usize) -> Self {
         Self {
-            inner: Mutex::new(Some(RustGzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
+            inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
         }
     }
 
-    fn read(&self, py: Python<'_>, size: usize) -> PyResult<Py<PyAny>> {
+    pub fn read(&self, py: Python<'_>, size: usize) -> PyResult<Py<PyBytes>> {
         let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
         let mut buf = vec![0; size];
-        let len = reader.read(&mut buf).map_err(io_err_to_py)?;
-        Ok(pyo3::types::PyBytes::new(py, &buf[..len]).into_any().unbind())
+        let len = reader.read(&mut buf)?;
+        Ok(PyBytes::new(py, &buf[..len]).unbind())
     }
 
-    fn seek(&self, offset: u64) -> PyResult<u64> {
+    pub fn seek(&self, offset: u64) -> PyResult<u64> {
         let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        reader.seek(SeekFrom::Start(offset)).map_err(io_err_to_py)
+        Ok(reader.seek(SeekFrom::Start(offset))?)
     }
 
-    fn tell(&self) -> PyResult<u64> {
+    pub fn tell(&self) -> PyResult<u64> {
         let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        reader.stream_position().map_err(io_err_to_py)
+        Ok(reader.stream_position()?)
     }
 
-    fn close(&self) -> PyResult<()> {
+    pub fn close(&self) -> PyResult<()> {
         let mut reader = self.inner.lock().unwrap();
-        if let Some(reader) = reader.take() {
-            let mut inner = reader.into_inner();
-            inner.close()?;
-        }
+        reader.take();
         Ok(())
     }
 }
 
 #[pyclass]
 pub struct GzipWriter {
-    inner: Mutex<Option<RustGzipWriter<PyWriter>>>,
+    inner: Mutex<Option<gzip::GzipWriter<PyWriter>>>,
 }
 
 #[pymethods]
 impl GzipWriter {
     #[new]
     #[pyo3(signature = (raw_stream, compression_level=9, buffer_size=8192))]
-    fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> Self {
+    pub fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> Self {
         Self {
-            inner: Mutex::new(Some(RustGzipWriter::with_capacity_comp_level(
+            inner: Mutex::new(Some(gzip::GzipWriter::with_capacity_comp_level(
                 buffer_size,
                 PyWriter::new(raw_stream),
                 compression_level,
@@ -90,36 +88,36 @@ impl GzipWriter {
         }
     }
 
-    fn write(&self, data: &[u8]) -> PyResult<usize> {
+    pub fn write(&self, data: &[u8]) -> PyResult<usize> {
         let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        writer.write(data).map_err(io_err_to_py)
+        Ok(writer.write(data)?)
     }
 
-    fn flush(&self) -> PyResult<()> {
+    pub fn flush(&self) -> PyResult<()> {
         let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        writer.flush().map_err(io_err_to_py)
+        Ok(writer.flush()?)
     }
 
-    fn finish(&self) -> PyResult<()> {
+    pub fn finish(&self) -> PyResult<()> {
         let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        writer.finish().map_err(io_err_to_py)
+        Ok(writer.finish()?)
     }
 
-    fn close(&self) -> PyResult<()> {
+    pub fn close(&self) -> PyResult<()> {
         let mut writer = self.inner.lock().unwrap();
-        if let Some(writer) = writer.take() {
-            let mut inner = writer.into_inner().map_err(io_err_to_py)?;
-            inner.close()?;
+        if let Some(w) = writer.as_mut() {
+            w.flush()?;
         }
+        writer.take();
         Ok(())
     }
 }

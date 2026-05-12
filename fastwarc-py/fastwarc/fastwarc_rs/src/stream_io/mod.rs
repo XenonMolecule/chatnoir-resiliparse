@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
@@ -23,25 +22,18 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 pub mod gzip;
 
 // ===========================================================
-// Helpers
-// ===========================================================
-
-fn io_err_to_py(err: io::Error) -> PyErr {
-    PyOSError::new_err(err.to_string())
-}
-
-fn py_to_io_err(err: PyErr) -> io::Error {
-    io::Error::other(err.to_string())
-}
-
-// ===========================================================
 // Adapter for Python file-like objects
 // ===========================================================
 
 // #[derive(FromPyObject)]
-// enum StreamType<'py> {
-//     GzipReader(PyRef<'py, stream_io::GzipReader>),
-//     GzipWriter(PyRef<'py, stream_io::GzipWriter>),
+// enum ReaderType<'py> {
+//     GzipReader(PyRef<'py, gzip::GzipReader>),
+//     Py(Bound<'py, PyAny>),
+// }
+//
+// #[derive(FromPyObject)]
+// enum WriterType<'py> {
+//     GzipWriter(PyRef<'py, gzip::GzipWriter>),
 //     Py(Bound<'py, PyAny>),
 // }
 
@@ -53,17 +45,6 @@ impl PyReader {
     fn new(inner: Py<PyAny>) -> Self {
         Self { inner }
     }
-
-    // noinspection ALL
-    fn close(&mut self) -> PyResult<()> {
-        Python::attach(|py| {
-            let reader = self.inner.bind(py);
-            match reader.call_method0("close") {
-                Ok(_) => Ok(()),
-                Err(err) => Err(err),
-            }
-        })
-    }
 }
 
 // SAFETY: All interaction with `PyReader::inner` must go through `Python::attach`.
@@ -72,12 +53,8 @@ unsafe impl Send for PyReader {}
 impl Read for PyReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         Python::attach(|py| {
-            let data = self
-                .inner
-                .bind(py)
-                .call_method1("read", (buf.len(),))
-                .map_err(py_to_io_err)?;
-            let data = data.extract::<Vec<u8>>().map_err(py_to_io_err)?;
+            let data = self.inner.bind(py).call_method1("read", (buf.len(),))?;
+            let data = data.extract::<Vec<u8>>()?;
             let len = data.len().min(buf.len());
             buf[..len].copy_from_slice(&data[..len]);
             Ok(len)
@@ -93,32 +70,19 @@ impl Seek for PyReader {
                 SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
                 SeekFrom::Current(offset) => stream.call_method1("seek", (offset, 1)),
                 SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
-            }
-            .map_err(py_to_io_err)?;
-
-            result.extract::<u64>().map_err(py_to_io_err)
+            }?;
+            Ok(result.extract::<u64>()?)
         })
     }
 }
 
-struct PyWriter {
+pub(crate) struct PyWriter {
     inner: Py<PyAny>,
 }
 
 impl PyWriter {
     fn new(inner: Py<PyAny>) -> Self {
         Self { inner }
-    }
-
-    // noinspection ALL
-    fn close(&mut self) -> PyResult<()> {
-        Python::attach(|py| {
-            let writer = self.inner.bind(py);
-            match writer.call_method0("close") {
-                Ok(_) => Ok(()),
-                Err(err) => Err(err),
-            }
-        })
     }
 }
 
@@ -128,21 +92,15 @@ unsafe impl Send for PyWriter {}
 impl Write for PyWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         Python::attach(|py| {
-            self.inner
+            Ok(self
+                .inner
                 .bind(py)
                 .call_method1("write", (buf,))
-                .and_then(|result| result.extract::<usize>())
-                .map_err(py_to_io_err)
+                .and_then(|result| result.extract::<usize>())?)
         })
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Python::attach(|py| {
-            self.inner
-                .bind(py)
-                .call_method0("flush")
-                .map(|_| ())
-                .map_err(py_to_io_err)
-        })
+        Python::attach(|py| Ok(self.inner.bind(py).call_method0("flush").map(|_| ())?))
     }
 }

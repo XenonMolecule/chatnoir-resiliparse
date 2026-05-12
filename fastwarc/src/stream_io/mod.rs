@@ -38,7 +38,7 @@ impl<T: io::BufRead + io::Seek + ?Sized> BufReadSeek for T {}
 
 /// Trait for [`io::Read`] stream implementations reading from
 /// compressed input streams.
-pub trait DecompressingStream: ReadSeek + Sized {
+pub trait DecompressingStream: ReadSeek {
     /// Seek to an offset, in bytes, in the compressed inner stream.
     /// The semantics are the same as [`io::Seek::seek()`].
     ///
@@ -65,7 +65,7 @@ pub trait DecompressingStream: ReadSeek + Sized {
 
 /// Trait for [`io::Write`] stream implementations that write compressed data
 /// onto an output stream.
-pub trait CompressingStream: io::Write + Sized {
+pub trait CompressingStream: io::Write {
     /// Finish a compression member / frame and reset the compressor state.
     ///
     /// If the compressor supports multi-member streams, the writer can be
