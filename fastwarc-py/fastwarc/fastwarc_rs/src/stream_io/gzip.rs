@@ -30,11 +30,11 @@ pub struct GzipReaderPy {
 #[pymethods]
 impl GzipReaderPy {
     #[new]
-    #[pyo3(signature = (raw_stream, buffer_size=4096))]
-    pub fn __new__(raw_stream: Py<PyAny>, buffer_size: usize) -> (Self, DecompressingStreamPy) {
+    #[pyo3(signature = (inner, buffer_size=4096))]
+    pub fn __new__(inner: Py<PyAny>, buffer_size: usize) -> (Self, DecompressingStreamPy) {
         (
             Self {
-                inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
+                inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(inner)))),
             },
             DecompressingStreamPy::default(),
         )
@@ -65,13 +65,13 @@ pub struct GzipWriterPy {
 #[pymethods]
 impl GzipWriterPy {
     #[new]
-    #[pyo3(signature = (raw_stream, compression_level=9, buffer_size=8192))]
-    pub fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> (Self, CompressingStreamPy) {
+    #[pyo3(signature = (inner, compression_level=9, buffer_size=8192))]
+    pub fn __new__(inner: Py<PyAny>, compression_level: i32, buffer_size: usize) -> (Self, CompressingStreamPy) {
         (
             Self {
                 inner: Mutex::new(Some(gzip::GzipWriter::with_capacity_comp_level(
                     buffer_size,
-                    PyWriter::new(raw_stream),
+                    PyWriter::new(inner),
                     compression_level,
                 ))),
             },

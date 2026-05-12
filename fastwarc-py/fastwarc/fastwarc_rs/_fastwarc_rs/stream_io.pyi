@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from types import TracebackType
-from typing import ContextManager, Protocol, Optional, Type
+from typing import ContextManager, Protocol, Optional, Type, Union, BinaryIO
 
 
 class _GenericReader(Protocol):
@@ -72,7 +72,10 @@ class CompressingStream(ContextManager[CompressingStream]):
     ) -> None: ...
 
 
-class GzipReader(DecompressingStream): ...
+class GzipReader(DecompressingStream):
+    def __new__(cls, raw_stream: Union[BinaryIO, _GenericReader], buffer_size: int = 4096): ...
 
 
-class GzipWriter(CompressingStream): ...
+class GzipWriter(CompressingStream):
+    def __new__(cls, raw_stream: Union[BinaryIO, _GenericReader], compression_level: int = 9,
+                buffer_size: int = 8192): ...
