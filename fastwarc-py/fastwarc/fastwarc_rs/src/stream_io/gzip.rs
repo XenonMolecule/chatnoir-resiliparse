@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::impl_macros::*;
 use crate::stream_io::{PyReader, PyWriter};
 use fastwarc::stream_io::CompressingStream;
 use fastwarc::stream_io::gzip;
@@ -37,35 +38,19 @@ impl GzipReader {
     }
 
     pub fn read(&self, py: Python<'_>, size: usize) -> PyResult<Py<PyBytes>> {
-        let mut reader = self.inner.lock().unwrap();
-        let reader = reader
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        let mut buf = vec![0; size];
-        let len = reader.read(&mut buf)?;
-        Ok(PyBytes::new(py, &buf[..len]).unbind())
+        impl_reader_read!(self, py, size)
     }
 
     pub fn seek(&self, offset: u64) -> PyResult<u64> {
-        let mut reader = self.inner.lock().unwrap();
-        let reader = reader
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        Ok(reader.seek(SeekFrom::Start(offset))?)
+        impl_reader_seek!(self, offset)
     }
 
     pub fn tell(&self) -> PyResult<u64> {
-        let mut reader = self.inner.lock().unwrap();
-        let reader = reader
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        Ok(reader.stream_position()?)
+        impl_reader_tell!(self)
     }
 
     pub fn close(&self) -> PyResult<()> {
-        let mut reader = self.inner.lock().unwrap();
-        reader.take();
-        Ok(())
+        impl_reader_close!(self)
     }
 }
 
@@ -89,35 +74,18 @@ impl GzipWriter {
     }
 
     pub fn write(&self, data: &[u8]) -> PyResult<usize> {
-        let mut writer = self.inner.lock().unwrap();
-        let writer = writer
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        Ok(writer.write(data)?)
+        impl_writer_write!(self, data)
     }
 
     pub fn flush(&self) -> PyResult<()> {
-        let mut writer = self.inner.lock().unwrap();
-        let writer = writer
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        Ok(writer.flush()?)
+        impl_writer_flush!(self)
     }
 
     pub fn finish(&self) -> PyResult<()> {
-        let mut writer = self.inner.lock().unwrap();
-        let writer = writer
-            .as_mut()
-            .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-        Ok(writer.finish()?)
+        impl_writer_finish!(self)
     }
 
     pub fn close(&self) -> PyResult<()> {
-        let mut writer = self.inner.lock().unwrap();
-        if let Some(w) = writer.as_mut() {
-            w.flush()?;
-        }
-        writer.take();
-        Ok(())
+        impl_writer_close!(self)
     }
 }

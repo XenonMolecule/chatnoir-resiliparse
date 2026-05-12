@@ -104,3 +104,98 @@ impl Write for PyWriter {
         Python::attach(|py| Ok(self.inner.bind(py).call_method0("flush").map(|_| ())?))
     }
 }
+
+// ===========================================================
+// Helper macros for redundant Reader/Writer implementations
+// ===========================================================
+
+pub(crate) mod impl_macros {
+    macro_rules! impl_reader_read {
+        ($self: ident, $py: ident, $size: ident) => {{
+            let mut reader = $self.inner.lock().unwrap();
+            let reader = reader
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            let mut buf = vec![0; $size];
+            let len = reader.read(&mut buf)?;
+            Ok(PyBytes::new($py, &buf[..len]).unbind())
+        }};
+    }
+    pub(crate) use impl_reader_read;
+
+    macro_rules! impl_reader_seek {
+        ($self: ident, $offset: ident) => {{
+            let mut reader = $self.inner.lock().unwrap();
+            let reader = reader
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            Ok(reader.seek(SeekFrom::Start($offset))?)
+        }};
+    }
+    pub(crate) use impl_reader_seek;
+
+    macro_rules! impl_reader_tell {
+        ($self: ident) => {{
+            let mut reader = $self.inner.lock().unwrap();
+            let reader = reader
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            Ok(reader.stream_position()?)
+        }};
+    }
+    pub(crate) use impl_reader_tell;
+
+    macro_rules! impl_reader_close {
+        ($self: ident) => {{
+            let mut reader = $self.inner.lock().unwrap();
+            reader.take();
+            Ok(())
+        }};
+    }
+    pub(crate) use impl_reader_close;
+
+    macro_rules! impl_writer_write {
+        ($self: ident, $data: ident) => {{
+            let mut writer = $self.inner.lock().unwrap();
+            let writer = writer
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            Ok(writer.write($data)?)
+        }};
+    }
+    pub(crate) use impl_writer_write;
+
+    macro_rules! impl_writer_flush {
+        ($self: ident) => {{
+            let mut writer = $self.inner.lock().unwrap();
+            let writer = writer
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            Ok(writer.flush()?)
+        }};
+    }
+    pub(crate) use impl_writer_flush;
+
+    macro_rules! impl_writer_finish {
+        ($self: ident) => {{
+            let mut writer = $self.inner.lock().unwrap();
+            let writer = writer
+                .as_mut()
+                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
+            Ok(writer.finish()?)
+        }};
+    }
+    pub(crate) use impl_writer_finish;
+
+    macro_rules! impl_writer_close {
+        ($self: ident) => {{
+            let mut writer = $self.inner.lock().unwrap();
+            if let Some(w) = writer.as_mut() {
+                w.flush()?;
+            }
+            writer.take();
+            Ok(())
+        }};
+    }
+    pub(crate) use impl_writer_close;
+}
