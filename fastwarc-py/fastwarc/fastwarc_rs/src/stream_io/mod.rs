@@ -66,7 +66,7 @@ impl CompressingStreamPy {
         Self {}
     }
 
-    pub fn write(&self, data: Py<PyBytes>, py: Python<'_>) -> Py<PyAny> {
+    pub fn write(&self, py: Python<'_>, data: Py<PyBytes>) -> Py<PyAny> {
         let _ = data;
         py.NotImplemented()
     }
