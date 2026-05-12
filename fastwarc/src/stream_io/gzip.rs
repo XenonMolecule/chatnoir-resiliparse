@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
-use std::io;
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
 
 // ===========================================================
