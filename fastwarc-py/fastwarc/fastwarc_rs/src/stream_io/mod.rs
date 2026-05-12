@@ -37,21 +37,37 @@ impl DecompressingStreamPy {
         Self {}
     }
 
-    pub fn read(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn read(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
     }
 
-    pub fn seek(&self, py: Python<'_>, offset: u64) -> Py<PyAny> {
+    pub fn seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
         let _ = offset;
-        py.NotImplemented()
+        Ok(py.NotImplemented())
     }
 
-    pub fn tell(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
     }
 
-    pub fn close(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+
+    pub fn __enter__<'py>(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
+        Ok(slf)
+    }
+
+    // noinspection DuplicatedCode
+    pub fn __exit__(
+        &self,
+        py: Python<'_>,
+        _exc_type: Option<Py<PyAny>>,
+        _exc_val: Option<Py<PyAny>>,
+        _exc_tb: Option<Py<PyAny>>,
+    ) -> PyResult<()> {
+        self.close(py)?;
+        Ok(())
     }
 }
 
@@ -66,21 +82,37 @@ impl CompressingStreamPy {
         Self {}
     }
 
-    pub fn write(&self, py: Python<'_>, data: Py<PyBytes>) -> Py<PyAny> {
+    pub fn write(&self, py: Python<'_>, data: Py<PyBytes>) -> PyResult<Py<PyAny>> {
         let _ = data;
-        py.NotImplemented()
+        Ok(py.NotImplemented())
     }
 
-    pub fn flush(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn flush(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
     }
 
-    pub fn finish(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn finish(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
     }
 
-    pub fn close(&self, py: Python<'_>) -> Py<PyAny> {
-        py.NotImplemented()
+    pub fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+
+    pub fn __enter__<'py>(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
+        Ok(slf)
+    }
+
+    // noinspection DuplicatedCode
+    pub fn __exit__(
+        &self,
+        py: Python<'_>,
+        _exc_type: Option<Py<PyAny>>,
+        _exc_val: Option<Py<PyAny>>,
+        _exc_tb: Option<Py<PyAny>>,
+    ) -> PyResult<()> {
+        self.close(py)?;
+        Ok(())
     }
 }
 
