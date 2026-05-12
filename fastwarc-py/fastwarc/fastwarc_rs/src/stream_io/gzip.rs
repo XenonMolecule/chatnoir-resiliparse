@@ -17,12 +17,12 @@ use fastwarc::stream_io::CompressingStream;
 use fastwarc::stream_io::gzip::{GzipReader as RustGzipReader, GzipWriter as RustGzipWriter};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::cell::RefCell;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::Mutex;
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct GzipReader {
-    inner: RefCell<Option<RustGzipReader<PyReader>>>,
+    inner: Mutex<Option<RustGzipReader<PyReader>>>,
 }
 
 #[pymethods]
@@ -31,12 +31,12 @@ impl GzipReader {
     #[pyo3(signature = (raw_stream, buffer_size=4096))]
     fn __new__(raw_stream: Py<PyAny>, buffer_size: usize) -> Self {
         Self {
-            inner: RefCell::new(Some(RustGzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
+            inner: Mutex::new(Some(RustGzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
         }
     }
 
     fn read(&self, py: Python<'_>, size: usize) -> PyResult<Py<PyAny>> {
-        let mut reader = self.inner.borrow_mut();
+        let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -46,7 +46,7 @@ impl GzipReader {
     }
 
     fn seek(&self, offset: u64) -> PyResult<u64> {
-        let mut reader = self.inner.borrow_mut();
+        let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -54,7 +54,7 @@ impl GzipReader {
     }
 
     fn tell(&self) -> PyResult<u64> {
-        let mut reader = self.inner.borrow_mut();
+        let mut reader = self.inner.lock().unwrap();
         let reader = reader
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -62,7 +62,7 @@ impl GzipReader {
     }
 
     fn close(&self) -> PyResult<()> {
-        let mut reader = self.inner.borrow_mut();
+        let mut reader = self.inner.lock().unwrap();
         if let Some(reader) = reader.take() {
             let mut inner = reader.into_inner();
             inner.close()?;
@@ -71,9 +71,9 @@ impl GzipReader {
     }
 }
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct GzipWriter {
-    inner: RefCell<Option<RustGzipWriter<PyWriter>>>,
+    inner: Mutex<Option<RustGzipWriter<PyWriter>>>,
 }
 
 #[pymethods]
@@ -82,7 +82,7 @@ impl GzipWriter {
     #[pyo3(signature = (raw_stream, compression_level=9, buffer_size=8192))]
     fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> Self {
         Self {
-            inner: RefCell::new(Some(RustGzipWriter::with_capacity_comp_level(
+            inner: Mutex::new(Some(RustGzipWriter::with_capacity_comp_level(
                 buffer_size,
                 PyWriter::new(raw_stream),
                 compression_level,
@@ -91,7 +91,7 @@ impl GzipWriter {
     }
 
     fn write(&self, data: &[u8]) -> PyResult<usize> {
-        let mut writer = self.inner.borrow_mut();
+        let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -99,7 +99,7 @@ impl GzipWriter {
     }
 
     fn flush(&self) -> PyResult<()> {
-        let mut writer = self.inner.borrow_mut();
+        let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -107,7 +107,7 @@ impl GzipWriter {
     }
 
     fn finish(&self) -> PyResult<()> {
-        let mut writer = self.inner.borrow_mut();
+        let mut writer = self.inner.lock().unwrap();
         let writer = writer
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
@@ -115,7 +115,7 @@ impl GzipWriter {
     }
 
     fn close(&self) -> PyResult<()> {
-        let mut writer = self.inner.borrow_mut();
+        let mut writer = self.inner.lock().unwrap();
         if let Some(writer) = writer.take() {
             let mut inner = writer.into_inner().map_err(io_err_to_py)?;
             inner.close()?;

@@ -66,6 +66,9 @@ impl PyReader {
     }
 }
 
+// SAFETY: All interaction with `PyReader::inner` must go through `Python::attach`.
+unsafe impl Send for PyReader {}
+
 impl Read for PyReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         Python::attach(|py| {
@@ -118,6 +121,9 @@ impl PyWriter {
         })
     }
 }
+
+// SAFETY: All interaction with `PyWriter::inner` must go through `Python::attach`.
+unsafe impl Send for PyWriter {}
 
 impl Write for PyWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
