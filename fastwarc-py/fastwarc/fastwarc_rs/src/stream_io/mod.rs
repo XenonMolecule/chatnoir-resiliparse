@@ -26,12 +26,12 @@ pub mod gzip;
 // Exported stream parent classes
 // ===========================================================
 
-#[pyclass(subclass)]
+#[pyclass(name = "DecompressingStream", subclass)]
 #[derive(Default)]
-pub struct DecompressingStream {}
+pub struct DecompressingStreamPy {}
 
 #[pymethods]
-impl DecompressingStream {
+impl DecompressingStreamPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
@@ -55,12 +55,12 @@ impl DecompressingStream {
     }
 }
 
-#[pyclass(subclass)]
+#[pyclass(name = "CompressingStream", subclass)]
 #[derive(Default)]
-pub struct CompressingStream {}
+pub struct CompressingStreamPy {}
 
 #[pymethods]
-impl CompressingStream {
+impl CompressingStreamPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
