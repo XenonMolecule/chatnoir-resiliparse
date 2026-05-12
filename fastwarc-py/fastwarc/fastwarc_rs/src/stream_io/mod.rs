@@ -54,7 +54,7 @@ impl DecompressingStreamPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn __enter__<'py>(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
+    pub fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
         Ok(slf)
     }
 
@@ -99,7 +99,7 @@ impl CompressingStreamPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn __enter__<'py>(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
+    pub fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
         Ok(slf)
     }
 
