@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
@@ -20,6 +21,68 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 // ===========================================================
 
 pub mod gzip;
+
+// ===========================================================
+// Exported stream parent classes
+// ===========================================================
+
+#[pyclass(subclass)]
+#[derive(Default)]
+pub struct DecompressingStream {}
+
+#[pymethods]
+impl DecompressingStream {
+    #[new]
+    pub fn __new__() -> Self {
+        Self {}
+    }
+
+    pub fn read(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+
+    pub fn seek(&self, py: Python<'_>, offset: u64) -> Py<PyAny> {
+        let _ = offset;
+        py.NotImplemented()
+    }
+
+    pub fn tell(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+
+    pub fn close(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+}
+
+#[pyclass(subclass)]
+#[derive(Default)]
+pub struct CompressingStream {}
+
+#[pymethods]
+impl CompressingStream {
+    #[new]
+    pub fn __new__() -> Self {
+        Self {}
+    }
+
+    pub fn write(&self, data: Py<PyBytes>, py: Python<'_>) -> Py<PyAny> {
+        let _ = data;
+        py.NotImplemented()
+    }
+
+    pub fn flush(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+
+    pub fn finish(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+
+    pub fn close(&self, py: Python<'_>) -> Py<PyAny> {
+        py.NotImplemented()
+    }
+}
 
 // ===========================================================
 // Adapter for Python file-like objects

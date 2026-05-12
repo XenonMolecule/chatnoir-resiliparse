@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{PyReader, PyWriter};
-use fastwarc::stream_io::CompressingStream;
+use crate::stream_io::{CompressingStream, DecompressingStream, PyReader, PyWriter};
+use fastwarc::stream_io::CompressingStream as _;
 use fastwarc::stream_io::gzip;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -22,7 +22,7 @@ use pyo3::types::PyBytes;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
-#[pyclass]
+#[pyclass(extends = DecompressingStream, subclass)]
 pub struct GzipReader {
     inner: Mutex<Option<gzip::GzipReader<PyReader>>>,
 }
@@ -31,10 +31,13 @@ pub struct GzipReader {
 impl GzipReader {
     #[new]
     #[pyo3(signature = (raw_stream, buffer_size=4096))]
-    pub fn __new_(raw_stream: Py<PyAny>, buffer_size: usize) -> Self {
-        Self {
-            inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
-        }
+    pub fn __new__(raw_stream: Py<PyAny>, buffer_size: usize) -> (Self, DecompressingStream) {
+        (
+            Self {
+                inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(raw_stream)))),
+            },
+            DecompressingStream::default(),
+        )
     }
 
     pub fn read(&self, py: Python<'_>, size: usize) -> PyResult<Py<PyBytes>> {
@@ -54,7 +57,7 @@ impl GzipReader {
     }
 }
 
-#[pyclass]
+#[pyclass(extends = CompressingStream, subclass)]
 pub struct GzipWriter {
     inner: Mutex<Option<gzip::GzipWriter<PyWriter>>>,
 }
@@ -63,14 +66,17 @@ pub struct GzipWriter {
 impl GzipWriter {
     #[new]
     #[pyo3(signature = (raw_stream, compression_level=9, buffer_size=8192))]
-    pub fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> Self {
-        Self {
-            inner: Mutex::new(Some(gzip::GzipWriter::with_capacity_comp_level(
-                buffer_size,
-                PyWriter::new(raw_stream),
-                compression_level,
-            ))),
-        }
+    pub fn __new__(raw_stream: Py<PyAny>, compression_level: i32, buffer_size: usize) -> (Self, CompressingStream) {
+        (
+            Self {
+                inner: Mutex::new(Some(gzip::GzipWriter::with_capacity_comp_level(
+                    buffer_size,
+                    PyWriter::new(raw_stream),
+                    compression_level,
+                ))),
+            },
+            CompressingStream::default(),
+        )
     }
 
     pub fn write(&self, data: &[u8]) -> PyResult<usize> {
