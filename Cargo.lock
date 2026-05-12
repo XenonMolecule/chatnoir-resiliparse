@@ -226,6 +226,7 @@ version = "0.0.0"
 dependencies = [
  "fastwarc",
  "pyo3",
+ "pyo3-build-config",
 ]
 
 [[package]]

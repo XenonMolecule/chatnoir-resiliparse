@@ -25,4 +25,5 @@ license = "Apache-2.0"
 [workspace.dependencies]
 bindgen = "0.72"
 pyo3 = "0.28"
+pyo3-build-config = "0.28"
 pretty_assertions = "1.4"
