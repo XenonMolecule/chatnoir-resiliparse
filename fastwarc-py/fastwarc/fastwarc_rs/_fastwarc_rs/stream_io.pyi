@@ -85,3 +85,11 @@ class GzipReader(DecompressingStream):
 class GzipWriter(CompressingStream):
     def __new__(cls, inner: Union[BinaryIO, _GenericWriter], compression_level: int = 9,
                 buffer_size: int = 8192): ...
+
+
+class Lz4Reader(DecompressingStream):
+    def __new__(cls, inner: Union[BinaryIO, _GenericReader], buffer_size: int = 4096): ...
+
+
+class Lz4Writer(CompressingStream):
+    def __new__(cls, inner: Union[BinaryIO, _GenericWriter], buffer_size: int = 8192): ...

@@ -23,7 +23,7 @@ pub mod _fastwarc_rs {
     #[pymodule_init]
     pub fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
         Python::attach(|py| {
-            // Register full submodules to make them importable.
+            // Register submodules to make them importable.
             // https://github.com/PyO3/pyo3/issues/759#issuecomment-2282197848
             let parent_name: String = m.getattr("__name__")?.extract()?;
             let sys_modules = py.import("sys")?.getattr("modules")?;
