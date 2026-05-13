@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyString};
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -171,11 +172,11 @@ unsafe impl Send for PyReaderAdapter {}
 impl Read for PyReaderAdapter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         Python::attach(|py| {
-            let data = self
-                .inner
-                .bind(py)
-                .call_method1("read", (buf.len(),))?
-                .extract::<Vec<u8>>()?;
+            let bound = self.inner.bind(py).call_method1("read", (buf.len(),))?;
+            let data = bound
+                .cast::<PyBytes>()
+                .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
+                .as_bytes();
             let len = data.len().min(buf.len());
             buf[..len].copy_from_slice(&data[..len]);
             Ok(len)
