@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from os import PathLike
 from types import TracebackType
 from typing import BinaryIO, ContextManager, Optional, Protocol, Type, Union
 
@@ -79,17 +80,17 @@ class CompressingStream(ContextManager[CompressingStream]):
 
 
 class GzipReader(DecompressingStream):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader], buffer_size: int = 4096): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
 
 
 class GzipWriter(CompressingStream):
-    def __new__(cls, inner: Union[BinaryIO, _GenericWriter], compression_level: int = 9,
+    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
                 buffer_size: int = 8192): ...
 
 
 class Lz4Reader(DecompressingStream):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader], buffer_size: int = 4096): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
 
 
 class Lz4Writer(CompressingStream):
-    def __new__(cls, inner: Union[BinaryIO, _GenericWriter], buffer_size: int = 8192): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], buffer_size: int = 8192): ...
