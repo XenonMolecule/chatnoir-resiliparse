@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::impl_stream_from_path;
 use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
@@ -160,26 +161,7 @@ impl<T: ReadSeek> GzipReader<T> {
     }
 }
 
-impl GzipReader<std::fs::File> {
-    /// Create a [`GzipReader] from a file path.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - file path
-    pub fn from_path(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
-        Ok(Self::new(std::fs::File::open(path)?))
-    }
-
-    /// Create a [`GzipReader] from a file path with a given buffer capacity.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - file path
-    /// * `inner` - input (inner) stream to read from
-    pub fn from_path_with_options(path: impl AsRef<std::path::Path>, options: GzipReaderOptions) -> io::Result<Self> {
-        Ok(Self::with_options(std::fs::File::open(path)?, options))
-    }
-}
+impl_stream_from_path!(GzipReader, GzipReaderOptions);
 
 impl<T: ReadSeek> io::Read for GzipReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -473,6 +455,8 @@ impl<T: Write> GzipWriter<T> {
         self.level = level;
     }
 }
+
+impl_stream_from_path!(GzipWriter, GzipWriterOptions);
 
 impl<T: Write> CompressingStream for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {

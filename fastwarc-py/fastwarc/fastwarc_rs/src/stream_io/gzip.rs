@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy, PyReader, PyWriter};
+use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy, PyReader, PyWriter, path_like_to_string};
 use fastwarc::stream_io::gzip;
 use fastwarc::stream_io::{CompressingStream, DecompressingStream};
 use pyo3::exceptions::PyValueError;

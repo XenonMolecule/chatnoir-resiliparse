@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
+use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek, impl_stream_from_path};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 
@@ -86,6 +86,8 @@ impl<T: ReadSeek> Lz4Reader<T> {
         self.inner.unwrap().into_inner().into_inner()
     }
 }
+
+impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -232,6 +234,8 @@ impl<T: Write> Lz4Writer<T> {
         Ok(writer.into_inner()?)
     }
 }
+
+impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
 
 impl<T: Write> CompressingStream for Lz4Writer<T> {
     fn finish(&mut self) -> io::Result<()> {

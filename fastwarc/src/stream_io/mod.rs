@@ -84,6 +84,41 @@ pub trait CompressingStream: io::Write {
 }
 
 // ===========================================================
+// Helper macros
+// ===========================================================
+
+/// Helper macro for implementing `from_path()` and `from_path_with_options()`
+/// constructors for Readers and Writers.
+macro_rules! impl_stream_from_path {
+    ($StreamType: ident, $OptionsType: ident) => {
+        impl $StreamType<std::fs::File> {
+            #[doc = concat!("Create a [`", stringify!($StreamType), "`] from a file path.")]
+            #[doc = ""]
+            #[doc = "# Arguments"]
+            #[doc = ""]
+            #[doc = "* `path` - file path"]
+            pub fn from_path(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+                Ok(Self::new(std::fs::File::open(path)?))
+            }
+
+            #[doc = concat!("Create a [`", stringify!($StreamType), "`] from a file path.")]
+            #[doc = ""]
+            #[doc = "# Arguments"]
+            #[doc = ""]
+            #[doc = "* `path` - file path"]
+            #[doc = "* `options` - constructor options"]
+            pub fn from_path_with_options(
+                path: impl AsRef<std::path::Path>,
+                options: $OptionsType,
+            ) -> io::Result<Self> {
+                Ok(Self::with_options(std::fs::File::open(path)?, options))
+            }
+        }
+    };
+}
+pub(crate) use impl_stream_from_path;
+
+// ===========================================================
 // Limited buffered reader
 // ===========================================================
 
