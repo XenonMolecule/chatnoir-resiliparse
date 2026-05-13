@@ -190,12 +190,12 @@ jobs:
         run: |
           set -e
           python${PYTHON_VERSION} -m pip install -e "fastwarc-py[all,test]"
-                                       python${PYTHON_VERSION} -m pip install -e "resiliparse-py[all,test]"
+          python${PYTHON_VERSION} -m pip install -e "resiliparse-py[all,test]"
 
-                                       - name: Run Tests
-                                         run: |
-                                           export LD_PRELOAD="$(ldconfig -p | grep libasan | head -n1 | awk '{print $4}')"
-                                           python${PYTHON_VERSION} -m pytest --capture=sys --verbose tests/
+      - name: Run Tests
+        run: |
+          export LD_PRELOAD="$(ldconfig -p | grep libasan | head -n1 | awk '{print $4}')"
+          python${PYTHON_VERSION} -m pytest --capture=sys --verbose tests/
 
   build-coverage:
     runs-on: ubuntu-latest
