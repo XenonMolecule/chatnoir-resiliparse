@@ -14,7 +14,7 @@
 
 from os import PathLike
 from types import TracebackType
-from typing import BinaryIO, ContextManager, Optional, Protocol, Type, Union
+from typing import BinaryIO, ContextManager, Optional, Protocol, Type, Self, Union
 
 
 class _GenericReader(Protocol):
@@ -44,7 +44,7 @@ class Reader(ContextManager[Reader]):
 
     def close(self) -> None: ...
 
-    def __enter__(self) -> Reader: ...
+    def __enter__(self) -> Self: ...
 
     def __exit__(
             self,
@@ -69,7 +69,7 @@ class Writer(ContextManager[Writer]):
 
     def close(self) -> None: ...
 
-    def __enter__(self) -> Writer: ...
+    def __enter__(self) -> Self: ...
 
     def __exit__(
             self,
@@ -84,17 +84,17 @@ class CompressingWriter(Writer):
 
 
 class GzipReader(DecompressingReader):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096) -> Self: ...
 
 
 class GzipWriter(CompressingWriter):
     def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
-                buffer_size: int = 8192): ...
+                buffer_size: int = 8192) -> Self: ...
 
 
 class Lz4Reader(DecompressingReader):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096) -> Self: ...
 
 
 class Lz4Writer(CompressingWriter):
-    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], buffer_size: int = 8192): ...
+    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], buffer_size: int = 8192) -> Self: ...
