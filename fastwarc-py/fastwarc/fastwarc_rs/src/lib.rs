@@ -42,5 +42,8 @@ pub mod _fastwarc_rs {
 
         #[pymodule_export]
         pub use crate::stream_io::gzip::{GzipReaderPy, GzipWriterPy};
+
+        #[pymodule_export]
+        pub use crate::stream_io::lz4::{Lz4ReaderPy, Lz4WriterPy};
     }
 }

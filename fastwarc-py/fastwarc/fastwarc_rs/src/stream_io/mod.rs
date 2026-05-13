@@ -21,6 +21,7 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 // ===========================================================
 
 pub mod gzip;
+pub mod lz4;
 
 // ===========================================================
 // Exported stream parent classes
@@ -211,9 +212,16 @@ pub(crate) mod impl_macros {
             let reader = reader
                 .as_mut()
                 .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            let mut buf = vec![0; $size];
-            let len = reader.read(&mut buf)?;
-            Ok(PyBytes::new($py, &buf[..len]).unbind())
+            let mut buf;
+            let n;
+            if $size < 0 {
+                buf = Vec::new();
+                n = reader.read_to_end(&mut buf)?;
+            } else {
+                buf = vec![0; $size as usize];
+                n = reader.read(&mut buf)?;
+            }
+            Ok(PyBytes::new($py, &buf[..n]).unbind())
         }};
     }
     pub(crate) use impl_reader_read;
