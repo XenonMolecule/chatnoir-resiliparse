@@ -1,6 +1,4 @@
 // Copyright 2026 Janek Bevendorff
-
-#![allow(clippy::needless_question_mark)]
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,12 +28,11 @@ pub mod lz4;
 // Exported stream parent classes
 // ===========================================================
 
-#[pyclass(name = "DecompressingStream", subclass)]
-#[derive(Default)]
-pub struct DecompressingStreamPy {}
+#[pyclass(name = "Reader", subclass)]
+pub struct ReaderPy {}
 
 #[pymethods]
-impl DecompressingStreamPy {
+impl ReaderPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
@@ -50,20 +47,7 @@ impl DecompressingStreamPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn inner_seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
-        let _ = offset;
-        Ok(py.NotImplemented())
-    }
-
     pub fn tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
-    }
-
-    pub fn inner_tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
-    }
-
-    pub fn member_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
 
@@ -88,12 +72,35 @@ impl DecompressingStreamPy {
     }
 }
 
-#[pyclass(name = "CompressingStream", subclass)]
-#[derive(Default)]
-pub struct CompressingStreamPy {}
+#[pyclass(name = "DecompressingReader", extends = ReaderPy, subclass)]
+pub struct DecompressingReaderPy {}
 
 #[pymethods]
-impl CompressingStreamPy {
+impl DecompressingReaderPy {
+    #[new]
+    pub fn __new__() -> (Self, ReaderPy) {
+        (Self {}, ReaderPy::__new__())
+    }
+
+    pub fn inner_seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
+        let _ = offset;
+        Ok(py.NotImplemented())
+    }
+
+    pub fn inner_tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+
+    pub fn member_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+}
+
+#[pyclass(name = "Writer", subclass)]
+pub struct WriterPy {}
+
+#[pymethods]
+impl WriterPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
@@ -108,10 +115,6 @@ impl CompressingStreamPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn finish(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
-    }
-
     pub fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
@@ -133,8 +136,23 @@ impl CompressingStreamPy {
     }
 }
 
+#[pyclass(name = "CompressingWriter", extends = WriterPy, subclass)]
+pub struct CompressingWriterPy {}
+
+#[pymethods]
+impl CompressingWriterPy {
+    #[new]
+    pub fn __new__() -> (Self, WriterPy) {
+        (Self {}, WriterPy::__new__())
+    }
+
+    pub fn finish(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+}
+
 // ===========================================================
-// Adapter for Python file-like objects
+// Adapters for Python file-like objects
 // ===========================================================
 
 #[allow(unused)]
@@ -143,12 +161,12 @@ pub enum ReaderType {
     Native(Box<dyn BufReadSeek>),
 }
 
-struct PyReader {
+struct PyReaderAdapter {
     inner: ReaderType,
 }
 
 #[allow(unused)]
-impl PyReader {
+impl PyReaderAdapter {
     fn new_native<T: BufReadSeek + 'static>(inner: T) -> Self {
         Self {
             inner: ReaderType::Native(Box::new(inner)),
@@ -163,9 +181,9 @@ impl PyReader {
 }
 
 // SAFETY: All interaction with `PyReader::inner` must go through `Python::attach`.
-unsafe impl Send for PyReader {}
+unsafe impl Send for PyReaderAdapter {}
 
-impl Read for PyReader {
+impl Read for PyReaderAdapter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.inner {
             ReaderType::Native(r) => r.read(buf),
@@ -180,7 +198,7 @@ impl Read for PyReader {
     }
 }
 
-impl Seek for PyReader {
+impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match &mut self.inner {
             ReaderType::Native(r) => r.seek(pos),
@@ -203,12 +221,12 @@ pub enum WriterType {
     Native(Box<dyn Write>),
 }
 
-pub(crate) struct PyWriter {
+pub(crate) struct PyWriterAdapter {
     inner: WriterType,
 }
 
 #[allow(unused)]
-impl PyWriter {
+impl PyWriterAdapter {
     fn new_native<T: Write + 'static>(inner: T) -> Self {
         Self {
             inner: WriterType::Native(Box::new(inner)),
@@ -223,9 +241,9 @@ impl PyWriter {
 }
 
 // SAFETY: All interaction with `PyWriter::inner` must go through `Python::attach`.
-unsafe impl Send for PyWriter {}
+unsafe impl Send for PyWriterAdapter {}
 
-impl Write for PyWriter {
+impl Write for PyWriterAdapter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match &mut self.inner {
             WriterType::Native(r) => r.write(buf),

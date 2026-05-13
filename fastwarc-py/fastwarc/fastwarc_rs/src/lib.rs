@@ -38,7 +38,7 @@ pub mod _fastwarc_rs {
     #[pymodule]
     pub mod stream_io {
         #[pymodule_export]
-        pub use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy};
+        pub use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy};
 
         #[pymodule_export]
         pub use crate::stream_io::gzip::{GzipReaderPy, GzipWriterPy};

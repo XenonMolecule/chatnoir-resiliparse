@@ -35,41 +35,41 @@ class _GenericWriter(Protocol):
     def close(self) -> None: ...
 
 
-class DecompressingStream(ContextManager[DecompressingStream]):
+class Reader(ContextManager[DecompressingReader]):
     def read(self, size: int = -1) -> bytes: ...
 
     def seek(self, offset: int, whence: int = 0) -> int: ...
 
-    def inner_seek(self, offset: int, whence: int = 0) -> int: ...
-
     def tell(self) -> int: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> DecompressingReader: ...
+
+    def __exit__(
+            self,
+            exc_type: Optional[Type[BaseException]],
+            exc: Optional[BaseException],
+            traceback: Optional[TracebackType]
+    ) -> None: ...
+
+
+class DecompressingReader(Reader):
+    def inner_seek(self, offset: int, whence: int = 0) -> int: ...
 
     def inner_tell(self) -> int: ...
 
     def member_start_position(self) -> int: ...
 
-    def close(self) -> None: ...
 
-    def __enter__(self) -> DecompressingStream: ...
-
-    def __exit__(
-            self,
-            exc_type: Optional[Type[BaseException]],
-            exc: Optional[BaseException],
-            traceback: Optional[TracebackType]
-    ) -> None: ...
-
-
-class CompressingStream(ContextManager[CompressingStream]):
+class Writer(ContextManager[CompressingWriter]):
     def write(self, data: bytes) -> int: ...
 
     def flush(self) -> None: ...
 
-    def finish(self) -> None: ...
-
     def close(self) -> None: ...
 
-    def __enter__(self) -> CompressingStream: ...
+    def __enter__(self) -> CompressingWriter: ...
 
     def __exit__(
             self,
@@ -79,18 +79,22 @@ class CompressingStream(ContextManager[CompressingStream]):
     ) -> None: ...
 
 
-class GzipReader(DecompressingStream):
+class CompressingWriter(Writer):
+    def finish(self) -> None: ...
+
+
+class GzipReader(DecompressingReader):
     def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
 
 
-class GzipWriter(CompressingStream):
+class GzipWriter(CompressingWriter):
     def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
                 buffer_size: int = 8192): ...
 
 
-class Lz4Reader(DecompressingStream):
+class Lz4Reader(DecompressingReader):
     def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096): ...
 
 
-class Lz4Writer(CompressingStream):
+class Lz4Writer(CompressingWriter):
     def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], buffer_size: int = 8192): ...

@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy, PyReader, PyWriter, path_like_to_string};
-use fastwarc::stream_io::lz4;
-use fastwarc::stream_io::{CompressingStream, DecompressingStream};
+use crate::stream_io::{
+    CompressingWriterPy, DecompressingReaderPy, PyReaderAdapter, PyWriterAdapter, path_like_to_string,
+};
+use fastwarc::stream_io::{CompressingWriter, DecompressingReader, lz4};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use std::io;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "Lz4Reader", extends = DecompressingStreamPy, subclass)]
+#[pyclass(name = "Lz4Reader", extends = DecompressingReaderPy, subclass)]
 pub struct Lz4ReaderPy {
-    inner: Mutex<Option<Box<dyn DecompressingStream + Send>>>,
+    inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -33,20 +33,16 @@ pub struct Lz4ReaderPy {
 impl Lz4ReaderPy {
     #[new]
     #[pyo3(signature = (inner, buffer_size=4096))]
-    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<(Self, DecompressingStreamPy)> {
+    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<PyClassInitializer<Self>> {
         let options = lz4::Lz4ReaderOptions { capacity: buffer_size };
-        let inner: Box<dyn DecompressingStream + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
+        let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(lz4::Lz4Reader::from_path_with_options(p, options)?)
         } else {
-            Box::new(lz4::Lz4Reader::with_options(PyReader::new_py(inner), options))
+            Box::new(lz4::Lz4Reader::with_options(PyReaderAdapter::new_py(inner), options))
         };
-
-        Ok((
-            Self {
-                inner: Mutex::new(Some(inner)),
-            },
-            DecompressingStreamPy::default(),
-        ))
+        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+            inner: Mutex::new(Some(inner)),
+        }))
     }
 
     #[pyo3(signature = (size=-1))]
@@ -81,9 +77,9 @@ impl Lz4ReaderPy {
     }
 }
 
-#[pyclass(name = "Lz4Writer", extends = CompressingStreamPy, subclass)]
+#[pyclass(name = "Lz4Writer", extends = CompressingWriterPy, subclass)]
 pub struct Lz4WriterPy {
-    inner: Mutex<Option<Box<dyn CompressingStream + Send>>>,
+    inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -91,20 +87,16 @@ pub struct Lz4WriterPy {
 impl Lz4WriterPy {
     #[new]
     #[pyo3(signature = (inner, buffer_size=8192))]
-    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<(Self, CompressingStreamPy)> {
+    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<PyClassInitializer<Self>> {
         let options = lz4::Lz4WriterOptions { capacity: buffer_size };
-        let inner: Box<dyn CompressingStream + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
+        let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(lz4::Lz4Writer::from_path_with_options(p, options)?)
         } else {
-            Box::new(lz4::Lz4Writer::with_options(PyWriter::new_py(inner), options))
+            Box::new(lz4::Lz4Writer::with_options(PyWriterAdapter::new_py(inner), options))
         };
-
-        Ok((
-            Self {
-                inner: Mutex::new(Some(inner)),
-            },
-            CompressingStreamPy::default(),
-        ))
+        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+            inner: Mutex::new(Some(inner)),
+        }))
     }
 
     pub fn write(&self, data: &[u8]) -> PyResult<usize> {

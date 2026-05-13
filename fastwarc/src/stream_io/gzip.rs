@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::impl_stream_from_path;
-use crate::stream_io::{CompressingStream, DecompressingStream, ReadSeek};
+use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek};
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
 
@@ -192,7 +192,7 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingStream for GzipReader<T> {
+impl<T: ReadSeek> DecompressingReader for GzipReader<T> {
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.deflate = Inflate::new(true, self.window_bits);
         self.buf_pos = 0;
@@ -458,7 +458,7 @@ impl<T: Write> GzipWriter<T> {
 
 impl_stream_from_path!(GzipWriter, GzipWriterOptions);
 
-impl<T: Write> CompressingStream for GzipWriter<T> {
+impl<T: Write> CompressingWriter for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.member_started {
             return Ok(());

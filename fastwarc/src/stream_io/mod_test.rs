@@ -20,7 +20,7 @@ use super::*;
 
 pub(crate) mod helpers {
     //! (Generic) test helpers for testing common functionality on readers and writers
-    //! implementing [`CompressingStream`] or [`DecompressingStream`].
+    //! implementing [`CompressingWriter`] or [`DecompressingReader`].
 
     use super::*;
     use std::cell::RefCell;
@@ -99,7 +99,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>) -> S,
-        S: DecompressingStream + BufReadSeek,
+        S: DecompressingReader + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -141,7 +141,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
-        S: DecompressingStream + BufReadSeek,
+        S: DecompressingReader + BufReadSeek,
         I: Fn(S) -> Cursor<Vec<u8>>,
     {
         let plain = sample_data();
@@ -176,7 +176,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
-        S: DecompressingStream + BufReadSeek,
+        S: DecompressingReader + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -209,7 +209,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>) -> S,
-        S: DecompressingStream + BufRead,
+        S: DecompressingReader + BufRead,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -231,7 +231,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>) -> S,
-        S: DecompressingStream + BufRead,
+        S: DecompressingReader + BufRead,
     {
         let first_plain = b"first member data\n".repeat(32);
         let second_plain = b"second member payload\n".repeat(24);
@@ -300,7 +300,7 @@ pub(crate) mod helpers {
     where
         D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
         W: Fn(Vec<u8>) -> S,
-        S: CompressingStream,
+        S: CompressingWriter,
         I: Fn(S) -> io::Result<Vec<u8>>,
     {
         let plain = sample_data();
@@ -322,7 +322,7 @@ pub(crate) mod helpers {
     where
         D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
         W: Fn(SharedVecWriter, usize) -> S,
-        S: CompressingStream,
+        S: CompressingWriter,
     {
         let plain = sample_data();
         let inner = SharedVecWriter::new();
@@ -343,7 +343,7 @@ pub(crate) mod helpers {
     pub fn test_writer_propagates_inner_flush_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
     where
         W: Fn(ErrorWriter, usize) -> S,
-        S: CompressingStream,
+        S: CompressingWriter,
     {
         let plain = sample_data();
         let mut writer = writer_with_capacity_fn(
@@ -367,7 +367,7 @@ pub(crate) mod helpers {
     pub fn test_writer_propagates_inner_write_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
     where
         W: Fn(ErrorWriter, usize) -> S,
-        S: CompressingStream,
+        S: CompressingWriter,
     {
         let plain = sample_data();
         let mut writer = writer_with_capacity_fn(

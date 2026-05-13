@@ -1231,8 +1231,8 @@ impl WarcRecord {
     /// Use [`Self::write_with_block_size`] or [`Self::write_with_block_size_checksum`] for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
+    /// [`crate::stream_io::CompressingWriter`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingWriter::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1251,8 +1251,8 @@ impl WarcRecord {
     /// `write_with_checksum_block_size` for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
+    /// [`crate::stream_io::CompressingWriter`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingWriter::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1273,8 +1273,8 @@ impl WarcRecord {
     /// for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
+    /// [`crate::stream_io::CompressingWriter`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingWriter::finish()`] afterwards.
     /// # Arguments
     ///
     /// * `writer` - Output stream
@@ -1289,8 +1289,8 @@ impl WarcRecord {
     /// Write WARC record onto a stream with a given block size and calculate SHA-1 record checksums.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingStream`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingStream::finish()`] afterwards.
+    /// [`crate::stream_io::CompressingWriter`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::CompressingWriter::finish()`] afterwards.
     ///
     /// # Arguments
     ///

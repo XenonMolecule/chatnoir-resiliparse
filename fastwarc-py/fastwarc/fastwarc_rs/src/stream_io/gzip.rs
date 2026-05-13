@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy, PyReader, PyWriter, path_like_to_string};
-use fastwarc::stream_io::gzip;
-use fastwarc::stream_io::{CompressingStream, DecompressingStream};
+use crate::stream_io::{
+    CompressingWriterPy, DecompressingReaderPy, PyReaderAdapter, PyWriterAdapter, path_like_to_string,
+};
+use fastwarc::stream_io::{CompressingWriter, DecompressingReader, gzip};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use std::io;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "GzipReader", extends = DecompressingStreamPy, subclass)]
+#[pyclass(name = "GzipReader", extends = DecompressingReaderPy, subclass)]
 pub struct GzipReaderPy {
-    inner: Mutex<Option<Box<dyn DecompressingStream + Send>>>,
+    inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -38,23 +38,20 @@ impl GzipReaderPy {
         inner: Py<PyAny>,
         buffer_size: usize,
         zlib: bool,
-    ) -> PyResult<(Self, DecompressingStreamPy)> {
+    ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipReaderOptions {
             capacity: buffer_size,
             window_bits: if zlib { 15 } else { 15 + 16 },
             expect_header: true,
         };
-        let inner: Box<dyn DecompressingStream + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
+        let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(gzip::GzipReader::from_path_with_options(p, options)?)
         } else {
-            Box::new(gzip::GzipReader::with_options(PyReader::new_py(inner), options))
+            Box::new(gzip::GzipReader::with_options(PyReaderAdapter::new_py(inner), options))
         };
-        Ok((
-            Self {
-                inner: Mutex::new(Some(inner)),
-            },
-            DecompressingStreamPy::default(),
-        ))
+        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+            inner: Mutex::new(Some(inner)),
+        }))
     }
 
     #[pyo3(signature = (size=-1))]
@@ -89,9 +86,9 @@ impl GzipReaderPy {
     }
 }
 
-#[pyclass(name = "GzipWriter", extends = CompressingStreamPy, subclass)]
+#[pyclass(name = "GzipWriter", extends = CompressingWriterPy, subclass)]
 pub struct GzipWriterPy {
-    inner: Mutex<Option<Box<dyn CompressingStream + Send>>>,
+    inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -105,24 +102,21 @@ impl GzipWriterPy {
         compression_level: i32,
         buffer_size: usize,
         zlib: bool,
-    ) -> PyResult<(Self, CompressingStreamPy)> {
+    ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipWriterOptions {
             capacity: buffer_size,
             window_bits: if zlib { 15 } else { 15 + 16 },
             expect_header: true,
             compression_level,
         };
-        let inner: Box<dyn CompressingStream + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
+        let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(gzip::GzipWriter::from_path_with_options(p, options)?)
         } else {
-            Box::new(gzip::GzipWriter::with_options(PyWriter::new_py(inner), options))
+            Box::new(gzip::GzipWriter::with_options(PyWriterAdapter::new_py(inner), options))
         };
-        Ok((
-            Self {
-                inner: Mutex::new(Some(inner)),
-            },
-            CompressingStreamPy::default(),
-        ))
+        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+            inner: Mutex::new(Some(inner)),
+        }))
     }
 
     pub fn write(&self, data: &[u8]) -> PyResult<usize> {
