@@ -38,7 +38,7 @@ impl Lz4ReaderPy {
         let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(lz4::Lz4Reader::from_path_with_options(p, options)?)
         } else {
-            Box::new(lz4::Lz4Reader::with_options(PyReaderAdapter::new_py(inner), options))
+            Box::new(lz4::Lz4Reader::with_options(PyReaderAdapter::new(inner), options))
         };
         Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
@@ -92,7 +92,7 @@ impl Lz4WriterPy {
         let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(lz4::Lz4Writer::from_path_with_options(p, options)?)
         } else {
-            Box::new(lz4::Lz4Writer::with_options(PyWriterAdapter::new_py(inner), options))
+            Box::new(lz4::Lz4Writer::with_options(PyWriterAdapter::new(inner), options))
         };
         Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),

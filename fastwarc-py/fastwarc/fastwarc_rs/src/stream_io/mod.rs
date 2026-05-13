@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use fastwarc::stream_io::BufReadSeek;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyString};
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -155,28 +154,14 @@ impl CompressingWriterPy {
 // Adapters for Python file-like objects
 // ===========================================================
 
-#[allow(unused)]
-pub enum ReaderType {
-    Py(Py<PyAny>),
-    Native(Box<dyn BufReadSeek>),
-}
-
 struct PyReaderAdapter {
-    inner: ReaderType,
+    inner: Py<PyAny>,
 }
 
 #[allow(unused)]
 impl PyReaderAdapter {
-    fn new_native<T: BufReadSeek + 'static>(inner: T) -> Self {
-        Self {
-            inner: ReaderType::Native(Box::new(inner)),
-        }
-    }
-
-    fn new_py(inner: Py<PyAny>) -> Self {
-        Self {
-            inner: ReaderType::Py(inner),
-        }
+    fn new(inner: Py<PyAny>) -> Self {
+        Self { inner }
     }
 }
 
@@ -185,58 +170,41 @@ unsafe impl Send for PyReaderAdapter {}
 
 impl Read for PyReaderAdapter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match &mut self.inner {
-            ReaderType::Native(r) => r.read(buf),
-            ReaderType::Py(r) => Python::attach(|py| {
-                let data = r.bind(py).call_method1("read", (buf.len(),))?;
-                let data = data.extract::<Vec<u8>>()?;
-                let len = data.len().min(buf.len());
-                buf[..len].copy_from_slice(&data[..len]);
-                Ok(len)
-            }),
-        }
+        Python::attach(|py| {
+            let data = self
+                .inner
+                .bind(py)
+                .call_method1("read", (buf.len(),))?
+                .extract::<Vec<u8>>()?;
+            let len = data.len().min(buf.len());
+            buf[..len].copy_from_slice(&data[..len]);
+            Ok(len)
+        })
     }
 }
 
 impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        match &mut self.inner {
-            ReaderType::Native(r) => r.seek(pos),
-            ReaderType::Py(r) => Python::attach(|py| {
-                let stream = r.bind(py);
-                let result = match pos {
-                    SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
-                    SeekFrom::Current(offset) => stream.call_method1("seek", (offset, 1)),
-                    SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
-                }?;
-                Ok(result.extract::<u64>()?)
-            }),
-        }
+        Python::attach(|py| {
+            let stream = self.inner.bind(py);
+            let result = match pos {
+                SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
+                SeekFrom::Current(offset) => stream.call_method1("seek", (offset, 1)),
+                SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
+            }?;
+            Ok(result.extract::<u64>()?)
+        })
     }
 }
 
-#[allow(unused)]
-pub enum WriterType {
-    Py(Py<PyAny>),
-    Native(Box<dyn Write>),
-}
-
 pub(crate) struct PyWriterAdapter {
-    inner: WriterType,
+    inner: Py<PyAny>,
 }
 
 #[allow(unused)]
 impl PyWriterAdapter {
-    fn new_native<T: Write + 'static>(inner: T) -> Self {
-        Self {
-            inner: WriterType::Native(Box::new(inner)),
-        }
-    }
-
-    fn new_py(inner: Py<PyAny>) -> Self {
-        Self {
-            inner: WriterType::Py(inner),
-        }
+    fn new(inner: Py<PyAny>) -> Self {
+        Self { inner }
     }
 }
 
@@ -245,21 +213,17 @@ unsafe impl Send for PyWriterAdapter {}
 
 impl Write for PyWriterAdapter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match &mut self.inner {
-            WriterType::Native(r) => r.write(buf),
-            WriterType::Py(r) => Python::attach(|py| {
-                Ok(r.bind(py)
-                    .call_method1("write", (buf,))
-                    .and_then(|result| result.extract::<usize>())?)
-            }),
-        }
+        Python::attach(|py| {
+            Ok(self
+                .inner
+                .bind(py)
+                .call_method1("write", (buf,))
+                .and_then(|result| result.extract::<usize>())?)
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        match &mut self.inner {
-            WriterType::Native(r) => r.flush(),
-            WriterType::Py(r) => Python::attach(|py| Ok(r.bind(py).call_method0("flush").map(|_| ())?)),
-        }
+        Python::attach(|py| Ok(self.inner.bind(py).call_method0("flush").map(|_| ())?))
     }
 }
 

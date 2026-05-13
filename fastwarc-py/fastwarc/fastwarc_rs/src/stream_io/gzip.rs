@@ -47,7 +47,7 @@ impl GzipReaderPy {
         let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(gzip::GzipReader::from_path_with_options(p, options)?)
         } else {
-            Box::new(gzip::GzipReader::with_options(PyReaderAdapter::new_py(inner), options))
+            Box::new(gzip::GzipReader::with_options(PyReaderAdapter::new(inner), options))
         };
         Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
@@ -112,7 +112,7 @@ impl GzipWriterPy {
         let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
             Box::new(gzip::GzipWriter::from_path_with_options(p, options)?)
         } else {
-            Box::new(gzip::GzipWriter::with_options(PyWriterAdapter::new_py(inner), options))
+            Box::new(gzip::GzipWriter::with_options(PyWriterAdapter::new(inner), options))
         };
         Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
