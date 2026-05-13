@@ -14,11 +14,12 @@
 
 use super::impl_macros::*;
 use crate::stream_io::{CompressingStreamPy, DecompressingStreamPy, PyReader, PyWriter};
-use fastwarc::stream_io::CompressingStream;
 use fastwarc::stream_io::gzip;
+use fastwarc::stream_io::{CompressingStream, DecompressingStream};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
@@ -46,12 +47,26 @@ impl GzipReaderPy {
         impl_reader_read!(self, py, size)
     }
 
-    pub fn seek(&self, offset: u64) -> PyResult<u64> {
-        impl_reader_seek!(self, offset)
+    #[pyo3(signature = (offset, whence=0))]
+    pub fn seek(&self, offset: u64, whence: u8) -> PyResult<u64> {
+        impl_reader_seek!(self, offset, whence, seek)
+    }
+
+    #[pyo3(signature = (offset, whence=0))]
+    pub fn inner_seek(&self, offset: u64, whence: u8) -> PyResult<u64> {
+        impl_reader_seek!(self, offset, whence, inner_seek)
     }
 
     pub fn tell(&self) -> PyResult<u64> {
-        impl_reader_tell!(self)
+        forward_fn_call!(self, stream_position)
+    }
+
+    pub fn inner_tell(&self) -> PyResult<u64> {
+        forward_fn_call!(self, inner_stream_position)
+    }
+
+    pub fn member_start_position(&mut self) -> io::Result<u64> {
+        forward_fn_call!(self, member_start_position)
     }
 
     pub fn close(&self) -> PyResult<()> {
@@ -87,11 +102,11 @@ impl GzipWriterPy {
     }
 
     pub fn flush(&self) -> PyResult<()> {
-        impl_writer_flush!(self)
+        forward_fn_call!(self, flush)
     }
 
     pub fn finish(&self) -> PyResult<()> {
-        impl_writer_finish!(self)
+        forward_fn_call!(self, finish)
     }
 
     pub fn close(&self) -> PyResult<()> {

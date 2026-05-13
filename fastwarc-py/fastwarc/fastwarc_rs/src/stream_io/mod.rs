@@ -1,4 +1,6 @@
 // Copyright 2026 Janek Bevendorff
+
+#![allow(clippy::needless_question_mark)]
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +49,20 @@ impl DecompressingStreamPy {
         Ok(py.NotImplemented())
     }
 
+    pub fn inner_seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
+        let _ = offset;
+        Ok(py.NotImplemented())
+    }
+
     pub fn tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+
+    pub fn inner_tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(py.NotImplemented())
+    }
+
+    pub fn member_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
 
@@ -224,29 +239,41 @@ pub(crate) mod impl_macros {
             Ok(PyBytes::new($py, &buf[..n]).unbind())
         }};
     }
+
     pub(crate) use impl_reader_read;
 
     macro_rules! impl_reader_seek {
-        ($self: ident, $offset: ident) => {{
+        ($self: ident, $offset: ident, $whence: ident, $seek_fn_name: ident) => {{
             let mut reader = $self.inner.lock().unwrap();
             let reader = reader
                 .as_mut()
                 .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            Ok(reader.seek(SeekFrom::Start($offset))?)
+            match $whence {
+                0 => Ok(reader.$seek_fn_name(SeekFrom::Start(
+                    u64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
+                ))?),
+                1 => Ok(reader.$seek_fn_name(SeekFrom::Current(
+                    i64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
+                ))?),
+                2 => Ok(reader.$seek_fn_name(SeekFrom::End(
+                    i64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
+                ))?),
+                _ => Err(PyValueError::new_err("Invalid value for `whence` argument. Must be 0, 1, or 2.")),
+            }
         }};
     }
     pub(crate) use impl_reader_seek;
 
-    macro_rules! impl_reader_tell {
-        ($self: ident) => {{
+    macro_rules! forward_fn_call {
+        ($self: ident, $fn_name: ident) => {{
             let mut reader = $self.inner.lock().unwrap();
             let reader = reader
                 .as_mut()
                 .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            Ok(reader.stream_position()?)
+            Ok(reader.$fn_name()?)
         }};
     }
-    pub(crate) use impl_reader_tell;
+    pub(crate) use forward_fn_call;
 
     macro_rules! impl_reader_close {
         ($self: ident) => {{
@@ -267,28 +294,6 @@ pub(crate) mod impl_macros {
         }};
     }
     pub(crate) use impl_writer_write;
-
-    macro_rules! impl_writer_flush {
-        ($self: ident) => {{
-            let mut writer = $self.inner.lock().unwrap();
-            let writer = writer
-                .as_mut()
-                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            Ok(writer.flush()?)
-        }};
-    }
-    pub(crate) use impl_writer_flush;
-
-    macro_rules! impl_writer_finish {
-        ($self: ident) => {{
-            let mut writer = $self.inner.lock().unwrap();
-            let writer = writer
-                .as_mut()
-                .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            Ok(writer.finish()?)
-        }};
-    }
-    pub(crate) use impl_writer_finish;
 
     macro_rules! impl_writer_close {
         ($self: ident) => {{
