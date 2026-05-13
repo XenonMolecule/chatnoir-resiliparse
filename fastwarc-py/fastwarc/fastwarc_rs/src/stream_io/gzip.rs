@@ -16,6 +16,7 @@ use super::impl_macros::*;
 use crate::stream_io::{
     CompressingWriterPy, DecompressingReaderPy, PyReaderAdapter, PyWriterAdapter, path_like_to_string,
 };
+use fastwarc::stream_io::gzip::MAX_WBITS;
 use fastwarc::stream_io::{CompressingWriter, DecompressingReader, gzip};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -41,7 +42,7 @@ impl GzipReaderPy {
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipReaderOptions {
             capacity: buffer_size,
-            window_bits: if zlib { 15 } else { 15 + 16 },
+            window_bits: if zlib { MAX_WBITS } else { MAX_WBITS + 16 },
             expect_header: true,
         };
         let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
@@ -105,7 +106,7 @@ impl GzipWriterPy {
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipWriterOptions {
             capacity: buffer_size,
-            window_bits: if zlib { 15 } else { 15 + 16 },
+            window_bits: if zlib { MAX_WBITS } else { MAX_WBITS + 16 },
             expect_header: true,
             compression_level,
         };
