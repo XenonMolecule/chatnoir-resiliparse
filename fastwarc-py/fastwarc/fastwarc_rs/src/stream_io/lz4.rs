@@ -36,7 +36,7 @@ impl Lz4ReaderPy {
     pub fn __new__(inner: Py<PyAny>, buffer_size: usize) -> (Self, DecompressingStreamPy) {
         (
             Self {
-                inner: Mutex::new(Some(lz4::Lz4Reader::with_capacity(buffer_size, PyReader::new(inner)))),
+                inner: Mutex::new(Some(lz4::Lz4Reader::with_capacity(PyReader::new(inner), buffer_size))),
             },
             DecompressingStreamPy::default(),
         )
@@ -87,7 +87,7 @@ impl Lz4WriterPy {
     pub fn __new__(inner: Py<PyAny>, buffer_size: usize) -> (Self, CompressingStreamPy) {
         (
             Self {
-                inner: Mutex::new(Some(lz4::Lz4Writer::with_capacity(buffer_size, PyWriter::new(inner)))),
+                inner: Mutex::new(Some(lz4::Lz4Writer::with_capacity(PyWriter::new(inner), buffer_size))),
             },
             CompressingStreamPy::default(),
         )

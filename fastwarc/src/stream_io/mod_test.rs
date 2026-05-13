@@ -140,13 +140,13 @@ pub(crate) mod helpers {
     ) -> io::Result<()>
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
-        R: Fn(usize, Cursor<Vec<u8>>) -> S,
+        R: Fn(Cursor<Vec<u8>>, usize) -> S,
         S: DecompressingStream + BufReadSeek,
         I: Fn(S) -> Cursor<Vec<u8>>,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
-        let mut reader = reader_with_capacity_fn(128, Cursor::new(compressed.clone()));
+        let mut reader = reader_with_capacity_fn(Cursor::new(compressed.clone()), 128);
 
         let buf = reader.fill_buf()?.to_vec();
         assert!(!buf.is_empty());
@@ -158,7 +158,7 @@ pub(crate) mod helpers {
         let buf = reader.fill_buf()?.to_vec();
         assert_eq!(buf, plain[3..3 + buf.len()]);
 
-        let fresh_reader = reader_with_capacity_fn(128, Cursor::new(compressed.clone()));
+        let fresh_reader = reader_with_capacity_fn(Cursor::new(compressed.clone()), 128);
         let mut inner = into_inner_fn(fresh_reader);
         assert_eq!(inner.stream_position()?, 0);
 
@@ -175,12 +175,12 @@ pub(crate) mod helpers {
     ) -> io::Result<()>
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
-        R: Fn(usize, Cursor<Vec<u8>>) -> S,
+        R: Fn(Cursor<Vec<u8>>, usize) -> S,
         S: DecompressingStream + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
-        let mut reader = reader_with_capacity_fn(8, Cursor::new(compressed));
+        let mut reader = reader_with_capacity_fn(Cursor::new(compressed), 8);
         let mut out = Vec::with_capacity(plain.len());
 
         loop {
@@ -321,7 +321,7 @@ pub(crate) mod helpers {
     ) -> io::Result<()>
     where
         D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
-        W: Fn(usize, SharedVecWriter) -> S,
+        W: Fn(SharedVecWriter, usize) -> S,
         S: CompressingStream,
     {
         let plain = sample_data();
@@ -329,7 +329,7 @@ pub(crate) mod helpers {
         let shared_data = inner.data();
 
         {
-            let mut writer = writer_with_capacity_fn(11, inner.clone());
+            let mut writer = writer_with_capacity_fn(inner.clone(), 11);
             writer.write_all(&plain)?;
         }
 
@@ -342,16 +342,16 @@ pub(crate) mod helpers {
 
     pub fn test_writer_propagates_inner_flush_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
     where
-        W: Fn(usize, ErrorWriter) -> S,
+        W: Fn(ErrorWriter, usize) -> S,
         S: CompressingStream,
     {
         let plain = sample_data();
         let mut writer = writer_with_capacity_fn(
-            64,
             ErrorWriter {
                 fail_on_write: false,
                 fail_on_flush: true,
             },
+            64,
         );
 
         writer.write_all(&plain)?;
@@ -366,16 +366,16 @@ pub(crate) mod helpers {
 
     pub fn test_writer_propagates_inner_write_errors<W, S>(writer_with_capacity_fn: W) -> io::Result<()>
     where
-        W: Fn(usize, ErrorWriter) -> S,
+        W: Fn(ErrorWriter, usize) -> S,
         S: CompressingStream,
     {
         let plain = sample_data();
         let mut writer = writer_with_capacity_fn(
-            8,
             ErrorWriter {
                 fail_on_write: true,
                 fail_on_flush: false,
             },
+            8,
         );
 
         let mut res = writer.write_all(&plain);

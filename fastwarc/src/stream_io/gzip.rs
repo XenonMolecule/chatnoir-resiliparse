@@ -33,6 +33,36 @@ pub struct GzipReader<T: ReadSeek> {
     decomp_ratio: f32,
 }
 
+pub const MAX_WBITS: u8 = 15;
+
+/// Options for constructing a new [`GzipReader`].
+///
+/// # Options
+///
+/// * `capacity` - sets the internal buffer size.
+/// * `window_bits` - history buffer size, behavior compatible with zlib:
+///   Values between `9..15` are for zlib streams. Values above `15` ([`MAX_WBITS`])
+///   enable gzip header decoding:
+///     * `+16` enables gzip header decoding only,
+///     * `+32` enables gzip/zlib header autodetection.
+/// * `expect_header` - specifies whether a zlib or gzip header is expected or
+///   whether this is a raw stream (equivalent to negative `window_bits` in zlib).
+pub struct GzipReaderOptions {
+    pub capacity: usize,
+    pub window_bits: u8,
+    pub expect_header: bool,
+}
+
+impl Default for GzipReaderOptions {
+    fn default() -> Self {
+        Self {
+            window_bits: MAX_WBITS + 16,
+            expect_header: true,
+            capacity: 4096,
+        }
+    }
+}
+
 impl<T: ReadSeek> GzipReader<T> {
     /// Create a new [`GzipReader`].
     ///
@@ -44,7 +74,7 @@ impl<T: ReadSeek> GzipReader<T> {
     /// The default buffer size is 4096 bytes. For custom buffer sizes, use
     /// [`Self::with_capacity()`].
     pub fn new(inner: T) -> Self {
-        Self::with_capacity(4096, inner)
+        Self::with_options(inner, GzipReaderOptions::default())
     }
 
     /// Create a new [`GzipReader`] with a given buffer capacity.
@@ -57,20 +87,38 @@ impl<T: ReadSeek> GzipReader<T> {
     /// # Arguments
     ///
     /// * `inner` - input (inner) stream to read from
-    pub fn with_capacity(capacity: usize, mut inner: T) -> Self {
-        // Window bits above 15 (MAX_WBITS) enable gzip header decoding:
-        // - +16 enables gzip header decoding only,
-        // - +32 enables gzip/zlib header autodetection (we don't use this here).
-        // This is standard behaviour in zlib, but so far undocumented in zlib-rs.
-        let window_bits = 15 + 16;
+    /// * `capacity` - buffer capacity
+    pub fn with_capacity(inner: T, capacity: usize) -> Self {
+        Self::with_options(
+            inner,
+            GzipReaderOptions {
+                capacity,
+                ..GzipReaderOptions::default()
+            },
+        )
+    }
+
+    /// Create a new [`GzipReader`] with a the supplied options..
+    ///
+    /// Allocates an internal buffer holding chunks of the uncompressed inner
+    /// stream. A second, larger buffer is allocated for the decompressed data.
+    /// Initially, the decompressed buffer will be twice the size of the
+    /// uncompressed buffer, but its size can change based on demand.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - input (inner) stream to read from
+    /// * `options` - reader options
+    pub fn with_options(mut inner: T, options: GzipReaderOptions) -> Self {
+        let window_bits = options.window_bits;
         let decomp_ratio = 2.0;
         let member_pos = inner.stream_position().unwrap_or(0);
         Self {
-            inner: BufReader::with_capacity(capacity, inner),
-            deflate: Inflate::new(true, window_bits),
+            inner: BufReader::with_capacity(options.capacity, inner),
+            deflate: Inflate::new(options.expect_header, window_bits),
             stream_pos: 0,
             member_pos,
-            buf: vec![0; capacity * decomp_ratio as usize],
+            buf: vec![0; options.capacity * decomp_ratio as usize],
             buf_pos: 0,
             buf_len: 0,
             window_bits,
@@ -109,6 +157,27 @@ impl<T: ReadSeek> GzipReader<T> {
             // println!("Shrinking output buffer to {}", target_buf_size);
             self.buf.truncate(target_buf_size);
         }
+    }
+}
+
+impl GzipReader<std::fs::File> {
+    /// Create a [`GzipReader] from a file path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - file path
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Ok(Self::new(std::fs::File::open(path)?))
+    }
+
+    /// Create a [`GzipReader] from a file path with a given buffer capacity.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - file path
+    /// * `inner` - input (inner) stream to read from
+    pub fn from_path_with_options(path: impl AsRef<std::path::Path>, options: GzipReaderOptions) -> io::Result<Self> {
+        Ok(Self::with_options(std::fs::File::open(path)?, options))
     }
 }
 
@@ -225,6 +294,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
 // GzipWriter
 // ===========================================================
 
+/// Writer for Gzip-compressed streams.
 pub struct GzipWriter<T: Write> {
     inner: Option<T>,
     deflate: Deflate,
@@ -233,6 +303,37 @@ pub struct GzipWriter<T: Write> {
     buf_pos: usize,
     level: i32,
     window_bits: u8,
+}
+
+/// Options for constructing a new [`GzipWriter`].
+///
+/// # Options
+///
+/// * `capacity` - sets the internal buffer size.
+/// * `window_bits` - history buffer size, behavior compatible with zlib:
+///   Values between `9..15` are for zlib streams. Values above `15` ([`MAX_WBITS`])
+///   enable gzip header encoding:
+///     * `+16` enables gzip header encoding only,
+///     * `+32` enables gzip/zlib header autodetection.
+/// * `expect_header` - specifies whether a zlib or gzip header is expected or
+///   whether this is a raw stream (equivalent to negative `window_bits` in zlib).
+/// * `compression_level` - gzip / DEFLATE compression level to use (`9` is best)
+pub struct GzipWriterOptions {
+    pub capacity: usize,
+    pub window_bits: u8,
+    pub expect_header: bool,
+    pub compression_level: i32,
+}
+
+impl Default for GzipWriterOptions {
+    fn default() -> Self {
+        Self {
+            window_bits: MAX_WBITS + 16,
+            expect_header: true,
+            capacity: 8192,
+            compression_level: 9,
+        }
+    }
 }
 
 impl<T: Write> GzipWriter<T> {
@@ -249,42 +350,43 @@ impl<T: Write> GzipWriter<T> {
     ///
     /// * `inner` - inner stream to write compressed output to
     pub fn new(inner: T) -> Self {
-        Self::with_capacity(8192, inner)
+        Self::with_options(inner, GzipWriterOptions::default())
     }
 
     /// Create a new [`GzipWriter`] a custom write buffer size.
-    ///
-    /// Maintains a small write buffer to temporarily store compressed data before flushing them
-    /// to the underlying stream.
     ///
     /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom
     /// compression levels.
     ///
     /// # Arguments
     ///
-    /// * `capacity` - write buffer size
     /// * `inner` - inner stream to write compressed output to
-    pub fn with_capacity(capacity: usize, inner: T) -> Self {
-        Self::with_capacity_comp_level(capacity, inner, 9)
+    /// * `capacity` - write buffer size
+    pub fn with_capacity(inner: T, capacity: usize) -> Self {
+        Self::with_options(
+            inner,
+            GzipWriterOptions {
+                capacity,
+                ..GzipWriterOptions::default()
+            },
+        )
     }
 
-    /// Create a new [`GzipWriter`] with a custom write buffer size and compression level.
+    /// Create a new [`GzipWriter`] with the supplied options.
     ///
     /// # Arguments
     ///
-    /// * `capacity` - write buffer size
     /// * `inner` - inner stream to write compressed output to
-    /// * `level` - compression level (1-9)
-    pub fn with_capacity_comp_level(capacity: usize, inner: T, level: i32) -> Self {
-        let window_bits = 15 + 16;
+    /// * `options` - writer options
+    pub fn with_options(inner: T, options: GzipWriterOptions) -> Self {
         Self {
             inner: Some(inner),
-            deflate: Deflate::new(level, true, window_bits),
+            deflate: Deflate::new(options.compression_level, options.expect_header, options.window_bits),
             member_started: false,
-            buf: vec![0; capacity],
+            buf: vec![0; options.capacity],
             buf_pos: 0,
-            level,
-            window_bits,
+            level: options.compression_level,
+            window_bits: options.window_bits,
         }
     }
 

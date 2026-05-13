@@ -111,7 +111,7 @@ fn gzip_reader_returns_error_for_invalid_gzip_data() {
 
 #[test]
 fn gzip_reader_update_buf_size_grows_and_shrinks_buffer() {
-    let mut reader = GzipReader::with_capacity(128, Cursor::new(Vec::new()));
+    let mut reader = GzipReader::with_capacity(Cursor::new(Vec::new()), 128);
     let initial_len = reader.buf.len();
 
     // A very high output-to-input ratio should force the decompressed buffer to grow.
@@ -133,7 +133,7 @@ fn gzip_reader_update_buf_size_grows_and_shrinks_buffer() {
 
 #[test]
 fn gzip_writer_returns_error_when_deflate_is_left_in_finish_state() {
-    let mut writer = GzipWriter::with_capacity(1, Vec::new());
+    let mut writer = GzipWriter::with_capacity(Vec::new(), 1);
     let mut out = [0u8; 64];
 
     // Finish the raw deflater directly so GzipWriter does not get a chance to reset it.
@@ -151,7 +151,7 @@ fn gzip_writer_with_capacity_flush_and_write_with_flush_opt() -> io::Result<()> 
     let plain = sample_data();
     let inner = SharedVecWriter::new();
     let shared_data = inner.data();
-    let mut writer = GzipWriter::with_capacity(8, inner.clone());
+    let mut writer = GzipWriter::with_capacity(inner.clone(), 8);
 
     assert_eq!(writer.write_with_flush_opt(&plain[..64], DeflateFlush::SyncFlush)?, 64);
     writer.flush()?;
@@ -173,7 +173,12 @@ fn gzip_writer_with_capacity_comp_level_finish_and_set_level_create_members() ->
     let first_plain = b"level-one member\n".repeat(40);
     let second_plain = b"level-nine member\n".repeat(40);
 
-    let mut writer = GzipWriter::with_capacity_comp_level(9, Vec::new(), 1);
+    let options = GzipWriterOptions {
+        capacity: 1,
+        compression_level: 9,
+        ..Default::default()
+    };
+    let mut writer = GzipWriter::with_options(Vec::new(), options);
     writer.write_all(&first_plain)?;
 
     // The level change only applies to the next member after finish() resets the compressor.

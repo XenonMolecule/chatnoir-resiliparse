@@ -32,14 +32,17 @@ pub struct GzipReaderPy {
 #[pymethods]
 impl GzipReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096))]
-    pub fn __new__(inner: Py<PyAny>, buffer_size: usize) -> (Self, DecompressingStreamPy) {
-        (
-            Self {
-                inner: Mutex::new(Some(gzip::GzipReader::with_capacity(buffer_size, PyReader::new(inner)))),
-            },
-            DecompressingStreamPy::default(),
-        )
+    #[pyo3(signature = (inner, buffer_size=4096, zlib=false))]
+    pub fn __new__(inner: Py<PyAny>, buffer_size: usize, zlib: bool) -> (Self, DecompressingStreamPy) {
+        let options = gzip::GzipReaderOptions {
+            capacity: buffer_size,
+            window_bits: if zlib { 15 } else { 15 + 16 },
+            expect_header: true,
+        };
+        let slf = Self {
+            inner: Mutex::new(Some(gzip::GzipReader::with_options(PyReader::new(inner), options))),
+        };
+        (slf, DecompressingStreamPy::default())
     }
 
     #[pyo3(signature = (size=-1))]
@@ -83,18 +86,23 @@ pub struct GzipWriterPy {
 #[pymethods]
 impl GzipWriterPy {
     #[new]
-    #[pyo3(signature = (inner, compression_level=9, buffer_size=8192))]
-    pub fn __new__(inner: Py<PyAny>, compression_level: i32, buffer_size: usize) -> (Self, CompressingStreamPy) {
-        (
-            Self {
-                inner: Mutex::new(Some(gzip::GzipWriter::with_capacity_comp_level(
-                    buffer_size,
-                    PyWriter::new(inner),
-                    compression_level,
-                ))),
-            },
-            CompressingStreamPy::default(),
-        )
+    #[pyo3(signature = (inner, compression_level=9, buffer_size=8192, zlib=false))]
+    pub fn __new__(
+        inner: Py<PyAny>,
+        compression_level: i32,
+        buffer_size: usize,
+        zlib: bool,
+    ) -> (Self, CompressingStreamPy) {
+        let options = gzip::GzipWriterOptions {
+            capacity: buffer_size,
+            window_bits: if zlib { 15 } else { 15 + 16 },
+            expect_header: true,
+            compression_level,
+        };
+        let slf = Self {
+            inner: Mutex::new(Some(gzip::GzipWriter::with_options(PyWriter::new(inner), options))),
+        };
+        (slf, CompressingStreamPy::default())
     }
 
     pub fn write(&self, data: &[u8]) -> PyResult<usize> {
