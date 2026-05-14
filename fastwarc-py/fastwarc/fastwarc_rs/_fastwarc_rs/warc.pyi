@@ -13,7 +13,7 @@
 # limitations under the License.
 from datetime import datetime
 from enum import IntFlag
-from typing import BinaryIO, Dict, Iterator, Literal, Optional, Self, Tuple, Union
+from typing import BinaryIO, Callable, Dict, Iterable, Iterator, Literal, Optional, Self, Tuple, Union
 
 from .stream_io import _GenericReader, _GenericWriter, Reader, Writer
 
@@ -159,3 +159,22 @@ class WarcRecord:
             payload_digest: Optional[bytes] = None,
             chunk_size: int = 16384
     ) -> int: ...
+
+
+class ArchiveIterator(Iterable[WarcRecord]):
+    def __new__(
+            cls,
+            stream: Union[Reader, BinaryIO, _GenericReader],
+            record_types: WarcRecordType = any_type,
+            parse_http: bool = True,
+            min_content_length: int = -1,
+            max_content_length: int = -1,
+            func_filter: Optional[Callable[[WarcRecord], bool]] = None,
+            verify_digests: bool = False,
+            strict_mode: bool = True,
+            auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none',
+    ) -> Self: ...
+
+    def __iter__(self) -> Iterator[WarcRecord]: ...
+
+    def __next__(self) -> WarcRecord: ...

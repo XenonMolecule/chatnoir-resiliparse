@@ -1519,6 +1519,8 @@ impl Iterator for WarcRecord {
 /// to multiple records in a row.
 pub struct ArchiveIterator {
     cur: Rc<RefCell<WarcRecord>>,
+    parse_http: bool,
+    verify_digests: bool,
 }
 
 /// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
@@ -1540,7 +1542,21 @@ impl ArchiveIterator {
     pub fn new(reader: Box<dyn BufReadSeek + Send>) -> Self {
         let empty = Rc::new(RefCell::new(WarcRecord::new()));
         empty.borrow_mut().attach_reader(reader);
-        Self { cur: empty }
+        Self {
+            cur: empty,
+            parse_http: false,
+            verify_digests: false,
+        }
+    }
+
+    /// Enable or disable automatic HTTP parsing on iterated records.
+    pub fn set_parse_http(&mut self, parse_http: bool) {
+        self.parse_http = parse_http;
+    }
+
+    /// Enable or disable skipping records with missing or invalid block digests.
+    pub fn set_verify_digests(&mut self, verify_digests: bool) {
+        self.verify_digests = verify_digests;
     }
 
     /// Create a new WARC record iterator with a filter predicate.
@@ -1573,13 +1589,26 @@ impl Iterator for ArchiveIterator {
     type Item = Result<Rc<RefCell<WarcRecord>>, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.cur.borrow_mut().next()?;
-        match next {
-            Ok(n) => {
-                self.cur.replace(n);
-                Some(Ok(self.cur.clone()))
+        loop {
+            let next = self.cur.borrow_mut().next()?;
+            match next {
+                Ok(n) => {
+                    self.cur.replace(n);
+                    let mut record = self.cur.borrow_mut();
+                    if self.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
+                        continue;
+                    }
+                    if self.parse_http
+                        && record.is_http()
+                        && let Err(e) = record.parse_http()
+                    {
+                        return Some(Err(e));
+                    }
+                    drop(record);
+                    return Some(Ok(self.cur.clone()));
+                }
+                Err(e) => return Some(Err(e)),
             }
-            Err(e) => Some(Err(e)),
         }
     }
 }
