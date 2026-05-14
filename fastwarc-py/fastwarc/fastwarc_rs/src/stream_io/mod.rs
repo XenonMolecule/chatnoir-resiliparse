@@ -155,13 +155,13 @@ impl CompressingWriterPy {
 // Adapters for Python file-like objects
 // ===========================================================
 
-struct PyReaderAdapter {
+pub(crate) struct PyReaderAdapter {
     inner: Py<PyAny>,
 }
 
 #[allow(unused)]
 impl PyReaderAdapter {
-    fn new(inner: Py<PyAny>) -> Self {
+    pub fn new(inner: Py<PyAny>) -> Self {
         Self { inner }
     }
 }
@@ -204,7 +204,7 @@ pub(crate) struct PyWriterAdapter {
 
 #[allow(unused)]
 impl PyWriterAdapter {
-    fn new(inner: Py<PyAny>) -> Self {
+    pub fn new(inner: Py<PyAny>) -> Self {
         Self { inner }
     }
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod stream_io;
+mod warc;
 
 use pyo3::prelude::*;
 
@@ -22,17 +23,14 @@ pub mod _fastwarc_rs {
 
     #[pymodule_init]
     pub fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        Python::attach(|py| {
-            // Register submodules to make them importable.
-            // https://github.com/PyO3/pyo3/issues/759#issuecomment-2282197848
-            let parent_name: String = m.getattr("__name__")?.extract()?;
-            let sys_modules = py.import("sys")?.getattr("modules")?;
+        // Register submodules to make them importable.
+        // https://github.com/PyO3/pyo3/issues/759#issuecomment-2282197848
+        let parent_name: String = m.getattr("__name__")?.extract()?;
+        let sys_modules = m.py().import("sys")?.getattr("modules")?;
+        sys_modules.set_item(format!("{parent_name}.stream_io"), m.getattr("stream_io")?)?;
+        sys_modules.set_item(format!("{parent_name}.warc"), m.getattr("warc")?)?;
 
-            let stream_io = m.getattr("stream_io")?;
-            sys_modules.set_item(format!("{parent_name}.stream_io"), stream_io)?;
-
-            Ok(())
-        })
+        Ok(())
     }
 
     #[pymodule]
@@ -45,5 +43,31 @@ pub mod _fastwarc_rs {
 
         #[pymodule_export]
         pub use crate::stream_io::lz4::{Lz4ReaderPy, Lz4WriterPy};
+    }
+
+    #[pymodule]
+    pub mod warc {
+        use super::*;
+
+        #[pymodule_init]
+        fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
+            // Re-export enum members as individual constants.
+            m.add("warcinfo", WarcRecordTypePy::warcinfo)?;
+            m.add("response", WarcRecordTypePy::response)?;
+            m.add("resource", WarcRecordTypePy::resource)?;
+            m.add("request", WarcRecordTypePy::request)?;
+            m.add("metadata", WarcRecordTypePy::metadata)?;
+            m.add("revisit", WarcRecordTypePy::revisit)?;
+            m.add("conversion", WarcRecordTypePy::conversion)?;
+            m.add("continuation", WarcRecordTypePy::continuation)?;
+            m.add("unknown", WarcRecordTypePy::unknown)?;
+            m.add("no_type", WarcRecordTypePy::no_type)?;
+            m.add("any_type", WarcRecordTypePy::any_type)?;
+
+            Ok(())
+        }
+
+        #[pymodule_export]
+        pub use crate::warc::{HeaderMapPy, WarcRecordTypePy};
     }
 }
