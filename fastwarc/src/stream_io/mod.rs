@@ -125,14 +125,14 @@ pub(crate) use impl_stream_from_path;
 /// A limited seekable buffered reader.
 /// Wraps an existing [`BufReadSeek`] reader, terminating when `limit` is reached.
 pub struct LimitedBufReadSeek {
-    pub(crate) reader: Box<dyn BufReadSeek>,
+    pub(crate) reader: Box<dyn BufReadSeek + Send>,
     pub(crate) limit: u64,
     pub(crate) pos: u64,
 }
 
 impl LimitedBufReadSeek {
     /// Create a new limited reader from a buffered reader instance.
-    pub fn new(reader: Box<dyn BufReadSeek>, limit: Option<u64>) -> Self {
+    pub fn new(reader: Box<dyn BufReadSeek + Send>, limit: Option<u64>) -> Self {
         Self {
             reader,
             limit: limit.unwrap_or(u64::MAX),
@@ -155,7 +155,7 @@ impl LimitedBufReadSeek {
 
     /// Replace the internal stream with a new one and hand ownership of the previous
     /// stream back to the caller. Resets `limit` and `pos`.
-    pub fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek> {
+    pub fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send> {
         self.limit = u64::MAX;
         self.pos = 0;
         mem::replace(&mut self.reader, new_reader)

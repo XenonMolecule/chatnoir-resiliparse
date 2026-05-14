@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from datetime import datetime
 from enum import IntFlag
-from typing import BinaryIO, Dict, Iterator, Optional, Self, Tuple, Union
+from typing import BinaryIO, Dict, Iterator, Literal, Optional, Self, Tuple, Union
 
-from fastwarc.fastwarc_rs._fastwarc_rs.stream_io import _GenericReader
+from .stream_io import _GenericReader, _GenericWriter, Reader, Writer
 
 
 class WarcRecordType(IntFlag):
@@ -51,13 +51,13 @@ class HeaderMap:
     status_line: Optional[str]
     status_line_bytes: Optional[bytes]
 
-    def __new__(cls, encoding: str = "utf-8") -> Self: ...
+    def __new__(cls, encoding: str = 'utf-8') -> Self: ...
 
     def encoding(self) -> str: ...
 
-    def parse(self, reader: Union[BinaryIO, _GenericReader], has_status_line: bool = True) -> int: ...
+    def parse(self, reader: Union[Reader, BinaryIO, _GenericReader], has_status_line: bool = True) -> int: ...
 
-    def write(self, writer: Union[BinaryIO, _GenericReader]) -> int: ...
+    def write(self, writer: Union[Reader, BinaryIO, _GenericReader]) -> int: ...
 
     def append(self, key: str, value: str): ...
 
@@ -112,3 +112,50 @@ class HeaderMap:
     def __setitem__(self, key: str, value: str): ...
 
     def __contains__(self, item: str) -> bool: ...
+
+
+class WarcRecord:
+    record_id: str
+    record_type: WarcRecordType
+    content_length: int
+    record_date: Optional[datetime]
+    headers: HeaderMap
+    is_http: bool
+    is_http_parsed: bool
+    http_headers: Optional[HeaderMap]
+    http_content_type: Optional[str]
+    http_charset: Optional[str]
+    http_date: Optional[datetime]
+    http_last_modified: Optional[datetime]
+    reader: Reader
+    stream_pos: int
+    is_frozen: bool
+
+    def init_headers(
+            self, content_length: int = 0, record_type: WarcRecordType = no_type, record_urn: Optional[bytes] = None
+    ) -> None: ...
+
+    def freeze(self) -> bool: ...
+
+    def set_bytes_content(self, content: bytes) -> None: ...
+
+    def set_bytes_payload(self, content: bytes) -> None: ...
+
+    def consume(self, n: Optional[int] = None) -> int: ...
+
+    def parse_warc_headers(self, quirks_mode: bool = False) -> int: ...
+
+    def parse_http(self, strict_mode: bool = True,
+                   auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none') -> None: ...
+
+    def verify_block_digest(self, consume: bool = False) -> bool: ...
+
+    def verify_payload_digest(self, consume: bool = False) -> bool: ...
+
+    def write(
+            self,
+            stream: Union[Writer, BinaryIO, _GenericWriter],
+            checksum_data: bool = False,
+            payload_digest: Optional[bytes] = None,
+            chunk_size: int = 16384
+    ) -> int: ...

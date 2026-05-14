@@ -68,6 +68,6 @@ pub mod _fastwarc_rs {
         }
 
         #[pymodule_export]
-        pub use crate::warc::{HeaderMapPy, WarcRecordTypePy};
+        pub use crate::warc::{HeaderMapPy, WarcRecordPy, WarcRecordTypePy};
     }
 }

@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
 use std::ops::Deref;
 use std::rc::Rc;
@@ -703,7 +704,7 @@ pub struct WarcRecord {
     http_charset: Option<String>,
     http_headers: Option<HeaderMap>,
     reader: Option<LimitedBufReadSeek>,
-    reader_original: Option<Box<dyn BufReadSeek>>,
+    reader_original: Option<Box<dyn BufReadSeek + Send>>,
     stream_pos: u64,
     frozen: bool,
 }
@@ -715,6 +716,18 @@ pub enum DigestError {
     FormatError(String),
     NoPayload(String),
     StreamError(String),
+}
+
+impl Display for DigestError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DigestError::Missing(s) => write!(f, "Missing digest header: {}", s),
+            DigestError::Unsupported(s) => write!(f, "Unsupported digest algorithm: {}", s),
+            DigestError::FormatError(s) => write!(f, "Digest format error: {}", s),
+            DigestError::NoPayload(s) => write!(f, "Missing payload: {}", s),
+            DigestError::StreamError(s) => write!(f, "Stream error: {}", s),
+        }
+    }
 }
 
 impl fmt::Debug for WarcRecord {
@@ -772,7 +785,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// WARC record parsed from the stream.
-    pub fn from_reader(reader: Box<dyn BufReadSeek>) -> Result<Self, io::Error> {
+    pub fn from_reader(reader: Box<dyn BufReadSeek + Send>) -> Result<Self, io::Error> {
         match Self::_from_reader_internal(reader)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
@@ -791,7 +804,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn _from_reader_internal(reader: Box<dyn BufReadSeek>) -> Result<Option<Self>, io::Error> {
+    fn _from_reader_internal(reader: Box<dyn BufReadSeek + Send>) -> Result<Option<Self>, io::Error> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
         if record.parse_warc_headers()? == 0 {
@@ -824,7 +837,7 @@ impl WarcRecord {
     /// # Arguments
     ///
     /// * `reader` - Shared pointer to a buffered reader instance
-    pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek>) {
+    pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek + Send>) {
         self.reader = Some(LimitedBufReadSeek::new(reader, None));
         self.frozen = false;
     }
@@ -867,7 +880,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// Reader instance or `None`
-    pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek>> {
+    pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek + Send>> {
         self.frozen = false;
         if self.reader_original.is_some() {
             self.reader_original.take()
@@ -1392,7 +1405,7 @@ impl WarcRecord {
         let digest = self
             .headers
             .get("WARC-Block-Digest")
-            .ok_or_else(|| DigestError::Missing("Missing WARC-Block-Digest header".into()))?
+            .ok_or_else(|| DigestError::Missing("WARC-Block-Digest".into()))?
             .to_string();
         self._verify_digest(&digest, consume)
     }
@@ -1415,7 +1428,7 @@ impl WarcRecord {
         let digest = self
             .headers
             .get("WARC-Payload-Digest")
-            .ok_or_else(|| DigestError::Missing("Missing WARC-Payload-Digest header".into()))?
+            .ok_or_else(|| DigestError::Missing("WARC-Payload-Digest".into()))?
             .to_string();
         self._verify_digest(&digest, consume)
     }
@@ -1524,7 +1537,7 @@ impl ArchiveIterator {
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance to attach to records
-    pub fn new(reader: Box<dyn BufReadSeek>) -> Self {
+    pub fn new(reader: Box<dyn BufReadSeek + Send>) -> Self {
         let empty = Rc::new(RefCell::new(WarcRecord::new()));
         empty.borrow_mut().attach_reader(reader);
         Self { cur: empty }
@@ -1536,7 +1549,7 @@ impl ArchiveIterator {
     ///
     /// * `reader` - buffered reader instance to attach to records
     /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
-    pub fn with_filter<F>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIterator<F>
+    pub fn with_filter<F>(reader: Box<dyn BufReadSeek + Send>, filter: F) -> FilteredArchiveIterator<F>
     where
         F: Fn(&mut WarcRecord) -> bool,
     {
@@ -1551,7 +1564,7 @@ impl ArchiveIterator {
     /// # Returns
     ///
     /// Reader instances originally attached to this iterator.
-    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek>> {
+    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek + Send>> {
         self.cur.take().detach_reader()
     }
 }
@@ -1689,7 +1702,7 @@ fn _get_digest(algorithm: &str) -> Result<Box<dyn DynDigest>, DigestError> {
             use sha2::Sha512;
             Ok(Box::new(Sha512::new()))
         }
-        _ => Err(DigestError::Unsupported(format!("Unsupported hash algorithm: {}", algorithm))),
+        _ => Err(DigestError::Unsupported(algorithm.to_string())),
     }
 }
 

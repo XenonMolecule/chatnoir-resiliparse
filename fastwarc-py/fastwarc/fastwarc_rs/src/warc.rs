@@ -13,11 +13,17 @@
 // limitations under the License.
 
 use crate::stream_io::{PyReaderAdapter, PyWriterAdapter};
-use fastwarc::record::{HeaderEncoding, HeaderMap};
-use pyo3::exceptions::{PyKeyError, PyValueError};
+use fastwarc::record::DigestError::StreamError;
+use fastwarc::record::{HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
 use std::io::BufReader;
+use std::sync::Mutex;
+
+// ===========================================================
+// WarcRecordType
+// ===========================================================
 
 #[allow(non_camel_case_types)]
 #[pyclass(name = "WarcRecordType", eq, eq_int, from_py_object)]
@@ -36,10 +42,56 @@ pub enum WarcRecordTypePy {
     no_type = 0,
 }
 
+impl From<WarcRecordTypePy> for WarcRecordType {
+    fn from(value: WarcRecordTypePy) -> Self {
+        match value {
+            WarcRecordTypePy::warcinfo => WarcRecordType::WarcInfo,
+            WarcRecordTypePy::response => WarcRecordType::Response,
+            WarcRecordTypePy::resource => WarcRecordType::Resource,
+            WarcRecordTypePy::request => WarcRecordType::Request,
+            WarcRecordTypePy::metadata => WarcRecordType::Metadata,
+            WarcRecordTypePy::revisit => WarcRecordType::Revisit,
+            WarcRecordTypePy::conversion => WarcRecordType::Conversion,
+            WarcRecordTypePy::continuation => WarcRecordType::Continuation,
+            WarcRecordTypePy::unknown => WarcRecordType::Unknown,
+            WarcRecordTypePy::any_type => WarcRecordType::AnyType,
+            WarcRecordTypePy::no_type => WarcRecordType::NoType,
+        }
+    }
+}
+
+impl From<WarcRecordType> for WarcRecordTypePy {
+    fn from(value: WarcRecordType) -> Self {
+        match value {
+            WarcRecordType::WarcInfo => WarcRecordTypePy::warcinfo,
+            WarcRecordType::Response => WarcRecordTypePy::response,
+            WarcRecordType::Resource => WarcRecordTypePy::resource,
+            WarcRecordType::Request => WarcRecordTypePy::request,
+            WarcRecordType::Metadata => WarcRecordTypePy::metadata,
+            WarcRecordType::Revisit => WarcRecordTypePy::revisit,
+            WarcRecordType::Conversion => WarcRecordTypePy::conversion,
+            WarcRecordType::Continuation => WarcRecordTypePy::continuation,
+            WarcRecordType::Unknown => WarcRecordTypePy::unknown,
+            WarcRecordType::AnyType => WarcRecordTypePy::any_type,
+            WarcRecordType::NoType => WarcRecordTypePy::no_type,
+        }
+    }
+}
+
+// ===========================================================
+// HeaderMap
+// ===========================================================
+
 #[pyclass(name = "HeaderMap")]
 #[derive(Default)]
 pub struct HeaderMapPy {
     inner: HeaderMap,
+}
+
+impl From<HeaderMap> for HeaderMapPy {
+    fn from(inner: HeaderMap) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
@@ -271,5 +323,270 @@ impl HeaderMapPy {
 
     pub fn __contains__(&self, item: &str) -> bool {
         self.inner.contains_key(item)
+    }
+}
+
+// ===========================================================
+// WarcRecord
+// ===========================================================
+
+#[pyclass(name = "WarcRecord")]
+pub struct WarcRecordPy {
+    inner: Mutex<WarcRecord>,
+}
+
+#[pymethods]
+impl WarcRecordPy {
+    #[new]
+    pub fn __new__() -> Self {
+        Self {
+            inner: Mutex::new(WarcRecord::new()),
+        }
+    }
+
+    #[getter]
+    pub fn record_id<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        self.inner
+            .lock()
+            .unwrap()
+            .record_id()
+            .map(|s| PyString::new(py, s.as_ref()))
+    }
+
+    #[getter]
+    pub fn record_type(&self) -> WarcRecordTypePy {
+        self.inner.lock().unwrap().record_type().into()
+    }
+
+    #[setter]
+    pub fn set_record_type(&mut self, record_type: WarcRecordTypePy) {
+        self.inner.lock().unwrap().set_record_type(record_type.into());
+    }
+
+    #[getter]
+    pub fn content_length(&self) -> u64 {
+        self.inner.lock().unwrap().content_length()
+    }
+
+    #[getter]
+    pub fn record_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        let inner = self.inner.lock().unwrap();
+        let Some(value) = inner.headers().get("WARC-Date") else {
+            return Ok(None);
+        };
+        let datetime_module = py.import("datetime")?;
+        let datetime = datetime_module.getattr("datetime")?;
+        let normalized = value.replace('Z', "+00:00");
+        match datetime.call_method1("fromisoformat", (normalized,)) {
+            Ok(obj) => Ok(Some(obj)),
+            Err(_) => Ok(None),
+        }
+    }
+
+    #[getter]
+    pub fn headers(&self) -> HeaderMapPy {
+        self.inner.lock().unwrap().headers().clone().into()
+    }
+
+    #[getter]
+    pub fn is_http(&self) -> bool {
+        self.inner.lock().unwrap().is_http()
+    }
+
+    #[setter]
+    pub fn set_is_http(&mut self, is_http: bool) {
+        self.inner.lock().unwrap().set_is_http(is_http);
+    }
+
+    #[getter]
+    pub fn is_http_parsed(&self) -> bool {
+        self.inner.lock().unwrap().is_http_parsed()
+    }
+
+    #[getter]
+    pub fn http_headers(&self) -> Option<HeaderMapPy> {
+        self.inner.lock().unwrap().http_headers().cloned().map(Into::into)
+    }
+
+    #[getter]
+    pub fn http_content_type<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        self.inner
+            .lock()
+            .unwrap()
+            .http_content_type()
+            .as_deref()
+            .map(|s| PyString::new(py, s))
+    }
+
+    #[getter]
+    pub fn http_charset<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        self.inner.lock().unwrap().http_charset().map(|s| PyString::new(py, s))
+    }
+
+    #[getter]
+    pub fn http_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        http_datetime_to_py(
+            py,
+            self.inner
+                .lock()
+                .unwrap()
+                .http_headers()
+                .and_then(|h| h.get("Date"))
+                .as_deref(),
+        )
+    }
+
+    #[getter]
+    pub fn http_last_modified<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        http_datetime_to_py(
+            py,
+            self.inner
+                .lock()
+                .unwrap()
+                .http_headers()
+                .and_then(|h| h.get("Last-Modified"))
+                .as_deref(),
+        )
+    }
+
+    #[getter]
+    pub fn reader<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        py.None().bind(py).clone()
+    }
+
+    #[getter]
+    pub fn stream_pos(&self) -> u64 {
+        self.inner.lock().unwrap().stream_pos()
+    }
+
+    #[getter]
+    pub fn is_frozen(&self) -> bool {
+        self.inner.lock().unwrap().is_frozen()
+    }
+
+    #[pyo3(signature = (content_length=0, record_type=WarcRecordTypePy::no_type, record_urn=None))]
+    pub fn init_headers(&mut self, content_length: u64, record_type: WarcRecordTypePy, record_urn: Option<&[u8]>) {
+        self.inner
+            .lock()
+            .unwrap()
+            .init_headers(content_length, Some(record_type.into()), record_urn);
+    }
+
+    pub fn freeze(&mut self) -> PyResult<bool> {
+        self.inner.lock().unwrap().freeze()?;
+        Ok(true)
+    }
+
+    pub fn set_bytes_content(&mut self, content: &[u8]) {
+        self.set_bytes_payload(content);
+    }
+
+    pub fn set_bytes_payload(&mut self, content: &[u8]) {
+        self.inner.lock().unwrap().set_bytes_payload(content.to_vec());
+    }
+
+    #[pyo3(signature = (n=None))]
+    pub fn consume(&mut self, n: Option<usize>) -> PyResult<usize> {
+        match n {
+            Some(n) => Ok(self.inner.lock().unwrap().consume_n(n)?),
+            None => Ok(self.inner.lock().unwrap().consume()?),
+        }
+    }
+
+    #[pyo3(signature = (quirks_mode=false))]
+    pub fn parse_warc_headers(&mut self, quirks_mode: bool) -> PyResult<usize> {
+        if quirks_mode {
+            Ok(self.inner.lock().unwrap().parse_warc_headers_quirks(quirks_mode)?)
+        } else {
+            Ok(self.inner.lock().unwrap().parse_warc_headers()?)
+        }
+    }
+
+    #[pyo3(signature = (strict_mode=true, auto_decode="none"))]
+    pub fn parse_http(&mut self, strict_mode: bool, auto_decode: &str) -> PyResult<()> {
+        // TODO: Implement parameters
+        let _ = (strict_mode, auto_decode);
+        self.inner.lock().unwrap().parse_http()?;
+        Ok(())
+    }
+
+    #[pyo3(signature = (consume=false))]
+    pub fn verify_block_digest(&mut self, consume: bool) -> PyResult<bool> {
+        self.inner
+            .lock()
+            .unwrap()
+            .verify_block_digest(consume)
+            .map_err(|e| match e {
+                StreamError(_) => PyOSError::new_err(e.to_string()),
+                _ => PyValueError::new_err(e.to_string()),
+            })
+    }
+
+    #[pyo3(signature = (consume=false))]
+    pub fn verify_payload_digest(&mut self, consume: bool) -> PyResult<bool> {
+        self.inner
+            .lock()
+            .unwrap()
+            .verify_payload_digest(consume)
+            .map_err(|e| match e {
+                StreamError(_) => PyOSError::new_err(e.to_string()),
+                _ => PyValueError::new_err(e.to_string()),
+            })
+    }
+
+    #[pyo3(signature = (stream, checksum_data=false, payload_digest=None, chunk_size=16384))]
+    pub fn write<'py>(
+        &mut self,
+        py: Python<'py>,
+        stream: Bound<'py, PyAny>,
+        checksum_data: bool,
+        payload_digest: Option<&[u8]>,
+        chunk_size: usize,
+    ) -> PyResult<usize> {
+        if let Some(payload_digest) = payload_digest
+            && !checksum_data
+        {
+            let encoded = py
+                .import("base64")?
+                .getattr("b32encode")?
+                .call1((PyBytes::new(py, payload_digest),))?
+                .extract::<Bound<'_, PyBytes>>()?;
+            let mut digest_header = b"sha1:".to_vec();
+            digest_header.extend_from_slice(encoded.as_bytes());
+            self.inner
+                .lock()
+                .unwrap()
+                .headers_mut()
+                .set_bytes(b"WARC-Payload-Digest", &digest_header);
+        }
+
+        let mut writer = PyWriterAdapter::new(stream.unbind());
+        if checksum_data {
+            Ok(self
+                .inner
+                .lock()
+                .unwrap()
+                .write_with_block_size_checksum(&mut writer, chunk_size, true)?)
+        } else {
+            Ok(self
+                .inner
+                .lock()
+                .unwrap()
+                .write_with_block_size(&mut writer, chunk_size)?)
+        }
+    }
+}
+
+fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let parsed = py
+        .import("email.utils")?
+        .getattr("parsedate_to_datetime")?
+        .call1((value,));
+    match parsed {
+        Ok(obj) => Ok(Some(obj)),
+        Err(_) => Ok(None),
     }
 }
