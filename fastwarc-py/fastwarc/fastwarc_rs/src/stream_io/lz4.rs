@@ -46,7 +46,7 @@ impl Lz4ReaderPy {
     }
 
     #[pyo3(signature = (size=-1))]
-    pub fn read(&self, py: Python<'_>, size: i128) -> PyResult<Py<PyBytes>> {
+    pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Bound<'py, PyBytes>> {
         impl_reader_read!(self, py, size)
     }
 

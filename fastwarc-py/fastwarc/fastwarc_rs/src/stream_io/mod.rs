@@ -262,7 +262,7 @@ pub(crate) mod impl_macros {
                 buf = vec![0; $size as usize];
                 n = reader.read(&mut buf)?;
             }
-            Ok(PyBytes::new($py, &buf[..n]).unbind())
+            Ok(PyBytes::new($py, &buf[..n]))
         }};
     }
 

@@ -76,8 +76,8 @@ impl HeaderMapPy {
     }
 
     #[getter]
-    pub fn reason_phrase(&self) -> Option<String> {
-        self.inner.reason_phrase().map(|s| s.to_string())
+    pub fn reason_phrase<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        self.inner.reason_phrase().map(|s| PyString::new(py, s.as_ref()))
     }
 
     #[getter]
@@ -86,8 +86,8 @@ impl HeaderMapPy {
     }
 
     #[getter]
-    pub fn status_line(&self) -> Option<String> {
-        self.inner.status_line().map(|s| s.to_string())
+    pub fn status_line<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        self.inner.status_line().map(|s| PyString::new(py, s.as_ref()))
     }
 
     #[setter]
@@ -96,8 +96,8 @@ impl HeaderMapPy {
     }
 
     #[getter]
-    pub fn status_line_bytes(&self, py: Python<'_>) -> Option<Py<PyBytes>> {
-        self.inner.status_line_bytes().map(|s| PyBytes::new(py, s).unbind())
+    pub fn status_line_bytes<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyBytes>> {
+        self.inner.status_line_bytes().map(|s| PyBytes::new(py, s))
     }
 
     #[setter]
@@ -109,15 +109,15 @@ impl HeaderMapPy {
         self.inner.append(key, value);
     }
 
-    pub fn asdict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    pub fn asdict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         for (key, value) in self.inner.to_map() {
             dict.set_item(key.as_ref(), value)?;
         }
-        Ok(dict.unbind())
+        Ok(dict)
     }
 
-    pub fn astuples(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn astuples<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         self.items(py)
     }
 
@@ -130,35 +130,46 @@ impl HeaderMapPy {
     }
 
     #[pyo3(signature = (key, default=None))]
-    pub fn get(&self, py: Python<'_>, key: &str, default: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
-        self.__getitem__(py, key)
-            .map(|v| v.into_any())
-            .or_else(|_| Ok(default.unwrap_or_else(|| py.None())))
+    pub fn get<'py>(
+        &self,
+        py: Python<'py>,
+        key: &str,
+        default: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Ok(self.inner.get(key).map_or_else(
+            || default.unwrap_or_else(|| py.None().bind(py).clone()),
+            |s| PyString::new(py, s.as_ref()).into_any(),
+        ))
     }
 
-    pub fn get_multiple(&self, py: Python<'_>, key: &str) -> PyResult<Py<PyTuple>> {
+    pub fn get_multiple<'py>(&self, py: Python<'py>, key: &str) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .get_multiple(key)
             .into_iter()
             .map(|s| PyString::new(py, s.as_ref()));
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn get_bytes(&self, py: Python<'_>, key: &[u8], default: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
+    pub fn get_bytes<'py>(
+        &self,
+        py: Python<'py>,
+        key: &[u8],
+        default: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         Ok(self
             .inner
             .get_bytes(key)
-            .map_or_else(|| default.unwrap_or_else(|| py.None()), |s| PyBytes::new(py, &s).into_any().unbind()))
+            .map_or_else(|| default.unwrap_or_else(|| py.None().bind(py).clone()), |s| PyBytes::new(py, s).into_any()))
     }
 
-    pub fn get_bytes_multiple(&self, py: Python<'_>, key: &[u8]) -> PyResult<Py<PyTuple>> {
+    pub fn get_bytes_multiple<'py>(&self, py: Python<'py>, key: &[u8]) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .get_bytes_multiple(key)
             .into_iter()
             .map(|s| PyBytes::new(py, s.as_ref()));
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
@@ -189,66 +200,65 @@ impl HeaderMapPy {
         self.inner.remove_bytes(key);
     }
 
-    pub fn items(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn items<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .items()
             .map(|(k, v)| PyTuple::new(py, [k.as_ref(), v.as_ref()]))
             .collect::<PyResult<Vec<_>>>()?;
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn items_bytes(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn items_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .items_bytes()
             .map(|(k, v)| PyTuple::new(py, [k, v]))
             .collect::<PyResult<Vec<_>>>()?;
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn keys(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn keys<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .keys()
             .map(|k| PyString::new(py, k.as_ref()))
             .collect::<Vec<_>>();
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn keys_bytes(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn keys_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self.inner.keys_bytes().map(|k| PyBytes::new(py, k)).collect::<Vec<_>>();
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn values(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn values<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .values()
             .map(|k| PyString::new(py, k.as_ref()))
             .collect::<Vec<_>>();
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn values_bytes(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+    pub fn values_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self
             .inner
             .values_bytes()
             .map(|k| PyBytes::new(py, k))
             .collect::<Vec<_>>();
-        Ok(PyTuple::new(py, items)?.unbind())
+        PyTuple::new(py, items)
     }
 
-    pub fn __getitem__(&self, py: Python<'_>, item: &str) -> PyResult<Py<PyString>> {
+    pub fn __getitem__<'py>(&self, py: Python<'py>, item: &str) -> PyResult<Bound<'py, PyString>> {
         self.inner
             .get(item)
-            .map(|s| PyString::new(py, &s).unbind())
-            .ok_or_else(|| PyKeyError::new_err(format!("Unknown key {}", item)))
+            .map(|s| PyString::new(py, s.as_ref()))
+            .ok_or_else(|| PyKeyError::new_err(item.to_string()))
     }
 
-    pub fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyIterator>> {
-        let iter = PyIterator::from_object(self.items(py)?.bind(py))?;
-        Ok(iter.unbind())
+    pub fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
+        Ok(PyIterator::from_object(self.items(py)?.as_any())?)
     }
 
     pub fn __len__(&self) -> usize {
