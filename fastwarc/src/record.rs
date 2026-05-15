@@ -1235,6 +1235,7 @@ impl WarcRecord {
 
         // Update content to skip HTTP headers
         self.content_length -= bytes_consumed as u64;
+        reader.set_limit(self.content_length);
         self.http_headers = Some(http_headers);
         self.http_parsed = true;
         Ok(())
