@@ -42,8 +42,9 @@ impl ReaderPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
-        let _ = offset;
+    #[pyo3(signature = (offset, whence=0))]
+    pub fn seek(&self, py: Python<'_>, offset: i128, whence: u8) -> PyResult<Py<PyAny>> {
+        let _ = (offset, whence);
         Ok(py.NotImplemented())
     }
 
@@ -82,8 +83,9 @@ impl DecompressingReaderPy {
         (Self {}, ReaderPy::__new__())
     }
 
-    pub fn inner_seek(&self, py: Python<'_>, offset: u64) -> PyResult<Py<PyAny>> {
-        let _ = offset;
+    #[pyo3(signature = (offset, whence=0))]
+    pub fn inner_seek(&self, py: Python<'_>, offset: i128, whence: u8) -> PyResult<Py<PyAny>> {
+        let _ = (offset, whence);
         Ok(py.NotImplemented())
     }
 

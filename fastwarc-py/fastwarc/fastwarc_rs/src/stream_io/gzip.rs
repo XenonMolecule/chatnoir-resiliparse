@@ -61,12 +61,12 @@ impl GzipReaderPy {
     }
 
     #[pyo3(signature = (offset, whence=0))]
-    pub fn seek(&self, offset: u64, whence: u8) -> PyResult<u64> {
+    pub fn seek(&self, offset: i128, whence: u8) -> PyResult<u64> {
         impl_reader_seek!(self, offset, whence, seek)
     }
 
     #[pyo3(signature = (offset, whence=0))]
-    pub fn inner_seek(&self, offset: u64, whence: u8) -> PyResult<u64> {
+    pub fn inner_seek(&self, offset: i128, whence: u8) -> PyResult<u64> {
         impl_reader_seek!(self, offset, whence, inner_seek)
     }
 
