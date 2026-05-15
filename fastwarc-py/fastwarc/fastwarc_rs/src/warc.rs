@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{PyReaderAdapter, PyWriterAdapter};
+use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, wrap_reader_stream};
 use fastwarc::record::DigestError::StreamError;
 use fastwarc::record::{ArchiveIteratorThreadSafe, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use fastwarc::stream_io::BufReadSeek;
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
+use std::io;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // ===========================================================
@@ -589,9 +591,11 @@ impl ArchiveIteratorPy {
         func_filter=None,
         verify_digests=false,
         strict_mode=true,
-        auto_decode="none"
+        auto_decode="none",
+        fsspec_args=None
     ))]
     pub fn __new__(
+        py: Python<'_>,
         stream: Py<PyAny>,
         record_types: WarcRecordTypePy,
         parse_http: bool,
@@ -601,11 +605,19 @@ impl ArchiveIteratorPy {
         verify_digests: bool,
         strict_mode: bool,
         auto_decode: &str,
-    ) -> Self {
-        let mut inner = ArchiveIteratorThreadSafe::new(Box::new(PyReaderAdapter::new(stream)));
+        fsspec_args: Option<Py<PyAny>>,
+    ) -> PyResult<Self> {
+        let reader = wrap_reader_stream(
+            py,
+            stream,
+            fsspec_args,
+            |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
+            |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
+        )?;
+        let mut inner = ArchiveIteratorThreadSafe::new(reader);
         inner.set_parse_http(parse_http);
         inner.set_verify_digests(verify_digests);
-        Self {
+        Ok(Self {
             inner,
             record_types: record_types as u16,
             parse_http,
@@ -615,7 +627,7 @@ impl ArchiveIteratorPy {
             verify_digests,
             strict_mode,
             auto_decode: auto_decode.to_owned(),
-        }
+        })
     }
 
     pub fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {

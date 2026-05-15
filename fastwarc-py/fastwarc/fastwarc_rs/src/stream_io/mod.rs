@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyString};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyString};
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
@@ -157,12 +157,24 @@ impl CompressingWriterPy {
 // Adapters for Python file-like objects
 // ===========================================================
 
+/// Python object stream adapter trait.
+pub(crate) trait PyStreamAdapter: Sized {
+    fn new(inner: Py<PyAny>) -> Self;
+}
+
+/// Reader adapter for Python file-like objects.
 pub(crate) struct PyReaderAdapter {
     inner: Py<PyAny>,
     pos: u64,
     buf: Vec<u8>,
     buf_pos: usize,
     buf_len: usize,
+}
+
+impl PyStreamAdapter for PyReaderAdapter {
+    fn new(inner: Py<PyAny>) -> Self {
+        PyReaderAdapter::new(inner)
+    }
 }
 
 #[allow(unused)]
@@ -251,8 +263,15 @@ impl BufRead for PyReaderAdapter {
     }
 }
 
+/// Writer adapter for Python file-like objects.
 pub(crate) struct PyWriterAdapter {
     inner: Py<PyAny>,
+}
+
+impl PyStreamAdapter for PyWriterAdapter {
+    fn new(inner: Py<PyAny>) -> Self {
+        PyWriterAdapter::new(inner)
+    }
 }
 
 #[allow(unused)]
@@ -293,6 +312,96 @@ pub(crate) fn path_like_to_string(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 
     let os_fspath = obj.py().import("os")?.getattr("fspath")?;
     os_fspath.call1((obj,))?.extract()
+}
+
+/// Wrap a Python stream object or file path / URL into a reader adapter.
+/// Returns an `fsspec` stream object if `raw_stream` is a string starting with a
+/// protocol prefix and `fsspec_args` is not `False`.
+///
+/// # Arguments
+///
+/// * `raw_stream` - input python stream / file-like object
+/// * `fsspec_open_mode` - open mode for `fsspec.open()`
+/// * `fsspec_args` - dict of arguments to pass to `fsspec` or `None` for defaults (set to `False` to disable `fsspec`)
+/// * `wrap_stream_fn` - closure for constructing a native reader from a [`PyStreamAdapter`]
+/// * `wrap_path_fn` - closure for constructing a native reader from a `String` file path
+pub(crate) fn wrap_stream<T, A, FStream, FPath>(
+    py: Python<'_>,
+    raw_stream: Py<PyAny>,
+    fsspec_open_mode: &str,
+    fsspec_args: Option<Py<PyAny>>,
+    wrap_stream_fn: FStream,
+    wrap_path_fn: FPath,
+) -> PyResult<T>
+where
+    A: PyStreamAdapter,
+    FStream: FnOnce(A) -> io::Result<T>,
+    FPath: FnOnce(String) -> io::Result<T>,
+{
+    // Check whether `raw_stream` is a string or path-like object or wrap in adapter.
+    let Ok(path) = path_like_to_string(raw_stream.bind(py)) else {
+        return Ok(wrap_stream_fn(A::new(raw_stream))?);
+    };
+
+    let use_fsspec = path.split_once("://").is_some()
+        && fsspec_args
+            .as_ref()
+            .is_none_or(|a| a.bind(py).is(PyBool::new(py, false)));
+    if use_fsspec {
+        match py.import("fsspec") {
+            Ok(fsspec) => {
+                let handle = if let Some(args) = fsspec_args {
+                    fsspec
+                        .getattr("open")?
+                        .call((path.as_str(), fsspec_open_mode), Some(args.bind(py).cast::<PyDict>()?))?
+                } else {
+                    fsspec.getattr("open")?.call1((path.as_str(), fsspec_open_mode))?
+                }
+                .call_method0("open")?;
+                return Ok(wrap_stream_fn(A::new(handle.unbind()))?);
+            }
+            Err(err) => {
+                if err.matches(py, py.get_type::<PyModuleNotFoundError>())? {
+                    // fall-through
+                } else {
+                    return Err(err);
+                }
+            }
+        }
+    }
+
+    // String argument, and we're not using fsspec: Construct native reader.
+    Ok(wrap_path_fn(path)?)
+}
+
+/// Shorthand for [`wrap_stream::<_, PyReaderAdapter, _, _>(...)`](wrap_stream).
+pub(crate) fn wrap_reader_stream<T, FStream, FPath>(
+    py: Python<'_>,
+    raw_stream: Py<PyAny>,
+    fsspec_args: Option<Py<PyAny>>,
+    wrap_stream_fn: FStream,
+    wrap_path_fn: FPath,
+) -> PyResult<T>
+where
+    FStream: FnOnce(PyReaderAdapter) -> io::Result<T>,
+    FPath: FnOnce(String) -> io::Result<T>,
+{
+    wrap_stream::<T, PyReaderAdapter, _, _>(py, raw_stream, "rb", fsspec_args, wrap_stream_fn, wrap_path_fn)
+}
+
+/// Shorthand for [`wrap_stream::<_, PyWriterAdapter, _, _>(...)`](wrap_stream).
+pub(crate) fn wrap_writer_stream<T, FStream, FPath>(
+    py: Python<'_>,
+    raw_stream: Py<PyAny>,
+    fsspec_args: Option<Py<PyAny>>,
+    wrap_stream_fn: FStream,
+    wrap_path_fn: FPath,
+) -> PyResult<T>
+where
+    FStream: FnOnce(PyWriterAdapter) -> io::Result<T>,
+    FPath: FnOnce(String) -> io::Result<T>,
+{
+    wrap_stream::<T, PyWriterAdapter, _, _>(py, raw_stream, "wb", fsspec_args, wrap_stream_fn, wrap_path_fn)
 }
 
 // ===========================================================

@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{
-    CompressingWriterPy, DecompressingReaderPy, PyReaderAdapter, PyWriterAdapter, path_like_to_string,
-};
+use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
 use fastwarc::stream_io::gzip::MAX_WBITS;
 use fastwarc::stream_io::{CompressingWriter, DecompressingReader, gzip};
 use pyo3::exceptions::PyValueError;
@@ -33,23 +31,28 @@ pub struct GzipReaderPy {
 #[pymethods]
 impl GzipReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096, zlib=false))]
+    #[pyo3(signature = (inner, buffer_size=4096, zlib=false, fsspec_args=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
         buffer_size: usize,
         zlib: bool,
+        fsspec_args: Option<Py<PyAny>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipReaderOptions {
             capacity: buffer_size,
             window_bits: if zlib { MAX_WBITS } else { MAX_WBITS + 16 },
             expect_header: true,
         };
-        let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
-            Box::new(gzip::GzipReader::from_path_with_options(p, options)?)
-        } else {
-            Box::new(gzip::GzipReader::with_options(PyReaderAdapter::new(inner), options))
-        };
+        let inner = wrap_reader_stream(
+            py,
+            inner,
+            fsspec_args,
+            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+                Ok(Box::new(gzip::GzipReader::with_options(reader, options)))
+            },
+            |path| Ok(Box::new(gzip::GzipReader::from_path_with_options(path, options)?)),
+        )?;
         Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
@@ -96,13 +99,14 @@ pub struct GzipWriterPy {
 #[pymethods]
 impl GzipWriterPy {
     #[new]
-    #[pyo3(signature = (inner, compression_level=9, buffer_size=8192, zlib=false))]
+    #[pyo3(signature = (inner, compression_level=9, buffer_size=8192, zlib=false, fsspec_args=None,))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
         compression_level: i32,
         buffer_size: usize,
         zlib: bool,
+        fsspec_args: Option<Py<PyAny>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = gzip::GzipWriterOptions {
             capacity: buffer_size,
@@ -110,11 +114,16 @@ impl GzipWriterPy {
             expect_header: true,
             compression_level,
         };
-        let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
-            Box::new(gzip::GzipWriter::from_path_with_options(p, options)?)
-        } else {
-            Box::new(gzip::GzipWriter::with_options(PyWriterAdapter::new(inner), options))
-        };
+        let inner = wrap_writer_stream(
+            py,
+            inner,
+            fsspec_args,
+            |writer| -> io::Result<Box<dyn CompressingWriter + Send>> {
+                Ok(Box::new(gzip::GzipWriter::with_options(writer, options)))
+            },
+            |path| Ok(Box::new(gzip::GzipWriter::from_path_with_options(path, options)?)),
+        )?;
+
         Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))

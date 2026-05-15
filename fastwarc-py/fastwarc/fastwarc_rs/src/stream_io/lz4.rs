@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{
-    CompressingWriterPy, DecompressingReaderPy, PyReaderAdapter, PyWriterAdapter, path_like_to_string,
-};
+use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
 use fastwarc::stream_io::{CompressingWriter, DecompressingReader, lz4};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -32,14 +30,23 @@ pub struct Lz4ReaderPy {
 #[pymethods]
 impl Lz4ReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096))]
-    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<PyClassInitializer<Self>> {
+    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None))]
+    pub fn __new__(
+        py: Python<'_>,
+        inner: Py<PyAny>,
+        buffer_size: usize,
+        fsspec_args: Option<Py<PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         let options = lz4::Lz4ReaderOptions { capacity: buffer_size };
-        let inner: Box<dyn DecompressingReader + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
-            Box::new(lz4::Lz4Reader::from_path_with_options(p, options)?)
-        } else {
-            Box::new(lz4::Lz4Reader::with_options(PyReaderAdapter::new(inner), options))
-        };
+        let inner = wrap_reader_stream(
+            py,
+            inner,
+            fsspec_args,
+            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+                Ok(Box::new(lz4::Lz4Reader::with_options(reader, options)))
+            },
+            |path| Ok(Box::new(lz4::Lz4Reader::from_path_with_options(path, options)?)),
+        )?;
         Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
@@ -86,14 +93,23 @@ pub struct Lz4WriterPy {
 #[pymethods]
 impl Lz4WriterPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=8192))]
-    pub fn __new__(py: Python<'_>, inner: Py<PyAny>, buffer_size: usize) -> PyResult<PyClassInitializer<Self>> {
+    #[pyo3(signature = (inner, buffer_size=8192, fsspec_args=None,))]
+    pub fn __new__(
+        py: Python<'_>,
+        inner: Py<PyAny>,
+        buffer_size: usize,
+        fsspec_args: Option<Py<PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         let options = lz4::Lz4WriterOptions { capacity: buffer_size };
-        let inner: Box<dyn CompressingWriter + Send> = if let Ok(p) = path_like_to_string(inner.bind(py)) {
-            Box::new(lz4::Lz4Writer::from_path_with_options(p, options)?)
-        } else {
-            Box::new(lz4::Lz4Writer::with_options(PyWriterAdapter::new(inner), options))
-        };
+        let inner = wrap_writer_stream(
+            py,
+            inner,
+            fsspec_args,
+            |reader| -> io::Result<Box<dyn CompressingWriter + Send>> {
+                Ok(Box::new(lz4::Lz4Writer::with_options(reader, options)))
+            },
+            |path| Ok(Box::new(lz4::Lz4Writer::from_path_with_options(path, options)?)),
+        )?;
         Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))

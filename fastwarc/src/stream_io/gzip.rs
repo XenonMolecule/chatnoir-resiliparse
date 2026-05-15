@@ -48,6 +48,7 @@ pub const MAX_WBITS: u8 = 15;
 ///     * `+32` enables gzip/zlib header autodetection.
 /// * `expect_header` - specifies whether a zlib or gzip header is expected or
 ///   whether this is a raw stream (equivalent to negative `window_bits` in zlib).
+#[derive(Debug, Copy, Clone)]
 pub struct GzipReaderOptions {
     pub capacity: usize,
     pub window_bits: u8,
@@ -303,6 +304,7 @@ pub struct GzipWriter<T: Write> {
 /// * `expect_header` - specifies whether a zlib or gzip header is expected or
 ///   whether this is a raw stream (equivalent to negative `window_bits` in zlib).
 /// * `compression_level` - gzip / DEFLATE compression level to use (`9` is best)
+#[derive(Debug, Copy, Clone)]
 pub struct GzipWriterOptions {
     pub capacity: usize,
     pub window_bits: u8,
