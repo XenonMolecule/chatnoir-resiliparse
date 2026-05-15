@@ -25,6 +25,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, Read, Seek};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 /// Helper for getting path to external test fixture.
 fn get_fixture_path(name: &str) -> PathBuf {
@@ -895,6 +896,24 @@ fn archive_iterator_into_inner() -> io::Result<()> {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
     assert_eq!(buf, record_data.as_bytes());
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_thread_safe() -> io::Result<()> {
+    let record_data1 = warc_record_data("resource", "<urn:uuid:threadsafe-1>", None, "ABC");
+    let record_data2 = warc_record_data("metadata", "<urn:uuid:threadsafe-2>", None, "XYZ");
+    let reader = Box::new(io::Cursor::new(format!("{record_data1}{record_data2}").into_bytes()));
+
+    let mut it = ArchiveIteratorThreadSafe::new(reader);
+    let record1 = it.next().unwrap()?;
+    let _: Arc<Mutex<WarcRecord>> = record1.clone();
+    assert_eq!(record1.lock().unwrap().record_id().unwrap(), "<urn:uuid:threadsafe-1>");
+
+    let record2 = it.next().unwrap()?;
+    assert_eq!(record2.lock().unwrap().record_id().unwrap(), "<urn:uuid:threadsafe-2>");
+    assert!(it.next().is_none());
 
     Ok(())
 }

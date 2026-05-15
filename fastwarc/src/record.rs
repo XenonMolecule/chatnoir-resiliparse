@@ -26,6 +26,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use uuid::Uuid;
@@ -1509,6 +1510,17 @@ impl Iterator for WarcRecord {
     }
 }
 
+#[doc(hidden)]
+/// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
+///
+/// This is an internal generic interface for implementing the single-threaded and
+/// thread-safe iterator variants.
+pub struct ArchiveIteratorImpl<R> {
+    cur: R,
+    parse_http: bool,
+    verify_digests: bool,
+}
+
 /// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
 ///
 /// Using the record iterator is roughly equivalent to creating an initial record instance
@@ -1517,31 +1529,67 @@ impl Iterator for WarcRecord {
 /// returns shared mutable references to allow iteration over multiple records using a single
 /// iterator instance. This enables the usage within loops and allows applying map functions
 /// to multiple records in a row.
-pub struct ArchiveIterator {
-    cur: Rc<RefCell<WarcRecord>>,
-    parse_http: bool,
-    verify_digests: bool,
+pub type ArchiveIterator = ArchiveIteratorImpl<Rc<RefCell<WarcRecord>>>;
+
+/// Thread-safe convenience wrapper for iterating [`WarcRecord`] instances from a stream.
+///
+/// This is a thread-safe variant of [`ArchiveIterator`].
+///
+/// Using the record iterator is roughly equivalent to creating an initial record instance
+/// with [`WarcRecord::from_reader()`] and then retrieving each new record by calling
+/// [`WarcRecord::next()`] on the previous record. The main difference is that this iterator
+/// returns shared mutable references to allow iteration over multiple records using a single
+/// iterator instance. This enables the usage within loops and allows applying map functions
+/// to multiple records in a row.
+pub type ArchiveIteratorThreadSafe = ArchiveIteratorImpl<Arc<Mutex<WarcRecord>>>;
+
+/// Reference-counted handle for holding [`WarcRecord`] instances.
+pub trait SharedWarcRecord: Clone {
+    fn new(record: WarcRecord) -> Self;
+    fn replace(&self, record: WarcRecord);
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R;
 }
 
-/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
-/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
-pub struct FilteredArchiveIterator<F>
+impl SharedWarcRecord for Rc<RefCell<WarcRecord>> {
+    fn new(record: WarcRecord) -> Self {
+        Rc::new(RefCell::new(record))
+    }
+
+    fn replace(&self, record: WarcRecord) {
+        *self.borrow_mut() = record;
+    }
+
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
+        f(&mut self.borrow_mut())
+    }
+}
+
+impl SharedWarcRecord for Arc<Mutex<WarcRecord>> {
+    fn new(record: WarcRecord) -> Self {
+        Arc::new(Mutex::new(record))
+    }
+
+    fn replace(&self, record: WarcRecord) {
+        *self.lock().unwrap() = record;
+    }
+
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
+        f(&mut self.lock().unwrap())
+    }
+}
+
+impl<R> ArchiveIteratorImpl<R>
 where
-    F: Fn(&mut WarcRecord) -> bool,
+    R: SharedWarcRecord,
 {
-    inner: ArchiveIterator,
-    pred: F,
-}
-
-impl ArchiveIterator {
     /// Create a new WARC record iterator from a buffered WARC stream reader.
     ///
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance to attach to records
     pub fn new(reader: Box<dyn BufReadSeek + Send>) -> Self {
-        let empty = Rc::new(RefCell::new(WarcRecord::new()));
-        empty.borrow_mut().attach_reader(reader);
+        let empty = R::new(WarcRecord::new());
+        empty.with_mut(|record| record.attach_reader(reader));
         Self {
             cur: empty,
             parse_http: false,
@@ -1565,12 +1613,12 @@ impl ArchiveIterator {
     ///
     /// * `reader` - buffered reader instance to attach to records
     /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
-    pub fn with_filter<F>(reader: Box<dyn BufReadSeek + Send>, filter: F) -> FilteredArchiveIterator<F>
+    pub fn with_filter<F>(reader: Box<dyn BufReadSeek + Send>, filter: F) -> FilteredArchiveIteratorImpl<R, F>
     where
         F: Fn(&mut WarcRecord) -> bool,
     {
-        FilteredArchiveIterator {
-            inner: ArchiveIterator::new(reader),
+        FilteredArchiveIteratorImpl {
+            inner: ArchiveIteratorImpl::new(reader),
             pred: filter,
         }
     }
@@ -1581,50 +1629,85 @@ impl ArchiveIterator {
     ///
     /// Reader instances originally attached to this iterator.
     pub fn into_inner(self) -> Option<Box<dyn BufReadSeek + Send>> {
-        self.cur.take().detach_reader()
+        self.cur.with_mut(WarcRecord::detach_reader)
     }
 }
 
-impl Iterator for ArchiveIterator {
-    type Item = Result<Rc<RefCell<WarcRecord>>, io::Error>;
+impl<S> Iterator for ArchiveIteratorImpl<S>
+where
+    S: SharedWarcRecord,
+{
+    type Item = Result<S, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let next = self.cur.borrow_mut().next()?;
-            match next {
+            let next = self.cur.with_mut(WarcRecord::next)?;
+            return match next {
                 Ok(n) => {
                     self.cur.replace(n);
-                    let mut record = self.cur.borrow_mut();
-                    if self.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
+                    let keep_record = match self.cur.with_mut(|record| {
+                        if self.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
+                            return Ok(false);
+                        }
+                        if self.parse_http
+                            && record.is_http()
+                            && let Err(e) = record.parse_http()
+                        {
+                            return Err(e);
+                        }
+                        Ok(true)
+                    }) {
+                        Ok(keep_record) => keep_record,
+                        Err(e) => return Some(Err(e)),
+                    };
+                    if !keep_record {
                         continue;
                     }
-                    if self.parse_http
-                        && record.is_http()
-                        && let Err(e) = record.parse_http()
-                    {
-                        return Some(Err(e));
-                    }
-                    drop(record);
-                    return Some(Ok(self.cur.clone()));
+                    Some(Ok(self.cur.clone()))
                 }
-                Err(e) => return Some(Err(e)),
-            }
+                Err(e) => Some(Err(e)),
+            };
         }
     }
 }
 
-impl<F> Iterator for FilteredArchiveIterator<F>
+#[doc(hidden)]
+/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
+/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
+///
+/// This is an internal generic interface for implementing the single-threaded and
+/// thread-safe iterator variants.
+pub struct FilteredArchiveIteratorImpl<S, F>
 where
     F: Fn(&mut WarcRecord) -> bool,
 {
-    type Item = Result<Rc<RefCell<WarcRecord>>, io::Error>;
+    inner: ArchiveIteratorImpl<S>,
+    pred: F,
+}
+
+/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
+/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
+pub type FilteredArchiveIterator<F> = FilteredArchiveIteratorImpl<Rc<RefCell<WarcRecord>>, F>;
+
+/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
+/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
+///
+/// This is a thread-safe variant of [`FilteredArchiveIterator`].
+pub type FilteredArchiveIteratorThreadSafe<F> = FilteredArchiveIteratorImpl<Arc<Mutex<WarcRecord>>, F>;
+
+impl<S, F> Iterator for FilteredArchiveIteratorImpl<S, F>
+where
+    S: SharedWarcRecord,
+    F: Fn(&mut WarcRecord) -> bool,
+{
+    type Item = Result<S, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let next = self.inner.next()?;
             return match next {
                 Ok(n) => {
-                    if !(self.pred)(&mut n.borrow_mut()) {
+                    if !n.with_mut(|record| (self.pred)(record)) {
                         continue;
                     }
                     Some(Ok(n))
@@ -1635,11 +1718,12 @@ where
     }
 }
 
-impl<F> Deref for FilteredArchiveIterator<F>
+impl<S, F> Deref for FilteredArchiveIteratorImpl<S, F>
 where
+    S: SharedWarcRecord,
     F: Fn(&mut WarcRecord) -> bool,
 {
-    type Target = ArchiveIterator;
+    type Target = ArchiveIteratorImpl<S>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

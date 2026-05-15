@@ -14,13 +14,12 @@
 
 use crate::stream_io::{PyReaderAdapter, PyWriterAdapter};
 use fastwarc::record::DigestError::StreamError;
-use fastwarc::record::{ArchiveIterator as RustArchiveIterator, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use fastwarc::record::{ArchiveIteratorThreadSafe, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
-use std::cell::RefCell;
 use std::io::BufReader;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 // ===========================================================
 // WarcRecordType
@@ -331,9 +330,15 @@ impl HeaderMapPy {
 // WarcRecord
 // ===========================================================
 
-#[pyclass(name = "WarcRecord", unsendable)]
+#[pyclass(name = "WarcRecord")]
 pub struct WarcRecordPy {
-    inner: Rc<RefCell<WarcRecord>>,
+    inner: Arc<Mutex<WarcRecord>>,
+}
+
+impl WarcRecordPy {
+    fn lock(&self) -> MutexGuard<'_, WarcRecord> {
+        self.inner.lock().unwrap()
+    }
 }
 
 #[pymethods]
@@ -341,33 +346,33 @@ impl WarcRecordPy {
     #[new]
     pub fn __new__() -> Self {
         Self {
-            inner: Rc::new(RefCell::new(WarcRecord::new())),
+            inner: Arc::new(Mutex::new(WarcRecord::new())),
         }
     }
 
     #[getter]
     pub fn record_id<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        self.inner.borrow().record_id().map(|s| PyString::new(py, s.as_ref()))
+        self.lock().record_id().map(|s| PyString::new(py, s.as_ref()))
     }
 
     #[getter]
     pub fn record_type(&self) -> WarcRecordTypePy {
-        self.inner.borrow().record_type().into()
+        self.lock().record_type().into()
     }
 
     #[setter]
     pub fn set_record_type(&mut self, record_type: WarcRecordTypePy) {
-        self.inner.borrow_mut().set_record_type(record_type.into());
+        self.lock().set_record_type(record_type.into());
     }
 
     #[getter]
     pub fn content_length(&self) -> u64 {
-        self.inner.borrow().content_length()
+        self.lock().content_length()
     }
 
     #[getter]
     pub fn record_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let inner = self.inner.borrow();
+        let inner = self.lock();
         let Some(value) = inner.headers().get("WARC-Date") else {
             return Ok(None);
         };
@@ -382,61 +387,49 @@ impl WarcRecordPy {
 
     #[getter]
     pub fn headers(&self) -> HeaderMapPy {
-        self.inner.borrow().headers().clone().into()
+        self.lock().headers().clone().into()
     }
 
     #[getter]
     pub fn is_http(&self) -> bool {
-        self.inner.borrow().is_http()
+        self.lock().is_http()
     }
 
     #[setter]
     pub fn set_is_http(&mut self, is_http: bool) {
-        self.inner.borrow_mut().set_is_http(is_http);
+        self.lock().set_is_http(is_http);
     }
 
     #[getter]
     pub fn is_http_parsed(&self) -> bool {
-        self.inner.borrow().is_http_parsed()
+        self.lock().is_http_parsed()
     }
 
     #[getter]
     pub fn http_headers(&self) -> Option<HeaderMapPy> {
-        self.inner.borrow().http_headers().cloned().map(Into::into)
+        self.lock().http_headers().cloned().map(Into::into)
     }
 
     #[getter]
     pub fn http_content_type<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        self.inner
-            .borrow()
-            .http_content_type()
-            .as_deref()
-            .map(|s| PyString::new(py, s))
+        self.lock().http_content_type().as_deref().map(|s| PyString::new(py, s))
     }
 
     #[getter]
     pub fn http_charset<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        self.inner.borrow().http_charset().map(|s| PyString::new(py, s))
+        self.lock().http_charset().map(|s| PyString::new(py, s))
     }
 
     #[getter]
     pub fn http_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        http_datetime_to_py(
-            py,
-            self.inner
-                .borrow()
-                .http_headers()
-                .and_then(|h| h.get("Date"))
-                .as_deref(),
-        )
+        http_datetime_to_py(py, self.lock().http_headers().and_then(|h| h.get("Date")).as_deref())
     }
 
     #[getter]
     pub fn http_last_modified<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         http_datetime_to_py(
             py,
-            self.inner
-                .borrow()
+            self.lock()
                 .http_headers()
                 .and_then(|h| h.get("Last-Modified"))
                 .as_deref(),
@@ -450,23 +443,22 @@ impl WarcRecordPy {
 
     #[getter]
     pub fn stream_pos(&self) -> u64 {
-        self.inner.borrow().stream_pos()
+        self.lock().stream_pos()
     }
 
     #[getter]
     pub fn is_frozen(&self) -> bool {
-        self.inner.borrow().is_frozen()
+        self.lock().is_frozen()
     }
 
     #[pyo3(signature = (content_length=0, record_type=WarcRecordTypePy::no_type, record_urn=None))]
     pub fn init_headers(&mut self, content_length: u64, record_type: WarcRecordTypePy, record_urn: Option<&[u8]>) {
-        self.inner
-            .borrow_mut()
+        self.lock()
             .init_headers(content_length, Some(record_type.into()), record_urn);
     }
 
     pub fn freeze(&mut self) -> PyResult<bool> {
-        self.inner.borrow_mut().freeze()?;
+        self.lock().freeze()?;
         Ok(true)
     }
 
@@ -475,23 +467,23 @@ impl WarcRecordPy {
     }
 
     pub fn set_bytes_payload(&mut self, content: &[u8]) {
-        self.inner.borrow_mut().set_bytes_payload(content.to_vec());
+        self.lock().set_bytes_payload(content.to_vec());
     }
 
     #[pyo3(signature = (n=None))]
     pub fn consume(&mut self, n: Option<usize>) -> PyResult<usize> {
         match n {
-            Some(n) => Ok(self.inner.borrow_mut().consume_n(n)?),
-            None => Ok(self.inner.borrow_mut().consume()?),
+            Some(n) => Ok(self.lock().consume_n(n)?),
+            None => Ok(self.lock().consume()?),
         }
     }
 
     #[pyo3(signature = (quirks_mode=false))]
     pub fn parse_warc_headers(&mut self, quirks_mode: bool) -> PyResult<usize> {
         if quirks_mode {
-            Ok(self.inner.borrow_mut().parse_warc_headers_quirks(quirks_mode)?)
+            Ok(self.lock().parse_warc_headers_quirks(quirks_mode)?)
         } else {
-            Ok(self.inner.borrow_mut().parse_warc_headers()?)
+            Ok(self.lock().parse_warc_headers()?)
         }
     }
 
@@ -499,30 +491,24 @@ impl WarcRecordPy {
     pub fn parse_http(&mut self, strict_mode: bool, auto_decode: &str) -> PyResult<()> {
         // TODO: Implement parameters
         let _ = (strict_mode, auto_decode);
-        self.inner.borrow_mut().parse_http()?;
+        self.lock().parse_http()?;
         Ok(())
     }
 
     #[pyo3(signature = (consume=false))]
     pub fn verify_block_digest(&mut self, consume: bool) -> PyResult<bool> {
-        self.inner
-            .borrow_mut()
-            .verify_block_digest(consume)
-            .map_err(|e| match e {
-                StreamError(_) => PyOSError::new_err(e.to_string()),
-                _ => PyValueError::new_err(e.to_string()),
-            })
+        self.lock().verify_block_digest(consume).map_err(|e| match e {
+            StreamError(_) => PyOSError::new_err(e.to_string()),
+            _ => PyValueError::new_err(e.to_string()),
+        })
     }
 
     #[pyo3(signature = (consume=false))]
     pub fn verify_payload_digest(&mut self, consume: bool) -> PyResult<bool> {
-        self.inner
-            .borrow_mut()
-            .verify_payload_digest(consume)
-            .map_err(|e| match e {
-                StreamError(_) => PyOSError::new_err(e.to_string()),
-                _ => PyValueError::new_err(e.to_string()),
-            })
+        self.lock().verify_payload_digest(consume).map_err(|e| match e {
+            StreamError(_) => PyOSError::new_err(e.to_string()),
+            _ => PyValueError::new_err(e.to_string()),
+        })
     }
 
     #[pyo3(signature = (stream, checksum_data=false, payload_digest=None, chunk_size=16384))]
@@ -544,8 +530,7 @@ impl WarcRecordPy {
                 .extract::<Bound<'_, PyBytes>>()?;
             let mut digest_header = b"sha1:".to_vec();
             digest_header.extend_from_slice(encoded.as_bytes());
-            self.inner
-                .borrow_mut()
+            self.lock()
                 .headers_mut()
                 .set_bytes(b"WARC-Payload-Digest", &digest_header);
         }
@@ -553,11 +538,10 @@ impl WarcRecordPy {
         let mut writer = PyWriterAdapter::new(stream.unbind());
         if checksum_data {
             Ok(self
-                .inner
-                .borrow_mut()
+                .lock()
                 .write_with_block_size_checksum(&mut writer, chunk_size, true)?)
         } else {
-            Ok(self.inner.borrow_mut().write_with_block_size(&mut writer, chunk_size)?)
+            Ok(self.lock().write_with_block_size(&mut writer, chunk_size)?)
         }
     }
 }
@@ -580,9 +564,9 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 // ArchiveIterator
 // ===========================================================
 
-#[pyclass(name = "ArchiveIterator", unsendable)]
+#[pyclass(name = "ArchiveIterator")]
 pub struct ArchiveIteratorPy {
-    inner: RustArchiveIterator,
+    inner: ArchiveIteratorThreadSafe,
     record_types: u16,
     parse_http: bool,
     min_content_length: Option<u64>,
@@ -595,6 +579,7 @@ pub struct ArchiveIteratorPy {
 
 #[pymethods]
 impl ArchiveIteratorPy {
+    #[allow(clippy::too_many_arguments)]
     #[new]
     #[pyo3(signature = (
         stream,
@@ -618,7 +603,7 @@ impl ArchiveIteratorPy {
         strict_mode: bool,
         auto_decode: &str,
     ) -> Self {
-        let mut inner = RustArchiveIterator::new(Box::new(BufReader::new(PyReaderAdapter::new(stream))));
+        let mut inner = ArchiveIteratorThreadSafe::new(Box::new(BufReader::new(PyReaderAdapter::new(stream))));
         inner.set_parse_http(parse_http);
         inner.set_verify_digests(verify_digests);
         Self {
@@ -644,7 +629,7 @@ impl ArchiveIteratorPy {
                 return Ok(None);
             };
             let record = next?;
-            let record_ref = record.borrow_mut();
+            let record_ref = record.lock().unwrap();
 
             let content_length = record_ref.content_length();
             if !record_ref.record_type().matches_bitmask(self.record_types)
