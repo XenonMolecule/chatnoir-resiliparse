@@ -1545,9 +1545,20 @@ pub type ArchiveIterator = ArchiveIteratorImpl<Rc<RefCell<WarcRecord>>>;
 pub type ArchiveIteratorThreadSafe = ArchiveIteratorImpl<Arc<Mutex<WarcRecord>>>;
 
 /// Reference-counted handle for holding [`WarcRecord`] instances.
+///
+/// This is a common accessor trait for the two reference-counted types
+/// `Rc<RefCell<WarcRecord>>` and `Arc<Mutex<WarcRecord>>` used by [`ArchiveIterator`]
+/// and [`ArchiveIteratorThreadSafe`], respectively.
 pub trait SharedWarcRecord: Clone {
+    /// Create a new reference-counted [`WarcRecord`] handle.
     fn new(record: WarcRecord) -> Self;
+
+    /// Replace the currently held [`WarcRecord`] with another one.
     fn replace(&self, record: WarcRecord);
+
+    /// Execute the closure with a mutable reference to the held record.
+    /// This is to abstract from the individual accessors of the underlying reference
+    /// counting mechanism ([`Rc::borrow_mut()`] vs. [`Mutex::lock()::unwrap()`](Mutex::lock()).
     fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R;
 }
 

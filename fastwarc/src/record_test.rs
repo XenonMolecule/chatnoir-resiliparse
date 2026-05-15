@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::*;
+use crate::stream_io::BufReadSeek;
 use crate::stream_io::LimitedBufReadSeek;
 use crate::stream_io::gzip::GzipReader;
 use data_encoding::{BASE32, HEXLOWER};
@@ -1007,18 +1008,40 @@ fn filter_test_warc_data() -> Vec<u8> {
     format!("{warc10}{http}{block}{metadata}").into_bytes()
 }
 
+/// Helper for running iterator checks on both [`ArchiveIterator`] and [`ArchiveIteratorThreadSafe`].
+fn run_archive_iterator_variants<R, M, F>(mut make_reader: M, mut check: F) -> io::Result<()>
+where
+    R: BufReadSeek + Send + 'static,
+    M: FnMut() -> io::Result<R>,
+    F: FnMut(&mut WarcRecord) -> io::Result<()>,
+{
+    for r in ArchiveIterator::new(Box::new(make_reader()?)) {
+        r?.with_mut(|rm| check(rm))?;
+    }
+
+    for r in ArchiveIteratorThreadSafe::new(Box::new(make_reader()?)) {
+        r?.with_mut(|rm| check(rm))?;
+    }
+
+    Ok(())
+}
+
 /// Test fixture: IDs of records matching a filter predicate
 fn filtered_record_ids<F>(filter: F) -> io::Result<Vec<String>>
 where
     F: Fn(&mut WarcRecord) -> bool,
 {
-    let reader = Box::new(io::Cursor::new(filter_test_warc_data()));
-    let mut records = ArchiveIterator::with_filter(reader, filter);
     let mut ids = Vec::new();
-    for record in records.by_ref() {
-        let record = record?;
-        ids.push(record.borrow().record_id().unwrap().to_string());
-    }
+    run_archive_iterator_variants(
+        || Ok(io::Cursor::new(filter_test_warc_data())),
+        |record| {
+            if filter(record) {
+                ids.push(record.record_id().unwrap().to_string());
+            }
+            Ok(())
+        },
+    )?;
+
     Ok(ids)
 }
 
@@ -1026,49 +1049,49 @@ where
 fn archive_iterator_filter_predicates() -> io::Result<()> {
     macro_rules! assert_filtered_ids {
         ($name:literal, $predicate:expr, $expected:expr) => {
-            assert_eq!(filtered_record_ids($predicate)?, $expected, "{}", $name);
+            assert_eq!(filtered_record_ids($predicate)?, $expected.repeat(2), "{}", $name);
         };
     }
 
-    assert_filtered_ids!("is_warc_10", filter::is_warc_10, vec!["<urn:uuid:filter-warc10>"]);
+    assert_filtered_ids!("is_warc_10", filter::is_warc_10, ["<urn:uuid:filter-warc10>"]);
     assert_filtered_ids!(
         "is_warc_11",
         filter::is_warc_11,
-        vec![
+        [
             "<urn:uuid:filter-http>",
             "<urn:uuid:filter-block>",
-            "<urn:uuid:filter-metadata>",
+            "<urn:uuid:filter-metadata>"
         ]
     );
-    assert_filtered_ids!("has_block_digest", filter::has_block_digest, vec!["<urn:uuid:filter-block>"]);
-    assert_filtered_ids!("has_valid_block_digest", filter::has_valid_block_digest, vec!["<urn:uuid:filter-block>"]);
-    assert_filtered_ids!("has_payload_digest", filter::has_payload_digest, vec!["<urn:uuid:filter-http>"]);
+    assert_filtered_ids!("has_block_digest", filter::has_block_digest, ["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!("has_valid_block_digest", filter::has_valid_block_digest, ["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!("has_payload_digest", filter::has_payload_digest, ["<urn:uuid:filter-http>"]);
     assert_filtered_ids!(
         "has_valid_payload_digest",
         |record: &mut WarcRecord| {
             record.parse_http().unwrap();
             filter::has_valid_payload_digest(record)
         },
-        vec!["<urn:uuid:filter-http>"]
+        ["<urn:uuid:filter-http>"]
     );
-    assert_filtered_ids!("is_http", filter::is_http, vec!["<urn:uuid:filter-http>"]);
-    assert_filtered_ids!("is_concurrent", filter::is_concurrent, vec!["<urn:uuid:filter-block>"]);
+    assert_filtered_ids!("is_http", filter::is_http, ["<urn:uuid:filter-http>"]);
+    assert_filtered_ids!("is_concurrent", filter::is_concurrent, ["<urn:uuid:filter-block>"]);
     assert_filtered_ids!(
         "has_record_type",
         filter::has_record_type(WarcRecordType::Metadata),
-        vec!["<urn:uuid:filter-metadata>"]
+        ["<urn:uuid:filter-metadata>"]
     );
-    assert_filtered_ids!("has_content_length_lte", filter::has_content_length_lte(4), vec!["<urn:uuid:filter-warc10>"]);
+    assert_filtered_ids!("has_content_length_lte", filter::has_content_length_lte(4), ["<urn:uuid:filter-warc10>"]);
     assert_filtered_ids!(
         "has_content_length_gte",
         filter::has_content_length_gte(6),
-        vec!["<urn:uuid:filter-http>", "<urn:uuid:filter-metadata>"]
+        ["<urn:uuid:filter-http>", "<urn:uuid:filter-metadata>"]
     );
     // Custom closure filter.
     assert_filtered_ids!(
         "custom_closure",
         |record: &mut WarcRecord| record.record_id().is_some_and(|id| id.contains("metadata")),
-        vec!["<urn:uuid:filter-metadata>"]
+        ["<urn:uuid:filter-metadata>"]
     );
 
     Ok(())
@@ -1079,32 +1102,32 @@ fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
     let clipped = get_fixture_path("clipped.warc.gz");
 
     for parse_http in [true, false] {
-        let reader = Box::new(GzipReader::new(File::open(clipped.clone())?));
         let mut rec_count = 0;
+        run_archive_iterator_variants(
+            || Ok(GzipReader::new(File::open(clipped.clone())?)),
+            |r| -> io::Result<()> {
+                let mut content = Vec::with_capacity(r.content_length() as usize);
+                r.reader_mut().unwrap().read_to_end(&mut content)?;
 
-        for r in ArchiveIterator::new(reader) {
-            let r = r?;
-            let mut rb = r.borrow_mut();
+                if parse_http {
+                    r.parse_http()?;
+                    assert!(r.http_headers().is_some());
+                } else {
+                    assert!(content.starts_with(b"HTTP/"));
+                }
+                // Content-Length is larger than the actual clipped payload.
+                assert!(r.content_length() as usize > content.len());
 
-            let mut content = Vec::with_capacity(rb.content_length() as usize);
-            rb.reader_mut().unwrap().read_to_end(&mut content)?;
+                // Should fail, since we already read the contents.
+                assert!(!r.verify_block_digest(true).unwrap());
+                rec_count += 1;
 
-            if parse_http {
-                rb.parse_http()?;
-                assert!(rb.http_headers().is_some());
-            } else {
-                assert!(content.starts_with(b"HTTP/"));
-            }
-            // Content-Length is larger than the actual clipped payload.
-            assert!(rb.content_length() as usize > content.len());
+                Ok(())
+            },
+        )?;
 
-            // Should fail, since we already read the contents.
-            assert!(!rb.verify_block_digest(true).unwrap());
-            rec_count += 1;
-        }
-
-        // Contains exactly one record
-        assert_eq!(rec_count, 1);
+        // Contains exactly one record (one per iteration)
+        assert_eq!(rec_count, 2);
     }
 
     Ok(())
