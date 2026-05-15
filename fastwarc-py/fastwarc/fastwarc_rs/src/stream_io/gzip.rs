@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 #[pyclass(name = "GzipReader", extends = DecompressingReaderPy, subclass)]
 pub struct GzipReaderPy {
-    inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -93,7 +93,7 @@ impl GzipReaderPy {
 
 #[pyclass(name = "GzipWriter", extends = CompressingWriterPy, subclass)]
 pub struct GzipWriterPy {
-    inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
 }
 
 // noinspection DuplicatedCode

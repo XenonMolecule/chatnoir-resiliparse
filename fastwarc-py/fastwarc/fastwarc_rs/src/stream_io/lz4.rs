@@ -23,7 +23,7 @@ use std::sync::Mutex;
 
 #[pyclass(name = "Lz4Reader", extends = DecompressingReaderPy, subclass)]
 pub struct Lz4ReaderPy {
-    inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -87,7 +87,7 @@ impl Lz4ReaderPy {
 
 #[pyclass(name = "Lz4Writer", extends = CompressingWriterPy, subclass)]
 pub struct Lz4WriterPy {
-    inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
 }
 
 // noinspection DuplicatedCode

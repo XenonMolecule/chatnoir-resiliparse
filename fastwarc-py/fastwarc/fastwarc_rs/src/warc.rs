@@ -610,6 +610,10 @@ impl ArchiveIteratorPy {
             |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
             |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
         )?;
+        // use crate::_fastwarc_rs::stream_io::GzipReaderPy;
+        // if stream.bind(py).cast::<GzipReaderPy>().is_ok() {
+        //     println!("gzip ok 1");
+        // }
         let mut inner = ArchiveIteratorThreadSafe::new(reader);
         inner.set_parse_http(parse_http);
         inner.set_verify_digests(verify_digests);

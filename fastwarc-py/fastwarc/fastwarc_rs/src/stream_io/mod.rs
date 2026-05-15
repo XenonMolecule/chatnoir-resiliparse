@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use self::gzip::{GzipReaderPy, GzipWriterPy};
+use self::lz4::{Lz4ReaderPy, Lz4WriterPy};
 use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyString};
@@ -162,9 +164,17 @@ pub(crate) trait PyStreamAdapter: Sized {
     fn new(inner: Py<PyAny>) -> Self;
 }
 
+enum PyReaderType {
+    GzipReader(Py<PyAny>),
+    Lz4Reader(Py<PyAny>),
+    Other(Py<PyAny>),
+}
+
 /// Reader adapter for Python file-like objects.
+/// Wrapped types from `stream_io` are optimized with static dispatch. Other
+/// `BytesIO` types will use dynamic Python `read()` / `seek()` calls.
 pub(crate) struct PyReaderAdapter {
-    inner: Py<PyAny>,
+    inner: PyReaderType,
     pos: u64,
     buf: Vec<u8>,
     buf_pos: usize,
@@ -184,6 +194,16 @@ impl PyReaderAdapter {
     }
 
     pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> Self {
+        let inner = Python::attach(|py| {
+            let bound = inner.bind(py);
+            if bound.is_exact_instance_of::<GzipReaderPy>() {
+                PyReaderType::GzipReader(inner)
+            } else if bound.is_exact_instance_of::<Lz4ReaderPy>() {
+                PyReaderType::Lz4Reader(inner)
+            } else {
+                PyReaderType::Other(inner)
+            }
+        });
         Self {
             inner,
             pos: 0,
@@ -193,9 +213,6 @@ impl PyReaderAdapter {
         }
     }
 }
-
-// SAFETY: All interaction with `PyReader::inner` must go through `Python::attach`.
-unsafe impl Send for PyReaderAdapter {}
 
 impl Read for PyReaderAdapter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -210,32 +227,52 @@ impl Read for PyReaderAdapter {
     }
 }
 
+macro_rules! native_seek_call {
+    ($inner: ident, $py: ident, $ReaderType: ident, $pos: ident) => {{
+        let inner = &$inner.bind($py).cast::<$ReaderType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().seek($pos)?)
+    }};
+}
+
 impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
             return Ok(self.pos);
         }
-        Python::attach(|py| {
-            let stream = self.inner.bind(py);
-            let result = match pos {
-                SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
-                SeekFrom::Current(offset) => {
-                    let buffered = (self.buf_len - self.buf_pos) as i64;
-                    stream.call_method1("seek", (offset - buffered, 1))
+        let new_pos = Python::attach(|py| -> io::Result<u64> {
+            match &self.inner {
+                PyReaderType::GzipReader(inner) => native_seek_call!(inner, py, GzipReaderPy, pos),
+                PyReaderType::Lz4Reader(inner) => native_seek_call!(inner, py, Lz4ReaderPy, pos),
+                PyReaderType::Other(inner) => {
+                    let stream = inner.bind(py);
+                    let result = match pos {
+                        SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
+                        SeekFrom::Current(offset) => {
+                            let buffered = (self.buf_len - self.buf_pos) as i64;
+                            stream.call_method1("seek", (offset - buffered, 1))
+                        }
+                        SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
+                    }?;
+                    Ok(result.extract::<u64>()?)
                 }
-                SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
-            }?;
-            let new_pos = result.extract::<u64>()?;
-            self.pos = new_pos;
-            self.buf_pos = 0;
-            self.buf_len = 0;
-            Ok(new_pos)
-        })
+            }
+        })?;
+        self.pos = new_pos;
+        self.buf_pos = 0;
+        self.buf_len = 0;
+        Ok(new_pos)
     }
 
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.pos)
     }
+}
+
+macro_rules! native_read_call {
+    ($inner: ident, $py: ident, $ReaderType: ident, $buf: expr) => {{
+        let inner = &$inner.bind($py).cast::<$ReaderType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().read(&mut $buf)?)
+    }};
 }
 
 impl BufRead for PyReaderAdapter {
@@ -244,17 +281,25 @@ impl BufRead for PyReaderAdapter {
             return Ok(&self.buf[self.buf_pos..self.buf_len]);
         }
 
-        Python::attach(|py| {
-            let bound = self.inner.bind(py).call_method1("read", (self.buf.len(),))?;
-            let data = bound
-                .cast::<PyBytes>()
-                .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
-                .as_bytes();
-            self.buf_pos = 0;
-            self.buf_len = data.len();
-            self.buf[..self.buf_len].copy_from_slice(data);
-            Ok(&self.buf[..self.buf_len])
-        })
+        let n = Python::attach(|py| -> io::Result<usize> {
+            match &self.inner {
+                PyReaderType::GzipReader(inner) => native_read_call!(inner, py, GzipReaderPy, self.buf),
+                PyReaderType::Lz4Reader(inner) => native_read_call!(inner, py, Lz4ReaderPy, self.buf),
+                PyReaderType::Other(inner) => {
+                    let bound = inner.bind(py).call_method1("read", (self.buf.len(),))?;
+                    let data = bound
+                        .cast::<PyBytes>()
+                        .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
+                        .as_bytes();
+                    self.buf[..data.len()].copy_from_slice(data);
+                    Ok(data.len())
+                }
+            }
+        })?;
+
+        self.buf_len = n;
+        self.buf_pos = 0;
+        Ok(&self.buf[..self.buf_len])
     }
 
     fn consume(&mut self, amount: usize) {
@@ -263,9 +308,17 @@ impl BufRead for PyReaderAdapter {
     }
 }
 
+enum PyWriterType {
+    GzipWriter(Py<PyAny>),
+    Lz4Writer(Py<PyAny>),
+    Other(Py<PyAny>),
+}
+
 /// Writer adapter for Python file-like objects.
+/// Wrapped types from `stream_io` are optimized with static dispatch. Other
+/// `BytesIO` types will use dynamic Python `write()` / `flush()` calls.
 pub(crate) struct PyWriterAdapter {
-    inner: Py<PyAny>,
+    inner: PyWriterType,
 }
 
 impl PyStreamAdapter for PyWriterAdapter {
@@ -274,29 +327,58 @@ impl PyStreamAdapter for PyWriterAdapter {
     }
 }
 
-#[allow(unused)]
 impl PyWriterAdapter {
     pub fn new(inner: Py<PyAny>) -> Self {
+        let inner = Python::attach(|py| {
+            let bound = inner.bind(py);
+            if bound.is_exact_instance_of::<GzipReaderPy>() {
+                PyWriterType::GzipWriter(inner)
+            } else if bound.is_exact_instance_of::<Lz4ReaderPy>() {
+                PyWriterType::Lz4Writer(inner)
+            } else {
+                PyWriterType::Other(inner)
+            }
+        });
         Self { inner }
     }
 }
 
-// SAFETY: All interaction with `PyWriter::inner` must go through `Python::attach`.
-unsafe impl Send for PyWriterAdapter {}
+macro_rules! native_write_call {
+    ($inner: ident, $py: ident, $WriterType: ident, $buf: ident) => {{
+        let inner = &$inner.bind($py).cast::<$WriterType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().write($buf)?)
+    }};
+}
+
+macro_rules! native_flush_call {
+    ($inner: ident, $py: ident, $WriterType: ident) => {{
+        let inner = &$inner.bind($py).cast::<$WriterType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().flush()?)
+    }};
+}
 
 impl Write for PyWriterAdapter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        Python::attach(|py| {
-            Ok(self
-                .inner
-                .bind(py)
-                .call_method1("write", (buf,))
-                .and_then(|result| result.extract::<usize>())?)
-        })
+        Ok(Python::attach(|py| -> io::Result<usize> {
+            match &self.inner {
+                PyWriterType::GzipWriter(inner) => native_write_call!(inner, py, GzipWriterPy, buf),
+                PyWriterType::Lz4Writer(inner) => native_write_call!(inner, py, Lz4WriterPy, buf),
+                PyWriterType::Other(inner) => Ok(inner
+                    .bind(py)
+                    .call_method1("write", (buf,))
+                    .and_then(|result| result.extract::<usize>())?),
+            }
+        })?)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Python::attach(|py| Ok(self.inner.bind(py).call_method0("flush").map(|_| ())?))
+        Ok(Python::attach(|py| -> io::Result<()> {
+            match &self.inner {
+                PyWriterType::GzipWriter(inner) => native_flush_call!(inner, py, GzipWriterPy),
+                PyWriterType::Lz4Writer(inner) => native_flush_call!(inner, py, Lz4WriterPy),
+                PyWriterType::Other(inner) => Ok(inner.bind(py).call_method0("flush").map(|_| ())?),
+            }
+        })?)
     }
 }
 
