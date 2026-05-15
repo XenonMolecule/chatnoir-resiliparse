@@ -81,6 +81,7 @@ impl GzipReaderPy {
         forward_fn_call!(self, inner_stream_position)
     }
 
+    #[allow(clippy::needless_question_mark)]
     pub fn member_start_position(&mut self) -> io::Result<u64> {
         forward_fn_call!(self, member_start_position)
     }
