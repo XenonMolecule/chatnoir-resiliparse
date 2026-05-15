@@ -569,13 +569,9 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 pub struct ArchiveIteratorPy {
     inner: ArchiveIteratorThreadSafe,
     record_types: u16,
-    parse_http: bool,
     min_content_length: Option<u64>,
     max_content_length: Option<u64>,
     func_filter: Option<Py<PyAny>>,
-    verify_digests: bool,
-    strict_mode: bool,
-    auto_decode: String,
 }
 
 #[pymethods]
@@ -617,16 +613,15 @@ impl ArchiveIteratorPy {
         let mut inner = ArchiveIteratorThreadSafe::new(reader);
         inner.set_parse_http(parse_http);
         inner.set_verify_digests(verify_digests);
+        // TODO: Implement
+        let _ = (auto_decode, strict_mode);
+
         Ok(Self {
             inner,
             record_types: record_types as u16,
-            parse_http,
             min_content_length: u64::try_from(min_content_length).ok(),
             max_content_length: u64::try_from(max_content_length).ok(),
             func_filter,
-            verify_digests,
-            strict_mode,
-            auto_decode: auto_decode.to_owned(),
         })
     }
 
@@ -642,15 +637,14 @@ impl ArchiveIteratorPy {
             let record = next?;
             let record_ref = record.lock().unwrap();
 
+            // TODO: Proper implementation with filters
             let content_length = record_ref.content_length();
             if !record_ref.record_type().matches_bitmask(self.record_types)
                 || self.min_content_length.is_some_and(|min| content_length < min)
                 || self.max_content_length.is_some_and(|max| content_length > max)
             {
-                let _ = &self.strict_mode;
                 continue;
             }
-            let _ = (self.parse_http, self.verify_digests, &self.auto_decode, self.strict_mode);
             drop(record_ref);
 
             let record_obj = Py::new(py, WarcRecordPy { inner: record.clone() })?;
