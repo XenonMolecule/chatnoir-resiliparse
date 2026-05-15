@@ -16,6 +16,7 @@ use super::*;
 use crate::stream_io::BufReadSeek;
 use crate::stream_io::LimitedBufReadSeek;
 use crate::stream_io::gzip::GzipReader;
+use crate::stream_io::lz4::Lz4Reader;
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
 use pretty_assertions::assert_eq;
@@ -24,9 +25,8 @@ use sha2::{Sha256, Sha512};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, Read, Seek};
+use std::io::{BufRead, Read, Seek, SeekFrom};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 /// Helper for getting path to external test fixture.
 fn get_fixture_path(name: &str) -> PathBuf {
@@ -1129,6 +1129,103 @@ fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
         // Contains exactly one record (one per iteration)
         assert_eq!(rec_count, 2);
     }
+
+    Ok(())
+}
+
+/// Helper for testing whether iterating over a WARC reports the correct record offsets,
+/// and whether we can restart a new iterator from those record / compression member boundaries.
+fn iterate_archive_members_with_offsets<R, M>(mut make_reader: M) -> io::Result<()>
+where
+    R: BufReadSeek + Send + 'static,
+    M: FnMut() -> io::Result<R>,
+{
+    let mut iterator_variant_runs = Vec::new();
+    let mut offsets = Vec::new();
+    let mut record_ids = Vec::new();
+
+    // First, iterate over all records and collect their offsets and record IDs.
+    run_archive_iterator_variants(&mut make_reader, |record| {
+        let stream_pos = record.stream_pos();
+
+        if !offsets.is_empty() && stream_pos == 0 {
+            // First iteration of second variant
+            iterator_variant_runs.push((std::mem::take(&mut offsets), std::mem::take(&mut record_ids)));
+        } else if let Some(&previous) = offsets.last() {
+            assert!(stream_pos > previous);
+        } else {
+            // First overall
+            assert_eq!(stream_pos, 0);
+        }
+
+        offsets.push(stream_pos);
+        record_ids.push(record.record_id().unwrap().to_string());
+
+        Ok(())
+    })?;
+    iterator_variant_runs.push((offsets, record_ids));
+
+    // Recorded two variant runs (non-thread-safe and thread-safe).
+    assert_eq!(iterator_variant_runs.len(), 2);
+    // Both must be identical.
+    assert_eq!(iterator_variant_runs[0], iterator_variant_runs[1]);
+
+    // Discard the second variant run.
+    let (offsets, record_ids) = &iterator_variant_runs[0];
+    let num_records = offsets.len();
+    assert!(num_records > 0);
+
+    // Test whether we can restart the iterator from any of the previously recorded offsets.
+    for (i, &offset) in offsets.iter().enumerate() {
+        let num_expected_records = num_records - i;
+        let expected_id = &record_ids[i];
+        let mut iterator_variant_counts = Vec::new();
+        let mut count = 0usize;
+        let mut first_record = true;
+
+        let make_reader = || {
+            let mut reader = make_reader()?;
+            reader.seek(SeekFrom::Start(offset))?;
+            Ok(reader)
+        };
+        run_archive_iterator_variants(make_reader, |record| {
+            // First run of second variant
+            if count > 0 && record.stream_pos() == offset {
+                iterator_variant_counts.push(count);
+                count = 0;
+                first_record = true;
+            }
+
+            // Check whether first record matches the previously recorded ID and verify block digest.
+            if first_record {
+                assert_eq!(record.record_id().as_deref(), Some(expected_id.as_str()));
+                if record.record_type() == WarcRecordType::Response {
+                    assert!(record.verify_block_digest(false).unwrap());
+                }
+                first_record = false;
+            }
+
+            count += 1;
+            Ok(())
+        })?;
+
+        iterator_variant_counts.push(count);
+        assert_eq!(iterator_variant_counts, vec![num_expected_records, num_expected_records]);
+    }
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_record_offsets() -> io::Result<()> {
+    let warc = get_fixture_path("warcfile.warc");
+    iterate_archive_members_with_offsets(|| Ok(io::BufReader::new(File::open(warc.clone())?)))?;
+
+    let warc_gz = get_fixture_path("warcfile.warc.gz");
+    iterate_archive_members_with_offsets(|| Ok(GzipReader::new(File::open(warc_gz.clone())?)))?;
+
+    let warc_lz4 = get_fixture_path("warcfile.warc.lz4");
+    iterate_archive_members_with_offsets(|| Ok(Lz4Reader::new(File::open(warc_lz4.clone())?)))?;
 
     Ok(())
 }
