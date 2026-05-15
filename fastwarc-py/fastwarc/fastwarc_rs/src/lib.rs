@@ -43,6 +43,9 @@ pub mod _fastwarc_rs {
 
         #[pymodule_export]
         pub use crate::stream_io::lz4::{Lz4ReaderPy, Lz4WriterPy};
+
+        #[pymodule_export]
+        pub use crate::stream_io::brotli::{BrotliReaderPy, BrotliWriterPy};
     }
 
     #[pymodule]

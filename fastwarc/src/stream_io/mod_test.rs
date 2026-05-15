@@ -382,6 +382,9 @@ pub(crate) mod helpers {
         if res.is_ok() {
             res = writer.finish();
         }
+        if res.is_ok() {
+            res = writer.flush();
+        }
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::Other);

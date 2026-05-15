@@ -19,6 +19,7 @@ use std::mem;
 // Submodules
 // ===========================================================
 
+pub mod brotli;
 pub mod gzip;
 pub mod lz4;
 

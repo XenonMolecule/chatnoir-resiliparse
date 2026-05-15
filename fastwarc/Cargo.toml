@@ -14,6 +14,7 @@ license.workspace = true
 crate-type = ["lib"]
 
 [dependencies]
+brotli = "8.0"
 data-encoding = "2.10"
 uuid = { version = "1.18", features = ["v4"] }
 encoding = "0.2"

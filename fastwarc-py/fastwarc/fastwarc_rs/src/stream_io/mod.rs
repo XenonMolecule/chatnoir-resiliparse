@@ -23,6 +23,7 @@ use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 // Submodules
 // ===========================================================
 
+pub mod brotli;
 pub mod gzip;
 pub mod lz4;
 
