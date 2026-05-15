@@ -183,6 +183,9 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
     ///
     /// `pos` - seek position
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        if pos == SeekFrom::Current(0) {
+            return Ok(self.stream_pos);
+        }
         super::_forward_seek(self, pos)
     }
 

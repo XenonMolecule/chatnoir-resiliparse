@@ -15,7 +15,7 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyString};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Submodules
@@ -159,12 +159,26 @@ impl CompressingWriterPy {
 
 pub(crate) struct PyReaderAdapter {
     inner: Py<PyAny>,
+    pos: u64,
+    buf: Vec<u8>,
+    buf_pos: usize,
+    buf_len: usize,
 }
 
 #[allow(unused)]
 impl PyReaderAdapter {
     pub fn new(inner: Py<PyAny>) -> Self {
-        Self { inner }
+        Self::with_capacity(inner, 8192)
+    }
+
+    pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> Self {
+        Self {
+            inner,
+            pos: 0,
+            buf: vec![0; capacity],
+            buf_pos: 0,
+            buf_len: 0,
+        }
     }
 }
 
@@ -173,30 +187,67 @@ unsafe impl Send for PyReaderAdapter {}
 
 impl Read for PyReaderAdapter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        Python::attach(|py| {
-            let bound = self.inner.bind(py).call_method1("read", (buf.len(),))?;
-            let data = bound
-                .cast::<PyBytes>()
-                .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
-                .as_bytes();
-            let len = data.len().min(buf.len());
-            buf[..len].copy_from_slice(&data[..len]);
-            Ok(len)
-        })
+        let in_buf = self.fill_buf()?;
+        if in_buf.is_empty() {
+            return Ok(0);
+        }
+        let n = in_buf.len().min(buf.len());
+        buf[..n].copy_from_slice(&in_buf[..n]);
+        self.consume(n);
+        Ok(n)
     }
 }
 
 impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        if pos == SeekFrom::Current(0) {
+            return Ok(self.pos);
+        }
         Python::attach(|py| {
             let stream = self.inner.bind(py);
             let result = match pos {
                 SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
-                SeekFrom::Current(offset) => stream.call_method1("seek", (offset, 1)),
+                SeekFrom::Current(offset) => {
+                    let buffered = (self.buf_len - self.buf_pos) as i64;
+                    stream.call_method1("seek", (offset - buffered, 1))
+                }
                 SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
             }?;
-            Ok(result.extract::<u64>()?)
+            let new_pos = result.extract::<u64>()?;
+            self.pos = new_pos;
+            self.buf_pos = 0;
+            self.buf_len = 0;
+            Ok(new_pos)
         })
+    }
+
+    fn stream_position(&mut self) -> io::Result<u64> {
+        Ok(self.pos)
+    }
+}
+
+impl BufRead for PyReaderAdapter {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if self.buf_pos < self.buf_len {
+            return Ok(&self.buf[self.buf_pos..self.buf_len]);
+        }
+
+        Python::attach(|py| {
+            let bound = self.inner.bind(py).call_method1("read", (self.buf.len(),))?;
+            let data = bound
+                .cast::<PyBytes>()
+                .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
+                .as_bytes();
+            self.buf_pos = 0;
+            self.buf_len = data.len();
+            self.buf[..self.buf_len].copy_from_slice(data);
+            Ok(&self.buf[..self.buf_len])
+        })
+    }
+
+    fn consume(&mut self, amount: usize) {
+        self.pos += amount as u64;
+        self.buf_pos += amount;
     }
 }
 

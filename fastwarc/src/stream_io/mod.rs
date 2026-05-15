@@ -188,6 +188,10 @@ impl io::BufRead for LimitedBufReadSeek {
 
 impl io::Seek for LimitedBufReadSeek {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        if pos == io::SeekFrom::Current(0) {
+            return Ok(self.pos);
+        }
+
         let mut new_pos = match pos {
             io::SeekFrom::Start(p) => p as i128,
             io::SeekFrom::End(p) => self.limit as i128 + p as i128,

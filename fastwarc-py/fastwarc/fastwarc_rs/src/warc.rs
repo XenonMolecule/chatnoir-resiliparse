@@ -18,7 +18,6 @@ use fastwarc::record::{ArchiveIteratorThreadSafe, HeaderEncoding, HeaderMap, War
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
-use std::io::BufReader;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // ===========================================================
@@ -118,7 +117,7 @@ impl HeaderMapPy {
 
     #[pyo3(signature = (reader, has_status_line=true))]
     pub fn parse(&mut self, reader: Py<PyAny>, has_status_line: bool) -> PyResult<usize> {
-        let mut reader = BufReader::new(PyReaderAdapter::new(reader));
+        let mut reader = PyReaderAdapter::new(reader);
         Ok(self.inner.parse(&mut reader, has_status_line)?)
     }
 
@@ -603,7 +602,7 @@ impl ArchiveIteratorPy {
         strict_mode: bool,
         auto_decode: &str,
     ) -> Self {
-        let mut inner = ArchiveIteratorThreadSafe::new(Box::new(BufReader::new(PyReaderAdapter::new(stream))));
+        let mut inner = ArchiveIteratorThreadSafe::new(Box::new(PyReaderAdapter::new(stream)));
         inner.set_parse_http(parse_http);
         inner.set_verify_digests(verify_digests);
         Self {
