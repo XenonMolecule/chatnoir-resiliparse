@@ -355,9 +355,9 @@ impl WarcRecordPayloadReaderPy {
     pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Bound<'py, PyBytes>> {
         self.with_payload_reader(|reader| {
             let mut buf;
-            let mut n = 0;
+            let n;
             if size < 0 {
-                buf = Vec::with_capacity(4096);
+                buf = Vec::with_capacity(2048);
                 n = reader.read_to_end(&mut buf)?;
             } else {
                 buf = Vec::with_capacity(size as usize);
