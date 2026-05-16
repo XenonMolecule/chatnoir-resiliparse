@@ -26,6 +26,7 @@ use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 pub mod brotli;
 pub mod gzip;
 pub mod lz4;
+pub mod zstd;
 
 // ===========================================================
 // Exported stream parent classes
