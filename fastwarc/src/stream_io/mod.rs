@@ -22,6 +22,7 @@ use std::mem;
 pub mod brotli;
 pub mod gzip;
 pub mod lz4;
+pub mod zstd;
 
 // ===========================================================
 // Global trait definitions
