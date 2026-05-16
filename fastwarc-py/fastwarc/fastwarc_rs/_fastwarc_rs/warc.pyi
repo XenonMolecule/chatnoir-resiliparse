@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from datetime import datetime
 from enum import IntFlag
+from os import PathLike
 from typing import BinaryIO, Callable, Dict, Iterable, Iterator, Literal, Optional, Self, Tuple, Union
 
 from .stream_io import _GenericReader, _GenericWriter, Reader, Writer
@@ -171,7 +173,7 @@ class WarcRecord:
 class ArchiveIterator(Iterable[WarcRecord]):
     def __new__(
             cls,
-            stream: Union[Reader, BinaryIO, _GenericReader],
+            stream: Union[Reader, BinaryIO, _GenericReader, PathLike, str],
             record_types: WarcRecordType = any_type,
             parse_http: bool = True,
             min_content_length: int = -1,

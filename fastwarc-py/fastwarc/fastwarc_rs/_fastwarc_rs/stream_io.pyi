@@ -84,17 +84,20 @@ class CompressingWriter(Writer):
 
 
 class GzipReader(DecompressingReader):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096) -> Self: ...
+    def __new__(cls, inner: Union[Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size: int = 4096) -> Self: ...
 
 
 class GzipWriter(CompressingWriter):
-    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
                 buffer_size: int = 8192) -> Self: ...
 
 
 class Lz4Reader(DecompressingReader):
-    def __new__(cls, inner: Union[BinaryIO, _GenericReader, PathLike, str], buffer_size: int = 4096) -> Self: ...
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size: int = 4096) -> Self: ...
 
 
 class Lz4Writer(CompressingWriter):
-    def __new__(cls, inner: Union[BinaryIO, _GenericWriter, PathLike, str], buffer_size: int = 8192) -> Self: ...
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size: int = 8192) -> Self: ...
