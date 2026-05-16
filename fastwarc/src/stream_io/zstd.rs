@@ -187,14 +187,12 @@ pub struct ZstdWriter<T: Write> {
 /// * `level` - compression level
 /// * `include_checksum` - include checksums at the end of frames
 /// * `multithread_workers` - number of threads to use for compression (0 to disable)
-/// * `include_dictid` - store the dict id
 #[derive(Debug, Copy, Clone)]
 pub struct ZstdWriterOptions {
     pub capacity: usize,
     pub level: i32,
     pub include_checksum: bool,
     pub multithread_workers: u32,
-    pub include_dictid: bool,
 }
 
 impl Default for ZstdWriterOptions {
@@ -204,7 +202,6 @@ impl Default for ZstdWriterOptions {
             level: 3,
             include_checksum: false,
             multithread_workers: 4,
-            include_dictid: true,
         }
     }
 }
@@ -249,7 +246,6 @@ impl<T: Write> ZstdWriter<T> {
         let mut encoder = Encoder::new(inner, options.level)?;
         encoder.multithread(options.multithread_workers)?;
         encoder.include_checksum(options.include_checksum)?;
-        encoder.include_dictid(options.include_dictid)?;
         Ok(encoder)
     }
 
