@@ -393,7 +393,6 @@ impl WarcRecordPayloadReaderPy {
 
     #[pyo3(signature = (offset, whence=0))]
     pub fn seek(&self, offset: i128, whence: u8) -> PyResult<u64> {
-        // TODO: This is still buggy
         self.with_payload_reader(|reader| Ok(reader.seek(python_whence_to_seekfrom(offset, whence)?)?))
     }
 
