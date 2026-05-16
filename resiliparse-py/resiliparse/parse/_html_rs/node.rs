@@ -43,7 +43,7 @@ pub enum NodeType {
     Notation = 0x0C,
 }
 
-#[pyclass(subclass, module = "resiliparse.parse._html_rs.node")]
+#[pyclass(subclass, module = "resiliparse.parse._html_rs.node", from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct Node {
     pub(crate) node: node_impl::Node,
@@ -298,7 +298,7 @@ macro_rules! character_data_node {
 
 macro_rules! define_node_type {
     ($Self: ident, $BaseEnum: ident, $Base: ty) => {
-        #[pyclass(extends=Node, module = "resiliparse.parse._html_rs.node")]
+        #[pyclass(extends=Node, module = "resiliparse.parse._html_rs.node", from_py_object)]
         #[derive(Clone)]
         pub struct $Self;
 
