@@ -57,14 +57,14 @@ impl NodeList {
 }
 
 fn get_tuple_slice<'py>(tup: &Bound<'py, PyTuple>, index_or_slice: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    if let Ok(s) = index_or_slice.downcast::<PySlice>() {
+    if let Ok(s) = index_or_slice.cast::<PySlice>() {
         let i = s.indices(tup.len() as isize)?;
         let e = tup
             .get_slice(i.start as usize, i.stop as usize)
             .iter()
             .step_by(i.step.abs() as usize);
         Ok(PyTuple::new(index_or_slice.py(), e)?.into_any())
-    } else if let Ok(i) = index_or_slice.downcast::<PyInt>() {
+    } else if let Ok(i) = index_or_slice.cast::<PyInt>() {
         if i.lt(i)? {
             i.add(tup.len())?;
         }
@@ -118,7 +118,7 @@ impl NodeList {
     }
 
     pub fn __contains__<'py>(&self, node: &Bound<'py, PyAny>) -> bool {
-        node.downcast::<Node>().map_or(false, |n| match &self.list {
+        node.cast::<Node>().map_or(false, |n| match &self.list {
             NL::NodeList(l) => l.iter().any(|i| i == n.borrow().node),
             NL::ElementNodeList(l) => l.iter().any(|i| i.as_node() == n.borrow().node),
             NL::NamedNodeMap(l) => l.iter().any(|i| i.as_node() == n.borrow().node),

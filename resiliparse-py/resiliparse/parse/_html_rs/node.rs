@@ -557,7 +557,7 @@ impl Node {
     }
 
     pub fn __contains__(&self, node: &Bound<'_, PyAny>) -> bool {
-        node.downcast::<Node>().map_or(false, |n| self.contains(n))
+        node.cast::<Node>().map_or(false, |n| self.contains(n))
     }
 
     pub fn __str__(&self) -> String {
