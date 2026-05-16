@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::io;
+use std::io::BufRead;
 use std::mem;
 
 // ===========================================================
@@ -161,6 +162,29 @@ impl LimitedBufReadSeek {
         self.pos = 0;
         mem::replace(&mut self.reader, new_reader)
     }
+
+    /// Read until linefeed (LF) is found or `max_line_len` is reached.
+    pub fn read_line(&mut self, mut max_line_len: usize) -> io::Result<Vec<u8>> {
+        max_line_len = max_line_len.min(self.limit as usize);
+        let mut buf = Vec::with_capacity(max_line_len.min(128));
+        while buf.len() < max_line_len {
+            let chunk = self.fill_buf()?;
+            if chunk.is_empty() {
+                break;
+            }
+            let remaining = max_line_len - buf.len();
+            let limit = chunk.len().min(remaining);
+
+            if let Some(pos) = chunk[..limit].iter().position(|&b| b == b'\n') {
+                buf.extend_from_slice(&chunk[..=pos]);
+                self.consume(pos + 1);
+                return Ok(buf);
+            }
+            buf.extend_from_slice(&chunk[..limit]);
+            self.consume(limit);
+        }
+        Ok(buf)
+    }
 }
 
 impl io::Read for LimitedBufReadSeek {
@@ -188,6 +212,7 @@ impl io::BufRead for LimitedBufReadSeek {
 }
 
 impl io::Seek for LimitedBufReadSeek {
+    /// TODO: Seek on limited stream is broken
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         if pos == io::SeekFrom::Current(0) {
             return Ok(self.pos);

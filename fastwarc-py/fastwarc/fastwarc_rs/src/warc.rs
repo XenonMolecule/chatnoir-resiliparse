@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, wrap_reader_stream};
+use crate::stream_io::impl_macros::convert_seek_whence_from_py;
+use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, ReaderPy, wrap_reader_stream};
 use fastwarc::record::DigestError::StreamError;
 use fastwarc::record::{ArchiveIteratorThreadSafe, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use fastwarc::stream_io::BufReadSeek;
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
-use std::io;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex, MutexGuard};
-
 // ===========================================================
 // WarcRecordType
 // ===========================================================
@@ -331,6 +331,74 @@ impl HeaderMapPy {
 // WarcRecord
 // ===========================================================
 
+#[pyclass(name = "WarcRecordPayloadReader", extends = ReaderPy)]
+struct WarcRecordPayloadReaderPy {
+    record: Arc<Mutex<WarcRecord>>,
+}
+
+#[pymethods]
+impl WarcRecordPayloadReaderPy {
+    #[pyo3(signature = (size=-1))]
+    pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Bound<'py, PyBytes>> {
+        let mut record = self.record.lock().unwrap();
+        let reader = record
+            .reader_mut()
+            .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
+
+        let mut buf;
+        let n;
+        if size < 0 {
+            buf = Vec::new();
+            n = reader.read_to_end(&mut buf)?;
+        } else {
+            buf = vec![0; size as usize];
+            n = reader.read(&mut buf)?;
+        }
+        Ok(PyBytes::new(py, &buf[..n]))
+    }
+
+    #[pyo3(signature = (crlf=false, max_line_len=8192))]
+    pub fn readline<'py>(&self, py: Python<'py>, crlf: bool, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
+        // Legacy compatibility
+        _ = crlf;
+
+        let mut record = self.record.lock().unwrap();
+        let reader = record
+            .reader_mut()
+            .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
+        Ok(PyBytes::new(py, &reader.read_line(max_line_len)?))
+    }
+
+    #[pyo3(signature = (size=-1))]
+    pub fn consume(&self, size: i128) -> PyResult<usize> {
+        let mut record = self.record.lock().unwrap();
+        if size < 0 {
+            Ok(record.consume()?)
+        } else {
+            Ok(record.consume_n(size as usize)?)
+        }
+    }
+
+    pub fn tell(&self) -> PyResult<u64> {
+        let mut record = self.record.lock().unwrap();
+        let reader = record
+            .reader_mut()
+            .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
+        Ok(reader.stream_position()?)
+    }
+
+    #[pyo3(signature = (offset, whence=0))]
+    pub fn seek(&self, offset: i128, whence: u8) -> PyResult<u64> {
+        let mut record = self.record.lock().unwrap();
+        let reader = record
+            .reader_mut()
+            .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
+        Ok(convert_seek_whence_from_py!(reader, offset, whence, seek)?)
+    }
+
+    pub fn close(&self) {}
+}
+
 #[pyclass(name = "WarcRecord")]
 pub struct WarcRecordPy {
     inner: Arc<Mutex<WarcRecord>>,
@@ -438,8 +506,14 @@ impl WarcRecordPy {
     }
 
     #[getter]
-    pub fn reader<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
-        py.None().bind(py).clone()
+    pub fn reader<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let reader = Py::new(
+            py,
+            PyClassInitializer::from(ReaderPy::__new__()).add_subclass(WarcRecordPayloadReaderPy {
+                record: self.inner.clone(),
+            }),
+        )?;
+        Ok(reader.into_bound(py).into_any())
     }
 
     #[getter]

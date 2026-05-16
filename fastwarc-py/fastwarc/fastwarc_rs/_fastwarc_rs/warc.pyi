@@ -114,6 +114,13 @@ class HeaderMap:
     def __contains__(self, item: str) -> bool: ...
 
 
+class WarcRecordPayloadReaderPy(Reader):
+
+    def readline(self, crlf: bool = True, max_line_len: int = 8192) -> bytes: ...
+
+    def consume(self, size: int = -1) -> int: ...
+
+
 class WarcRecord:
     record_id: str
     record_type: WarcRecordType
@@ -127,7 +134,7 @@ class WarcRecord:
     http_charset: Optional[str]
     http_date: Optional[datetime]
     http_last_modified: Optional[datetime]
-    reader: Reader
+    reader: WarcRecordPayloadReaderPy
     stream_pos: int
     is_frozen: bool
 
