@@ -357,16 +357,15 @@ impl WarcRecordPayloadReaderPy {
         Ok(PyBytes::new(py, &buf[..n]))
     }
 
-    #[pyo3(signature = (crlf=false, max_line_len=8192))]
-    pub fn readline<'py>(&self, py: Python<'py>, crlf: bool, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
-        // Legacy compatibility
-        _ = crlf;
-
+    #[pyo3(signature = (max_line_len=8192))]
+    pub fn readline<'py>(&self, py: Python<'py>, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
         let mut record = self.record.lock().unwrap();
         let reader = record
             .reader_mut()
             .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
-        Ok(PyBytes::new(py, &reader.read_line(max_line_len)?))
+        let mut buf = Vec::with_capacity(max_line_len.min(128));
+        reader.read_line(&mut buf, max_line_len)?;
+        Ok(PyBytes::new(py, &buf))
     }
 
     #[pyo3(signature = (size=-1))]

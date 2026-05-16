@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io;
-use std::io::BufRead;
+use std::io::{self, BufRead};
 use std::mem;
 
 // ===========================================================
@@ -125,7 +124,13 @@ pub(crate) use impl_stream_from_path;
 // ===========================================================
 
 /// A limited seekable buffered reader.
-/// Wraps an existing [`BufReadSeek`] reader, terminating when `limit` is reached.
+///
+/// Wraps an existing [`BufReadSeek`] reader, setting the current reader position to be the new
+/// stream start, and terminating with a premature, virtual EOF when the set limit is reached.
+/// Calls to [`Self::stream_position()`] and [`Self::seek()`] work with and return the new
+/// logical stream positions.
+///
+/// Does not allocate a new buffer. All calls are passed directly to the underlying reader.
 pub struct LimitedBufReadSeek {
     pub(crate) reader: Box<dyn BufReadSeek + Send>,
     pub(crate) limit: u64,
@@ -134,6 +139,11 @@ pub struct LimitedBufReadSeek {
 
 impl LimitedBufReadSeek {
     /// Create a new limited reader from a buffered reader instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - inner reader to put the limit on
+    /// * `limit` - limit in bytes at which EOF is returned
     pub fn new(reader: Box<dyn BufReadSeek + Send>, limit: Option<u64>) -> Self {
         Self {
             reader,
@@ -145,6 +155,10 @@ impl LimitedBufReadSeek {
     /// Change the limit of the reader.
     /// Also resets the logical stream position to 0. Use [`Self::real_stream_position()`] to get
     /// the real position on the original stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `limit` - new reader limit
     pub fn set_limit(&mut self, limit: u64) {
         self.limit = limit;
         self.pos = 0;
@@ -157,16 +171,33 @@ impl LimitedBufReadSeek {
 
     /// Replace the internal stream with a new one and hand ownership of the previous
     /// stream back to the caller. Resets `limit` and `pos`.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_reader` - new inner reader to put limit on
+    ///
+    /// # Returns
+    ///
+    /// Previous reader instance (unlimited)
     pub fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send> {
         self.limit = u64::MAX;
         self.pos = 0;
         mem::replace(&mut self.reader, new_reader)
     }
 
-    /// Read until linefeed (LF) is found or `max_line_len` is reached.
-    pub fn read_line(&mut self, mut max_line_len: usize) -> io::Result<Vec<u8>> {
+    /// Read until a linefeed (LF) is found or `max_line_len` is reached.
+    /// The results are appended to the provided buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` - output buffer to append to
+    /// * `max_line_len` - maximum line length to read if no LF found
+    ///
+    /// # Returns
+    ///
+    /// Number of bytes read
+    pub fn read_line(&mut self, buf: &mut Vec<u8>, mut max_line_len: usize) -> io::Result<usize> {
         max_line_len = max_line_len.min(self.limit as usize);
-        let mut buf = Vec::with_capacity(max_line_len.min(128));
         while buf.len() < max_line_len {
             let chunk = self.fill_buf()?;
             if chunk.is_empty() {
@@ -178,12 +209,12 @@ impl LimitedBufReadSeek {
             if let Some(pos) = chunk[..limit].iter().position(|&b| b == b'\n') {
                 buf.extend_from_slice(&chunk[..=pos]);
                 self.consume(pos + 1);
-                return Ok(buf);
+                return Ok(buf.len());
             }
             buf.extend_from_slice(&chunk[..limit]);
             self.consume(limit);
         }
-        Ok(buf)
+        Ok(buf.len())
     }
 }
 
@@ -212,7 +243,6 @@ impl io::BufRead for LimitedBufReadSeek {
 }
 
 impl io::Seek for LimitedBufReadSeek {
-    /// TODO: Seek on limited stream is broken
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         if pos == io::SeekFrom::Current(0) {
             return Ok(self.pos);
