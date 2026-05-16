@@ -508,6 +508,9 @@ impl WarcRecordPy {
 
     #[getter]
     pub fn reader<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        if !self.inner.lock().unwrap().reader_mut().is_some() {
+            return Ok(py.None().into_bound(py));
+        }
         let reader = Py::new(
             py,
             PyClassInitializer::from(ReaderPy::__new__()).add_subclass(WarcRecordPayloadReaderPy {

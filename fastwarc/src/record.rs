@@ -1656,8 +1656,8 @@ where
             let next = self.cur.with_mut(WarcRecord::next)?;
             return match next {
                 Ok(n) => {
-                    self.cur.replace(n);
-                    let keep_record = match self.cur.with_mut(|record| {
+                    self.cur = S::new(n);
+                    let keep_record = self.cur.with_mut(|record| {
                         if self.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
                             return Ok(false);
                         }
@@ -1668,13 +1668,12 @@ where
                             return Err(e);
                         }
                         Ok(true)
-                    }) {
-                        Ok(keep_record) => keep_record,
+                    });
+                    match keep_record {
+                        Ok(keep) if !keep => continue,
                         Err(e) => return Some(Err(e)),
+                        _ => {}
                     };
-                    if !keep_record {
-                        continue;
-                    }
                     Some(Ok(self.cur.clone()))
                 }
                 Err(e) => Some(Err(e)),
