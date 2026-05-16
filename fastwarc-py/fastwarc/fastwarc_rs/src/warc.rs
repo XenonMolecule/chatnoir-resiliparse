@@ -361,7 +361,6 @@ impl WarcRecordPayloadReaderPy {
                 n = reader.read_to_end(&mut buf)?;
             } else {
                 buf = Vec::with_capacity(size as usize);
-                // read() may terminate early after 8192 characters.
                 n = reader.take(size as u64).read_to_end(&mut buf)?;
             }
             Ok(PyBytes::new(py, &buf[..n]))

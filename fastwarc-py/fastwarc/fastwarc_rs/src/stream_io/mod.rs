@@ -529,11 +529,11 @@ pub(crate) mod impl_macros {
             let mut buf;
             let n;
             if $size < 0 {
-                buf = Vec::new();
+                buf = Vec::with_capacity(2048);
                 n = reader.read_to_end(&mut buf)?;
             } else {
-                buf = vec![0; $size as usize];
-                n = reader.read(&mut buf)?;
+                buf = Vec::with_capacity($size as usize);
+                n = reader.take($size as u64).read_to_end(&mut buf)?;
             }
             Ok(PyBytes::new($py, &buf[..n]))
         }};
