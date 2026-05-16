@@ -164,6 +164,11 @@ impl LimitedBufReadSeek {
         self.pos = 0;
     }
 
+    /// Get the current limit.
+    pub fn limit(&mut self) -> u64 {
+        self.limit
+    }
+
     /// Get the real (not the logical) stream position.
     pub fn real_stream_position(&mut self) -> io::Result<u64> {
         self.reader.stream_position()

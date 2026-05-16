@@ -14,7 +14,7 @@
 
 use self::gzip::{GzipReaderPy, GzipWriterPy};
 use self::lz4::{Lz4ReaderPy, Lz4WriterPy};
-use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError};
+use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyString};
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
@@ -229,9 +229,14 @@ impl Read for PyReaderAdapter {
 }
 
 macro_rules! native_seek_call {
-    ($inner: ident, $py: ident, $ReaderType: ident, $pos: ident) => {{
+    ($inner: ident, $py: ident, $ReaderType: ident, $pos: ident, $buffered: expr) => {{
         let inner = &$inner.bind($py).cast::<$ReaderType>().unwrap().borrow().inner;
-        Ok(inner.lock().unwrap().as_mut().unwrap().seek($pos)?)
+        let pos = match $pos {
+            SeekFrom::Start(offset) => SeekFrom::Start(offset),
+            SeekFrom::Current(offset) => SeekFrom::Current(offset - $buffered),
+            SeekFrom::End(offset) => SeekFrom::End(offset),
+        };
+        Ok(inner.lock().unwrap().as_mut().unwrap().seek(pos)?)
     }};
 }
 
@@ -240,18 +245,32 @@ impl Seek for PyReaderAdapter {
         if pos == SeekFrom::Current(0) {
             return Ok(self.pos);
         }
+        let new_pos = match pos {
+            SeekFrom::Start(p) => SeekFrom::Start(p),
+            SeekFrom::Current(p) => SeekFrom::Start(
+                u64::try_from(p as i128 + self.pos as i128)
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Seek out of range"))?,
+            ),
+            SeekFrom::End(p) => SeekFrom::End(p),
+        };
+        if let SeekFrom::Start(p) = new_pos {
+            if p >= self.pos - self.buf_pos as u64 && p < self.pos + self.buf_len as u64 {
+                self.buf_pos += (p - self.pos) as usize;
+                self.pos = p;
+                return Ok(p);
+            }
+        }
+
+        let buffered = (self.buf_len - self.buf_pos) as i64;
         let new_pos = Python::attach(|py| -> io::Result<u64> {
             match &self.inner {
-                PyReaderType::GzipReader(inner) => native_seek_call!(inner, py, GzipReaderPy, pos),
-                PyReaderType::Lz4Reader(inner) => native_seek_call!(inner, py, Lz4ReaderPy, pos),
+                PyReaderType::GzipReader(inner) => native_seek_call!(inner, py, GzipReaderPy, pos, buffered),
+                PyReaderType::Lz4Reader(inner) => native_seek_call!(inner, py, Lz4ReaderPy, pos, buffered),
                 PyReaderType::Other(inner) => {
                     let stream = inner.bind(py);
                     let result = match pos {
                         SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
-                        SeekFrom::Current(offset) => {
-                            let buffered = (self.buf_len - self.buf_pos) as i64;
-                            stream.call_method1("seek", (offset - buffered, 1))
-                        }
+                        SeekFrom::Current(offset) => stream.call_method1("seek", (offset - buffered, 1)),
                         SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
                     }?;
                     Ok(result.extract::<u64>()?)
@@ -392,9 +411,18 @@ pub(crate) fn path_like_to_string(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(s) = obj.cast::<PyString>() {
         return Ok(s.to_str()?.to_owned());
     }
-
     let os_fspath = obj.py().import("os")?.getattr("fspath")?;
     os_fspath.call1((obj,))?.extract()
+}
+
+/// Convert the `whence` argument of `BinaryIO.seek()` to a `SeekFrom`.
+pub(crate) fn python_whence_to_seekfrom(offset: i128, whence: u8) -> PyResult<SeekFrom> {
+    Ok(match whence {
+        0 => SeekFrom::Start(u64::try_from(offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?),
+        1 => SeekFrom::Current(i64::try_from(offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?),
+        2 => SeekFrom::End(i64::try_from(offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?),
+        _ => return Err(PyValueError::new_err("Invalid value for `whence` argument. Must be 0, 1, or 2.")),
+    })
 }
 
 /// Wrap a Python stream object or file path / URL into a reader adapter.
@@ -492,24 +520,6 @@ where
 // ===========================================================
 
 pub(crate) mod impl_macros {
-    macro_rules! convert_seek_whence_from_py {
-        ($reader: ident, $offset: ident, $whence: ident, $seek_fn_name: ident) => {{
-            match $whence {
-                0 => Ok($reader.$seek_fn_name(SeekFrom::Start(
-                    u64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
-                ))?),
-                1 => Ok($reader.$seek_fn_name(SeekFrom::Current(
-                    i64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
-                ))?),
-                2 => Ok($reader.$seek_fn_name(SeekFrom::End(
-                    i64::try_from($offset).map_err(|_| PyValueError::new_err("Seek offset out of range."))?,
-                ))?),
-                _ => Err(PyValueError::new_err("Invalid value for `whence` argument. Must be 0, 1, or 2.")),
-            }
-        }};
-    }
-    pub(crate) use convert_seek_whence_from_py;
-
     macro_rules! impl_reader_read {
         ($self: ident, $py: ident, $size: ident) => {{
             let mut reader = $self.inner.lock().unwrap();
@@ -536,7 +546,8 @@ pub(crate) mod impl_macros {
             let reader = reader
                 .as_mut()
                 .ok_or_else(|| PyValueError::new_err("Trying I/O on closed file."))?;
-            Ok(convert_seek_whence_from_py!(reader, $offset, $whence, $seek_fn_name)?)
+            use crate::stream_io::python_whence_to_seekfrom;
+            Ok(reader.$seek_fn_name(python_whence_to_seekfrom($offset, $whence)?)?)
         }};
     }
     pub(crate) use impl_reader_seek;

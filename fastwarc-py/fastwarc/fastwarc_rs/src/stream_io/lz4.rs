@@ -18,7 +18,7 @@ use fastwarc::stream_io::{CompressingWriter, DecompressingReader, lz4};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
 #[pyclass(name = "Lz4Reader", extends = DecompressingReaderPy, subclass)]

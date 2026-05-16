@@ -19,7 +19,7 @@ use fastwarc::stream_io::{CompressingWriter, DecompressingReader, gzip};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
 #[pyclass(name = "GzipReader", extends = DecompressingReaderPy, subclass)]
