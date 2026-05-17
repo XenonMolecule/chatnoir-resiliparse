@@ -93,7 +93,7 @@ impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let n = match self.inner.as_mut().unwrap().read(buf) {
-            Ok(0) if !self.inner.as_mut().unwrap().get_ref().buffer().is_empty() => {
+            Ok(0) if !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() => {
                 // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
                 let old_pos = self.stream_pos;
                 self.inner_seek(SeekFrom::Current(0))?;
