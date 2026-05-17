@@ -342,8 +342,8 @@ impl HeaderMap {
     }
 
     /// Get the raw status line as bytes.
-    pub fn status_line_bytes(&self) -> Option<&[u8]> {
-        self.status_line.as_deref()
+    pub fn status_line_bytes(&self) -> Option<Cow<'_, [u8]>> {
+        self.status_line.as_deref().map(Cow::Borrowed)
     }
 
     /// Set status line contents.
@@ -436,11 +436,11 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `key` - Header key
-    pub fn get_bytes(&self, key: &[u8]) -> Option<&[u8]> {
+    pub fn get_bytes(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
         self.headers
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(key))
-            .map(|(_, v)| v.as_slice())
+            .map(|(_, v)| Cow::Borrowed(v.as_slice()))
     }
 
     /// Get all byte values for a (case-insensitive) header key.
@@ -450,11 +450,11 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `key` - Header key as bytes
-    pub fn get_bytes_multiple(&self, key: &[u8]) -> Vec<&[u8]> {
+    pub fn get_bytes_multiple(&self, key: &[u8]) -> Vec<Cow<'_, [u8]>> {
         self.headers
             .iter()
             .filter(|(k, _)| k.eq_ignore_ascii_case(key))
-            .map(|(_, v)| v.as_slice())
+            .map(|(_, v)| Cow::Borrowed(v.as_slice()))
             .collect()
     }
 
@@ -1142,8 +1142,8 @@ impl WarcRecord {
     /// HTTP charset/encoding as returned by the server or `None` if no valid charset is set.
     ///
     /// A returned string is guaranteed to be a valid encoding name.
-    pub fn http_charset(&self) -> Option<&str> {
-        self.http_charset.as_deref()
+    pub fn http_charset(&self) -> Option<Cow<'_, str>> {
+        self.http_charset.as_deref().map(Cow::Borrowed)
     }
 
     /// Remaining WARC record length in bytes (not necessarily the same as the `Content-Length` header).
@@ -1737,12 +1737,18 @@ pub mod filter {
 
     /// Filter predicate for checking if a record is a WARC/1.0 record.
     pub fn is_warc_10(record: &mut WarcRecord) -> bool {
-        record.headers().status_line_bytes().is_some_and(|s| s == b"WARC/1.0")
+        record
+            .headers()
+            .status_line_bytes()
+            .is_some_and(|s| s.as_ref() == b"WARC/1.0")
     }
 
     /// Filter predicate for checking if a record is a WARC/1.1 record.
     pub fn is_warc_11(record: &mut WarcRecord) -> bool {
-        record.headers().status_line_bytes().is_some_and(|s| s == b"WARC/1.1")
+        record
+            .headers()
+            .status_line_bytes()
+            .is_some_and(|s| s.as_ref() == b"WARC/1.1")
     }
 
     /// Filter predicate for checking if a record has a block digest.

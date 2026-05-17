@@ -223,7 +223,7 @@ fn set_get_remove_header() {
     // Set and get as bytes
     headers.set_bytes(b"Content-Type", b"text/plain");
     assert_eq!(headers.get("Content-Type").as_deref(), Some("text/plain"));
-    assert_eq!(headers.get_bytes(b"Content-Type"), Some(b"text/plain".as_slice()));
+    assert_eq!(headers.get_bytes(b"Content-Type").as_deref(), Some(b"text/plain".as_slice()));
     assert_eq!(headers.len(), 2);
 
     // Header does not exist
@@ -395,12 +395,12 @@ fn new_empty_header_encoding() -> io::Result<()> {
     // Test Unicode encoding
     headers_unicode.set("X-Utf8", utf8_value);
     assert_eq!(headers_unicode.get("X-Utf8").as_deref(), Some(utf8_value));
-    assert_eq!(headers_unicode.get_bytes(b"X-Utf8"), Some(utf8_value.as_bytes()));
+    assert_eq!(headers_unicode.get_bytes(b"X-Utf8").as_deref(), Some(utf8_value.as_bytes()));
 
     // Test Latin1 encoding
     headers_latin1.set("X-Latin1", utf8_value);
     assert_eq!(headers_latin1.get("X-Latin1").as_deref(), Some(utf8_value));
-    assert_eq!(headers_latin1.get_bytes(b"X-Latin1"), Some(latin1_bytes.as_slice()));
+    assert_eq!(headers_latin1.get_bytes(b"X-Latin1").as_deref(), Some(latin1_bytes.as_slice()));
 
     // Incorrect decodings
     let latin_value_utf8_dec_lossy = "abc���";
@@ -409,12 +409,12 @@ fn new_empty_header_encoding() -> io::Result<()> {
     // Test incorrect UTF-8 decoding of Latin bytes (irreversible)
     headers_unicode.set_bytes(b"X-Latin1-Utf8", latin1_bytes.as_slice());
     assert_eq!(headers_unicode.get("X-Latin1-Utf8").as_deref(), Some(latin_value_utf8_dec_lossy));
-    assert_eq!(headers_unicode.get_bytes(b"X-Latin1-Utf8"), Some(latin1_bytes.as_slice()));
+    assert_eq!(headers_unicode.get_bytes(b"X-Latin1-Utf8").as_deref(), Some(latin1_bytes.as_slice()));
 
     // Test incorrect Latin1 decoding of UTF-8 bytes (reversible)
     headers_latin1.set_bytes(b"X-Utf8-Latin1", utf8_value.as_bytes());
     assert_eq!(headers_latin1.get("X-Utf8-Latin1").as_deref(), Some(utf8_value_latin_dec));
-    assert_eq!(headers_latin1.get_bytes(b"X-Utf8-Latin1"), Some(utf8_value.as_bytes()));
+    assert_eq!(headers_latin1.get_bytes(b"X-Utf8-Latin1").as_deref(), Some(utf8_value.as_bytes()));
 
     // Invalid UTF-8 sequence
     let invalid_utf8 = b"abc\xff\xfedef";
@@ -424,14 +424,14 @@ fn new_empty_header_encoding() -> io::Result<()> {
     // Test UTF-8 decoding with invalid UTF-8 sequence
     headers_unicode.set_bytes(b"X-Invalid", invalid_utf8);
     // Bytes should be the same
-    assert_eq!(headers_unicode.get_bytes(b"X-Invalid"), Some(invalid_utf8.as_ref()));
+    assert_eq!(headers_unicode.get_bytes(b"X-Invalid").as_deref(), Some(invalid_utf8.as_ref()));
     // Decoding is lossy
     assert_eq!(headers_unicode.get("X-Invalid").as_deref(), Some(invalid_utf8_dec_lossy));
 
     // Test Latin decoding with invalid UTF-8 sequence
     headers_latin1.set_bytes(b"X-Invalid", invalid_utf8);
     // Bytes should be the same
-    assert_eq!(headers_latin1.get_bytes(b"X-Invalid"), Some(invalid_utf8.as_ref()));
+    assert_eq!(headers_latin1.get_bytes(b"X-Invalid").as_deref(), Some(invalid_utf8.as_ref()));
     // Decodes to strange characters
     assert_eq!(headers_latin1.get("X-Invalid").as_deref(), Some(invalid_utf8_latin_dec));
 
@@ -460,15 +460,15 @@ fn parse_warc_headers() -> io::Result<()> {
 
     let headers = record1.headers();
     assert_eq!(headers.status_line().as_deref(), Some("WARC/1.1"));
-    assert_eq!(headers.status_line_bytes(), Some(b"WARC/1.1".as_slice()));
+    assert_eq!(headers.status_line_bytes().as_deref(), Some(b"WARC/1.1".as_slice()));
     assert!(!record1.is_http());
     assert_eq!(headers.get("WARC-Type").as_deref(), Some("request"));
-    assert_eq!(headers.get_bytes(b"WARC-Type"), Some(b"request".as_slice()));
+    assert_eq!(headers.get_bytes(b"WARC-Type").as_deref(), Some(b"request".as_slice()));
     assert_eq!(record1.record_id().as_deref(), Some("<urn:uuid:record1>"));
     assert_eq!(headers.get("WARC-Record-ID").as_deref(), Some("<urn:uuid:record1>"));
-    assert_eq!(headers.get_bytes(b"WARC-Record-ID"), Some(b"<urn:uuid:record1>".as_slice()));
+    assert_eq!(headers.get_bytes(b"WARC-Record-ID").as_deref(), Some(b"<urn:uuid:record1>".as_slice()));
     assert_eq!(headers.get("Content-Length").as_deref(), Some("3"));
-    assert_eq!(headers.get_bytes(b"Content-Length"), Some(b"3".as_slice()));
+    assert_eq!(headers.get_bytes(b"Content-Length").as_deref(), Some(b"3".as_slice()));
 
     // Change headers
     let headers = record1.headers_mut();
@@ -520,7 +520,7 @@ fn parse_http_headers() -> io::Result<()> {
     assert_eq!(http_headers.status_code(), Some(200));
     assert_eq!(http_headers.reason_phrase().as_deref(), Some("OK"));
     assert_eq!(http_headers.get("Content-Type").as_deref(), Some("text/plain; charset=utf-8"));
-    assert_eq!(record.http_charset(), Some("utf-8"));
+    assert_eq!(record.http_charset().as_deref(), Some("utf-8"));
     assert_eq!(record.http_content_type().as_deref(), Some("text/plain"));
 
     let mut buf = Vec::new();

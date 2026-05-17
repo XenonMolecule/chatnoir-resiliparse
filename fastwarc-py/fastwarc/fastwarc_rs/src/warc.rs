@@ -150,7 +150,7 @@ impl HeaderMapPy {
 
     #[getter]
     pub fn status_line_bytes<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyBytes>> {
-        self.inner.status_line_bytes().map(|s| PyBytes::new(py, s))
+        self.inner.status_line_bytes().as_ref().map(|s| PyBytes::new(py, s))
     }
 
     #[setter]
@@ -213,7 +213,7 @@ impl HeaderMapPy {
         Ok(self
             .inner
             .get_bytes(key)
-            .map_or_else(|| default.unwrap_or_else(|| py.None().bind(py).clone()), |s| PyBytes::new(py, s).into_any()))
+            .map_or_else(|| default.unwrap_or_else(|| py.None().bind(py).clone()), |s| PyBytes::new(py, &s).into_any()))
     }
 
     pub fn get_bytes_multiple<'py>(&self, py: Python<'py>, key: &[u8]) -> PyResult<Bound<'py, PyTuple>> {
@@ -485,7 +485,7 @@ impl WarcRecordPy {
 
     #[getter]
     pub fn http_charset<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        self.lock().http_charset().map(|s| PyString::new(py, s))
+        self.lock().http_charset().as_ref().map(|s| PyString::new(py, s))
     }
 
     #[getter]
