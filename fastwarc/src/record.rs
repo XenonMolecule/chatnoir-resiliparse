@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::stream_io::{BufReadSeek, LimitedBufReadSeek};
+use super::stream_io::{BufReadSeek, LimitedBufReadSeek, LimitedBufReader};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead, Read, Seek};
+use std::io::{self, Read};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -284,7 +284,7 @@ impl HeaderMap {
     /// # Returns
     ///
     /// Number of bytes read from the reader or IO error
-    pub fn parse(&mut self, reader: &mut impl BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
+    pub fn parse(&mut self, reader: &mut dyn BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
         let mut bytes_consumed = 0;
         let mut line = Vec::with_capacity(64);
         let mut expect_first_line = has_status_line;
@@ -704,10 +704,9 @@ pub struct WarcRecord {
     http_parsed: bool,
     http_charset: Option<String>,
     http_headers: Option<HeaderMap>,
-    reader: Option<LimitedBufReadSeek>,
-    reader_original: Option<Box<dyn BufReadSeek + Send>>,
+    reader: Option<LimitedBufReader>,
+    reader_frozen: Option<LimitedBufReader>,
     stream_pos: u64,
-    frozen: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -748,6 +747,17 @@ impl fmt::Debug for WarcRecord {
     }
 }
 
+/// Inner reader accessor that doesn't borrow self.
+macro_rules! get_reader_mut {
+    ($self: ident) => {{
+        if $self.reader_frozen.is_some() {
+            $self.reader_frozen.as_mut().map(|r| r as &mut dyn LimitedBufReadSeek)
+        } else {
+            $self.reader.as_mut().map(|r| r as &mut dyn LimitedBufReadSeek)
+        }
+    }};
+}
+
 impl WarcRecord {
     /// Create a new empty WARC record.
     ///
@@ -766,9 +776,8 @@ impl WarcRecord {
             http_headers: None,
             content_length: 0,
             reader: None,
-            reader_original: None,
+            reader_frozen: None,
             stream_pos: 0,
-            frozen: false,
         }
     }
 
@@ -821,9 +830,8 @@ impl WarcRecord {
     ///
     /// * `payload` - Body as bytes
     pub fn from_bytes(payload: Vec<u8>) -> Result<Self, io::Error> {
-        let reader = Box::new(io::BufReader::new(io::Cursor::new(payload)));
-        let mut record = WarcRecord::from_reader(reader)?;
-        record.frozen = true;
+        let mut record = WarcRecord::from_reader(Box::new(io::Cursor::new(payload)))?;
+        record.reader_frozen = record.reader.take();
         Ok(record)
     }
 
@@ -839,8 +847,8 @@ impl WarcRecord {
     ///
     /// * `reader` - Shared pointer to a buffered reader instance
     pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek + Send>) {
-        self.reader = Some(LimitedBufReadSeek::new(reader, None));
-        self.frozen = false;
+        self.reader = Some(LimitedBufReader::new(reader, None));
+        self.reader_frozen = None;
     }
 
     /// Set the WARC payload as bytes.
@@ -860,17 +868,9 @@ impl WarcRecord {
     /// * `payload` - Body as bytes
     pub fn set_bytes_payload(&mut self, payload: Vec<u8>) {
         self.content_length = payload.len() as u64;
-        let bytes_reader = Box::new(io::BufReader::new(io::Cursor::new(payload)));
-        if !self.frozen
-            && let Some(r) = &mut self.reader
-        {
-            self.reader_original = Some(r.replace_reader(bytes_reader));
-        } else {
-            self.reader = Some(LimitedBufReadSeek::new(bytes_reader, Some(self.content_length)));
-        }
+        self.reader_frozen = Some(LimitedBufReader::new(Box::new(io::Cursor::new(payload)), None));
         self.headers
             .set_bytes(b"Content-Length", self.content_length.to_string().as_bytes());
-        self.frozen = true;
     }
 
     /// Detach an attached buffered reader and hand ownership back to the caller.
@@ -882,19 +882,13 @@ impl WarcRecord {
     ///
     /// Reader instance or `None`
     pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek + Send>> {
-        self.frozen = false;
-        if self.reader_original.is_some() {
-            self.reader_original.take()
-        } else if self.reader.is_some() {
-            Some(self.reader.take().unwrap().into_inner())
-        } else {
-            None
-        }
+        self.reader_frozen = None;
+        Some(self.reader.take().unwrap().into_inner())
     }
 
     /// Get a mutable reference to the attached buffered reader.
-    pub fn reader_mut(&mut self) -> Option<&mut LimitedBufReadSeek> {
-        self.reader.as_mut()
+    pub fn reader_mut(&mut self) -> Option<&mut dyn LimitedBufReadSeek> {
+        get_reader_mut!(self)
     }
 
     /// WARC record type.
@@ -922,15 +916,13 @@ impl WarcRecord {
     ///
     /// It is safe to call this function multiple times, which is a no-op.
     pub fn freeze(&mut self) -> Result<(), io::Error> {
-        if self.frozen {
+        if self.reader_frozen.is_some() {
             return Ok(());
         }
         let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
         let mut buf = Vec::with_capacity(self.content_length as usize);
         self.content_length = reader.read_to_end(&mut buf)? as u64;
-        let new_reader = Box::new(io::BufReader::new(io::Cursor::new(buf)));
-        self.reader_original = Some(reader.replace_reader(new_reader));
-        self.frozen = true;
+        self.reader_frozen = Some(LimitedBufReader::new(Box::new(io::Cursor::new(buf)), None));
         Ok(())
     }
 
@@ -959,7 +951,7 @@ impl WarcRecord {
     pub fn consume_n(&mut self, mut n: usize) -> Result<usize, io::Error> {
         let mut n_consumed = 0usize;
         if n > 0
-            && let Some(r) = &mut self.reader
+            && let Some(r) = get_reader_mut!(self)
         {
             let pos = r.stream_position()? as usize;
             if pos >= self.content_length as usize {
@@ -1015,7 +1007,7 @@ impl WarcRecord {
     ///
     /// Number of bytes read (zero if EOF reached).
     pub fn parse_warc_headers_quirks(&mut self, quirks_mode: bool) -> Result<usize, io::Error> {
-        let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
+        let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
         let mut bytes_read = 0usize;
         let mut line = Vec::with_capacity(256);
         self.headers.clear();
@@ -1166,7 +1158,7 @@ impl WarcRecord {
 
     /// Whether the record has been frozen.
     pub fn is_frozen(&self) -> bool {
-        self.frozen
+        self.reader_frozen.is_some()
     }
 
     /// Initialize mandatory headers in a fresh WARC record instance.
@@ -1218,7 +1210,7 @@ impl WarcRecord {
         }
 
         let mut http_headers = HeaderMap::new(HeaderEncoding::Latin1);
-        let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
+        let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
         let bytes_consumed = http_headers.parse(reader, true)?;
 
         // Parse charset if present
@@ -1240,6 +1232,7 @@ impl WarcRecord {
         self.http_parsed = true;
         Ok(())
     }
+
     /// Write WARC record onto a stream.
     ///
     /// The default block size is 16384 bytes and no record checksums are calculated.
@@ -1326,7 +1319,7 @@ impl WarcRecord {
 
         if checksum_data {
             self.freeze()?;
-            let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
+            let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
 
             use data_encoding::BASE32;
             use sha1::Sha1;
@@ -1359,7 +1352,7 @@ impl WarcRecord {
             reader.rewind()?;
         }
 
-        let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
+        let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
 
         // Ensure Content-Length is correct
         self.headers
@@ -1456,15 +1449,12 @@ impl WarcRecord {
             },
         };
 
-        if !consume && !self.frozen {
+        if !consume && !self.is_frozen() {
             self.freeze()
                 .map_err(|e| DigestError::StreamError(format!("Failed to freeze record: {}", e)))?;
         }
 
-        let reader = self
-            .reader
-            .as_mut()
-            .ok_or_else(|| DigestError::StreamError("No reader set".into()))?;
+        let reader = get_reader_mut!(self).ok_or_else(|| DigestError::StreamError("No reader set".into()))?;
 
         let mut digest = _get_digest(&algorithm)?;
         let mut buf = [0u8; 4096];

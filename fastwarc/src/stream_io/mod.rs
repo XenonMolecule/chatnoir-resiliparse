@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{self, BufRead};
+use std::io;
 use std::mem;
 
 // ===========================================================
@@ -132,27 +132,7 @@ pub(crate) use impl_stream_from_path;
 /// logical stream positions.
 ///
 /// Does not allocate a new buffer. All calls are passed directly to the underlying reader.
-pub struct LimitedBufReadSeek {
-    reader: Box<dyn BufReadSeek + Send>,
-    limit: u64,
-    pos: u64,
-}
-
-impl LimitedBufReadSeek {
-    /// Create a new limited reader from a buffered reader instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `reader` - inner reader to put the limit on
-    /// * `limit` - limit in bytes at which EOF is returned
-    pub fn new(reader: Box<dyn BufReadSeek + Send>, limit: Option<u64>) -> Self {
-        Self {
-            reader,
-            limit: limit.unwrap_or(u64::MAX),
-            pos: 0,
-        }
-    }
-
+pub trait LimitedBufReadSeek: BufReadSeek + Send {
     /// Change the limit of the reader.
     /// Also resets the logical stream position to 0. Use [`Self::real_stream_position()`] to get
     /// the real position on the original stream.
@@ -160,25 +140,16 @@ impl LimitedBufReadSeek {
     /// # Arguments
     ///
     /// * `limit` - new reader limit
-    pub fn set_limit(&mut self, limit: u64) {
-        self.limit = limit;
-        self.pos = 0;
-    }
+    fn set_limit(&mut self, limit: u64);
 
     /// Get the current limit.
-    pub fn limit(&mut self) -> u64 {
-        self.limit
-    }
+    fn limit(&mut self) -> u64;
 
     /// Get the real (not the logical) stream position.
-    pub fn real_stream_position(&mut self) -> io::Result<u64> {
-        self.reader.stream_position()
-    }
+    fn real_stream_position(&mut self) -> io::Result<u64>;
 
     /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
-    pub fn into_inner(self) -> Box<dyn BufReadSeek + Send> {
-        self.reader
-    }
+    fn into_inner(self) -> Box<dyn BufReadSeek + Send>;
 
     /// Replace the internal stream with a new one and hand ownership of the previous
     /// stream back to the caller. Resets `limit` and `pos`.
@@ -190,11 +161,7 @@ impl LimitedBufReadSeek {
     /// # Returns
     ///
     /// Previous reader instance (unlimited)
-    pub fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send> {
-        self.limit = u64::MAX;
-        self.pos = 0;
-        mem::replace(&mut self.reader, new_reader)
-    }
+    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send>;
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.
     /// The results are appended to the provided buffer.
@@ -207,8 +174,8 @@ impl LimitedBufReadSeek {
     /// # Returns
     ///
     /// Number of bytes read
-    pub fn read_line(&mut self, buf: &mut Vec<u8>, mut max_line_len: usize) -> io::Result<usize> {
-        max_line_len = max_line_len.min(self.limit as usize);
+    fn read_line(&mut self, buf: &mut Vec<u8>, mut max_line_len: usize) -> io::Result<usize> {
+        max_line_len = max_line_len.min(self.limit() as usize);
         while buf.len() < max_line_len {
             let chunk = self.fill_buf()?;
             if chunk.is_empty() {
@@ -229,7 +196,54 @@ impl LimitedBufReadSeek {
     }
 }
 
-impl io::Read for LimitedBufReadSeek {
+pub struct LimitedBufReader {
+    reader: Box<dyn BufReadSeek + Send>,
+    limit: u64,
+    pos: u64,
+}
+
+impl LimitedBufReader {
+    /// Create a new limited reader from a buffered reader instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - inner reader to put the limit on
+    /// * `limit` - limit in bytes at which EOF is returned
+    pub fn new(reader: Box<dyn BufReadSeek + Send>, limit: Option<u64>) -> Self {
+        Self {
+            reader,
+            limit: limit.unwrap_or(u64::MAX),
+            pos: 0,
+        }
+    }
+}
+
+impl LimitedBufReadSeek for LimitedBufReader {
+    fn set_limit(&mut self, limit: u64) {
+        self.limit = limit;
+        self.pos = 0;
+    }
+
+    fn limit(&mut self) -> u64 {
+        self.limit
+    }
+
+    fn real_stream_position(&mut self) -> io::Result<u64> {
+        self.reader.stream_position()
+    }
+
+    fn into_inner(self) -> Box<dyn BufReadSeek + Send> {
+        self.reader
+    }
+
+    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send> {
+        self.limit = u64::MAX;
+        self.pos = 0;
+        mem::replace(&mut self.reader, new_reader)
+    }
+}
+
+impl io::Read for LimitedBufReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let l = buf.len();
         let buf_limited = &mut buf[..(l as u64).min(self.limit - self.pos) as usize];
@@ -239,7 +253,7 @@ impl io::Read for LimitedBufReadSeek {
     }
 }
 
-impl io::BufRead for LimitedBufReadSeek {
+impl io::BufRead for LimitedBufReader {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         let buf = self.reader.fill_buf()?;
         let buf_limited = &buf[..(buf.len() as u64).min(self.limit - self.pos) as usize];
@@ -253,7 +267,7 @@ impl io::BufRead for LimitedBufReadSeek {
     }
 }
 
-impl io::Seek for LimitedBufReadSeek {
+impl io::Seek for LimitedBufReader {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         if pos == io::SeekFrom::Current(0) {
             return Ok(self.pos);

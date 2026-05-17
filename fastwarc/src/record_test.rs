@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::stream_io::BufReadSeek;
-use crate::stream_io::LimitedBufReadSeek;
+use crate::stream_io::LimitedBufReader;
 use crate::stream_io::gzip::GzipReader;
 use crate::stream_io::lz4::Lz4Reader;
 use data_encoding::{BASE32, HEXLOWER};
@@ -86,7 +86,7 @@ fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
 
 #[test]
 fn limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
-    let mut limited = LimitedBufReadSeek::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
+    let mut limited = LimitedBufReader::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
 
     assert_eq!(limited.fill_buf()?, b"abcd");
     limited.consume(2);

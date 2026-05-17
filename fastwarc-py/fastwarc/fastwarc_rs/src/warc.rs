@@ -19,7 +19,7 @@ use fastwarc::stream_io::{BufReadSeek, LimitedBufReadSeek};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
-use std::io::{self, Read, Seek};
+use std::io::{self, Read};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // ===========================================================
@@ -339,13 +339,13 @@ struct WarcRecordPayloadReaderPy {
 impl WarcRecordPayloadReaderPy {
     fn with_payload_reader<F, T>(&self, closure: F) -> PyResult<T>
     where
-        F: FnOnce(&mut LimitedBufReadSeek) -> PyResult<T>,
+        F: FnOnce(&mut dyn LimitedBufReadSeek) -> PyResult<T>,
     {
         let mut record = self.record.lock().unwrap();
-        let mut reader = record
+        let reader = record
             .reader_mut()
             .ok_or_else(|| PyOSError::new_err("WarcRecord has no active reader"))?;
-        closure(&mut reader)
+        closure(reader)
     }
 }
 
@@ -371,7 +371,7 @@ impl WarcRecordPayloadReaderPy {
     pub fn readline<'py>(&self, py: Python<'py>, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
         self.with_payload_reader(|reader| {
             let mut buf = Vec::with_capacity(max_line_len.min(128));
-            reader.read_line(&mut buf, max_line_len)?;
+            LimitedBufReadSeek::read_line(reader, &mut buf, max_line_len)?;
             Ok(PyBytes::new(py, &buf))
         })
     }
