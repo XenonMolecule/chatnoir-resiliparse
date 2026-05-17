@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read, Seek};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -692,6 +692,12 @@ impl HeaderMap {
 // WARC record
 // ===========================================================
 
+enum ReaderType {
+    Original(LimitedBufReader),
+    Frozen((LimitedBufReader, Option<LimitedBufReader>)),
+    Wrapped(Box<dyn WarcRead>),
+}
+
 /// A WARC record.
 ///
 /// WARC records are cloneable, but cloning will "freeze" the WARC record.
@@ -704,9 +710,7 @@ pub struct WarcRecord {
     http_parsed: bool,
     http_charset: Option<String>,
     http_headers: Option<HeaderMap>,
-    reader: Option<LimitedBufReader>,
-    reader_frozen: Option<LimitedBufReader>,
-    reader_wrapped: Option<Box<dyn WarcRead>>,
+    reader: Option<ReaderType>,
     stream_pos: u64,
 }
 
@@ -768,10 +772,12 @@ impl fmt::Debug for WarcRecord {
 /// Inner reader accessor that doesn't borrow self.
 macro_rules! get_reader_mut {
     ($self: ident) => {{
-        if $self.reader_frozen.is_some() {
-            $self.reader_frozen.as_mut().map(|r| r as &mut dyn LimitedBufReadSeek)
-        } else {
-            $self.reader.as_mut().map(|r| r as &mut dyn LimitedBufReadSeek)
+        match &mut $self.reader {
+            Some(ReaderType::Original(r)) => Some(r),
+            Some(ReaderType::Frozen(r)) => Some(&mut r.0),
+            // TODO: Implement
+            // Some(ReaderType::Wrapped(r)) => Some(r.as_mut()),
+            _ => None,
         }
     }};
 }
@@ -794,8 +800,6 @@ impl WarcRecord {
             http_headers: None,
             content_length: 0,
             reader: None,
-            reader_frozen: None,
-            reader_wrapped: None,
             stream_pos: 0,
         }
     }
@@ -850,7 +854,9 @@ impl WarcRecord {
     /// * `payload` - Body as bytes
     pub fn from_bytes(payload: Vec<u8>) -> Result<Self, io::Error> {
         let mut record = WarcRecord::from_reader(Box::new(io::Cursor::new(payload)))?;
-        record.reader_frozen = record.reader.take();
+        if let Some(ReaderType::Original(r)) = record.reader.take() {
+            record.reader = Some(ReaderType::Frozen((r, None)));
+        }
         Ok(record)
     }
 
@@ -866,9 +872,7 @@ impl WarcRecord {
     ///
     /// * `reader` - Shared pointer to a buffered reader instance
     pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek>) {
-        self.reader = Some(LimitedBufReader::new(reader, None));
-        self.reader_frozen = None;
-        self.reader_wrapped = None;
+        self.reader = Some(ReaderType::Original(LimitedBufReader::new(reader, None)));
     }
 
     /// Set the WARC payload as bytes.
@@ -888,7 +892,13 @@ impl WarcRecord {
     /// * `payload` - Body as bytes
     pub fn set_bytes_payload(&mut self, payload: Vec<u8>) {
         self.content_length = payload.len() as u64;
-        self.reader_frozen = Some(LimitedBufReader::new(Box::new(io::Cursor::new(payload)), None));
+        let orig = match self.reader.take() {
+            Some(ReaderType::Original(r)) => Some(r),
+            // TODO: Implement
+            // Some(ReaderType::Wrapped(r)) => Some(r.into()),
+            _ => None,
+        };
+        self.reader = Some(ReaderType::Frozen((LimitedBufReader::new(Box::new(io::Cursor::new(payload)), None), orig)));
         self.headers
             .set_bytes(b"Content-Length", self.content_length.to_string().as_bytes());
     }
@@ -902,34 +912,35 @@ impl WarcRecord {
     ///
     /// Reader instance or `None`
     pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek>> {
-        self.reader_frozen = None;
-
-        // Unwrap content decoders
-        if let Some(reader) = self.reader_wrapped.take() {
-            macro_rules! downcast {
-                ($reader: ident, $($Type:tt)::+) => {{
-                    $reader
-                        .downcast::<$($Type)::+<Box<dyn WarcRead>>>()
-                        .unwrap()
-                        .into_inner()
-                        .into_any()
-                }};
-            }
-            let mut reader_any = reader.into_any();
-            loop {
-                if reader_any.is::<gzip::GzipReader<Box<dyn WarcRead>>>() {
-                    reader_any = downcast!(reader_any, gzip::GzipReader);
-                } else if reader_any.is::<brotli::BrotliReader<Box<dyn WarcRead>>>() {
-                    reader_any = downcast!(reader_any, brotli::BrotliReader);
-                } else if reader_any.is::<zstd::ZstdReader<Box<dyn WarcRead>>>() {
-                    reader_any = downcast!(reader_any, zstd::ZstdReader);
-                } else {
-                    break;
+        let Some(reader) = self.reader.take() else { return None };
+        match reader {
+            // Unwrap content decoders
+            ReaderType::Wrapped(reader) => {
+                macro_rules! downcast {
+                    ($reader: ident, $($Type:tt)::+) => {{
+                        $reader
+                            .downcast::<$($Type)::+<Box<dyn WarcRead>>>()
+                            .unwrap()
+                            .into_inner()
+                            .into_any()
+                    }};
                 }
+                let mut reader_any = reader.into_any();
+                loop {
+                    if reader_any.is::<gzip::GzipReader<Box<dyn WarcRead>>>() {
+                        reader_any = downcast!(reader_any, gzip::GzipReader);
+                    } else if reader_any.is::<brotli::BrotliReader<Box<dyn WarcRead>>>() {
+                        reader_any = downcast!(reader_any, brotli::BrotliReader);
+                    } else if reader_any.is::<zstd::ZstdReader<Box<dyn WarcRead>>>() {
+                        reader_any = downcast!(reader_any, zstd::ZstdReader);
+                    } else {
+                        break;
+                    }
+                }
+                Some(reader_any.downcast::<LimitedBufReader>().unwrap().into_inner())
             }
-            Some(reader_any.downcast::<LimitedBufReader>().unwrap().into_inner())
-        } else {
-            Some(self.reader.take().unwrap().into_inner())
+            ReaderType::Original(reader) => Some(reader.into_inner()),
+            ReaderType::Frozen(readers) => readers.1.map(|r| r.into_inner()),
         }
     }
 
@@ -963,13 +974,19 @@ impl WarcRecord {
     ///
     /// It is safe to call this function multiple times, which is a no-op.
     pub fn freeze(&mut self) -> Result<(), io::Error> {
-        if self.reader_frozen.is_some() {
+        if let Some(ReaderType::Frozen(_r)) = &self.reader {
             return Ok(());
         }
-        let reader = self.reader.as_mut().ok_or_else(|| io::Error::other("No reader set"))?;
+        let mut reader = match self.reader.take() {
+            Some(ReaderType::Original(r)) => Ok(r),
+            // TODO: Implement
+            // Some(ReaderType::Wrapped(r)) => Ok(r.into()),
+            _ => Err(io::Error::other("No reader set")),
+        }?;
         let mut buf = Vec::with_capacity(self.content_length as usize);
         self.content_length = reader.read_to_end(&mut buf)? as u64;
-        self.reader_frozen = Some(LimitedBufReader::new(Box::new(io::Cursor::new(buf)), None));
+        let frozen = LimitedBufReader::new(Box::new(io::Cursor::new(buf)), None);
+        self.reader = Some(ReaderType::Frozen((frozen, Some(reader))));
         Ok(())
     }
 
@@ -1205,7 +1222,11 @@ impl WarcRecord {
 
     /// Whether the record has been frozen.
     pub fn is_frozen(&self) -> bool {
-        self.reader_frozen.is_some()
+        if let Some(ReaderType::Frozen(_)) = self.reader {
+            true
+        } else {
+            false
+        }
     }
 
     /// Initialize mandatory headers in a fresh WARC record instance.
@@ -1322,15 +1343,14 @@ impl WarcRecord {
     /// * `encoding_str` - comma-separated list of encodings as ASCII bytes
     /// * `transfer` - whether this is transfer- or content-encoding
     fn wrap_reader_in_payload_decoders(&mut self, encoding_str: &[u8], transfer: bool) -> io::Result<()> {
-        let reader = if self.reader_frozen.is_some() {
-            &mut self.reader_frozen
-        } else {
-            &mut self.reader
-        };
-        let wrapped = reader
-            .take()
-            .ok_or_else(|| io::Error::other("Record has no reader set"))?;
-        let mut wrapped: Box<dyn WarcRead> = Box::new(wrapped);
+        let reader = match self.reader.take() {
+            Some(ReaderType::Original(r)) => Ok(r),
+            // TODO: Implement
+            // Some(ReaderType::Wrapped(r)) => Ok(r.into()),
+            _ => Err(io::Error::other("No reader set")),
+        }?;
+        // TODO: Implement wrapped frozen
+        let mut wrapped: Box<dyn WarcRead> = Box::new(reader);
 
         let encoding_it = encoding_str
             .split(|c| *c == b',')
@@ -1364,7 +1384,7 @@ impl WarcRecord {
             }
         }
 
-        self.reader_wrapped = Some(wrapped);
+        self.reader = Some(ReaderType::Wrapped(wrapped));
         Ok(())
     }
 
