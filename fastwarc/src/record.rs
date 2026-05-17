@@ -886,7 +886,7 @@ impl WarcRecord {
         if self.reader_original.is_some() {
             self.reader_original.take()
         } else if self.reader.is_some() {
-            Some(self.reader.take().unwrap().reader)
+            Some(self.reader.take().unwrap().into_inner())
         } else {
             None
         }

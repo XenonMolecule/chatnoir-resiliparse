@@ -133,9 +133,9 @@ pub(crate) use impl_stream_from_path;
 ///
 /// Does not allocate a new buffer. All calls are passed directly to the underlying reader.
 pub struct LimitedBufReadSeek {
-    pub(crate) reader: Box<dyn BufReadSeek + Send>,
-    pub(crate) limit: u64,
-    pub(crate) pos: u64,
+    reader: Box<dyn BufReadSeek + Send>,
+    limit: u64,
+    pos: u64,
 }
 
 impl LimitedBufReadSeek {
@@ -173,6 +173,11 @@ impl LimitedBufReadSeek {
     /// Get the real (not the logical) stream position.
     pub fn real_stream_position(&mut self) -> io::Result<u64> {
         self.reader.stream_position()
+    }
+
+    /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
+    pub fn into_inner(self) -> Box<dyn BufReadSeek + Send> {
+        self.reader
     }
 
     /// Replace the internal stream with a new one and hand ownership of the previous
