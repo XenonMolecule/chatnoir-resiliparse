@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, impl_stream_from_path};
+use crate::stream_io::{
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+};
+use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 use zstd::stream::{Decoder, Encoder};
 
@@ -94,6 +97,7 @@ impl<T: ReadSeek> ZstdReader<T> {
     }
 }
 
+impl_fastwarc_stream!(ZstdReader, WarcRead, ReadSeek);
 impl_stream_from_path!(ZstdReader, ZstdReaderOptions);
 
 impl<T: ReadSeek> io::Read for ZstdReader<T> {
@@ -173,7 +177,7 @@ impl<T: ReadSeek> BufRead for ZstdReader<T> {
 // ===========================================================
 
 /// Writer for Zstd-compressed streams.
-pub struct ZstdWriter<T: Write> {
+pub struct ZstdWriter<T: Write + 'static> {
     inner: Option<Encoder<'static, BufWriter<T>>>,
     options: ZstdWriterOptions,
     frame_started: bool,
@@ -206,7 +210,7 @@ impl Default for ZstdWriterOptions {
     }
 }
 
-impl<T: Write> ZstdWriter<T> {
+impl<T: Write + 'static> ZstdWriter<T> {
     /// Create a new [`ZstdWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -275,9 +279,10 @@ impl<T: Write> ZstdWriter<T> {
     }
 }
 
+impl_fastwarc_stream!(ZstdWriter, WarcWrite, Write + 'static);
 impl_stream_from_path!(ZstdWriter, ZstdWriterOptions);
 
-impl<T: Write> CompressingWriter for ZstdWriter<T> {
+impl<T: Write + 'static> CompressingWriter for ZstdWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.frame_started {
             return Ok(());
@@ -289,7 +294,7 @@ impl<T: Write> CompressingWriter for ZstdWriter<T> {
     }
 }
 
-impl<T: Write> Write for ZstdWriter<T> {
+impl<T: Write + 'static> Write for ZstdWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.frame_started = true;
         self.inner.as_mut().unwrap().write(buf)
@@ -301,7 +306,7 @@ impl<T: Write> Write for ZstdWriter<T> {
     }
 }
 
-impl<T: Write> Drop for ZstdWriter<T> {
+impl<T: Write + 'static> Drop for ZstdWriter<T> {
     // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {

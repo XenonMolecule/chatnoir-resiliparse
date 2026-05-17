@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::any::Any;
 use std::io;
 use std::mem;
 
@@ -28,11 +29,57 @@ pub mod zstd;
 // Global trait definitions
 // ===========================================================
 
-pub trait ReadSeek: io::Read + io::Seek {}
-impl<T: io::Read + io::Seek + ?Sized> ReadSeek for T {}
+pub trait ReadSeek: io::Read + io::Seek + Send + 'static {}
+impl<T: io::Read + io::Seek + Send + ?Sized + 'static> ReadSeek for T {}
 
-pub trait BufReadSeek: io::BufRead + io::Seek {}
-impl<T: io::BufRead + io::Seek + ?Sized> BufReadSeek for T {}
+pub trait BufReadSeek: io::BufRead + io::Seek + Send + 'static {}
+impl<T: io::BufRead + io::Seek + Send + ?Sized + 'static> BufReadSeek for T {}
+
+// ===========================================================
+// General Reader / Writer trait
+// ===========================================================
+
+pub trait WarcRead: BufReadSeek + Any {
+    /// Get an [`Any`] reference to this [`DecompressingReader`].
+    fn as_any(&self) -> &dyn Any;
+
+    /// Get a mutable [`Any`] reference to this [`DecompressingReader`].
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Convert the [`DecompressingReader`] into [`Any`].
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+}
+
+pub trait WarcWrite: io::Write + Any + 'static {
+    /// Get an [`Any`] reference to this [`DecompressingReader`].
+    fn as_any(&self) -> &dyn Any;
+
+    /// Get a mutable [`Any`] reference to this [`DecompressingReader`].
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Convert the [`DecompressingReader`] into [`Any`].
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+}
+
+/// Internal helper for implementing boilerplate methods for casting to [`Any`].
+macro_rules! impl_fastwarc_stream {
+    ($StreamType: ident, $Trait: ident, $($TraitBounds: tt)+) => {
+        impl<T: $($TraitBounds)+> $Trait for $StreamType<T> {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn Any {
+                self
+            }
+
+            fn into_any(self: Box<Self>) -> Box<dyn Any> {
+                self
+            }
+        }
+    };
+}
+pub(crate) use impl_fastwarc_stream;
 
 // ===========================================================
 // Compressors and decompressors
@@ -40,7 +87,7 @@ impl<T: io::BufRead + io::Seek + ?Sized> BufReadSeek for T {}
 
 /// Trait for [`io::Read`] stream implementations reading from
 /// compressed input streams.
-pub trait DecompressingReader: ReadSeek {
+pub trait DecompressingReader: WarcRead + ReadSeek {
     /// Seek to an offset, in bytes, in the compressed inner stream.
     /// The semantics are the same as [`io::Seek::seek()`].
     ///
@@ -67,7 +114,7 @@ pub trait DecompressingReader: ReadSeek {
 
 /// Trait for [`io::Write`] stream implementations that write compressed data
 /// onto an output stream.
-pub trait CompressingWriter: io::Write {
+pub trait CompressingWriter: WarcWrite {
     /// Finish a compression member / frame and reset the compressor state.
     ///
     /// If the compressor supports multi-member streams, the writer can be
@@ -132,7 +179,7 @@ pub(crate) use impl_stream_from_path;
 /// logical stream positions.
 ///
 /// Does not allocate a new buffer. All calls are passed directly to the underlying reader.
-pub trait LimitedBufReadSeek: BufReadSeek + Send {
+pub trait LimitedBufReadSeek: BufReadSeek {
     /// Change the limit of the reader.
     /// Also resets the logical stream position to 0. Use [`Self::real_stream_position()`] to get
     /// the real position on the original stream.
@@ -149,7 +196,7 @@ pub trait LimitedBufReadSeek: BufReadSeek + Send {
     fn real_stream_position(&mut self) -> io::Result<u64>;
 
     /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
-    fn into_inner(self) -> Box<dyn BufReadSeek + Send>;
+    fn into_inner(self) -> Box<dyn BufReadSeek>;
 
     /// Replace the internal stream with a new one and hand ownership of the previous
     /// stream back to the caller. Resets `limit` and `pos`.
@@ -161,7 +208,7 @@ pub trait LimitedBufReadSeek: BufReadSeek + Send {
     /// # Returns
     ///
     /// Previous reader instance (unlimited)
-    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send>;
+    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek>;
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.
     /// The results are appended to the provided buffer.
@@ -197,7 +244,7 @@ pub trait LimitedBufReadSeek: BufReadSeek + Send {
 }
 
 pub struct LimitedBufReader {
-    reader: Box<dyn BufReadSeek + Send>,
+    reader: Box<dyn BufReadSeek>,
     limit: u64,
     pos: u64,
 }
@@ -209,12 +256,26 @@ impl LimitedBufReader {
     ///
     /// * `reader` - inner reader to put the limit on
     /// * `limit` - limit in bytes at which EOF is returned
-    pub fn new(reader: Box<dyn BufReadSeek + Send>, limit: Option<u64>) -> Self {
+    pub fn new(reader: Box<dyn BufReadSeek>, limit: Option<u64>) -> Self {
         Self {
             reader,
             limit: limit.unwrap_or(u64::MAX),
             pos: 0,
         }
+    }
+}
+
+impl WarcRead for LimitedBufReader {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 }
 
@@ -232,11 +293,11 @@ impl LimitedBufReadSeek for LimitedBufReader {
         self.reader.stream_position()
     }
 
-    fn into_inner(self) -> Box<dyn BufReadSeek + Send> {
+    fn into_inner(self) -> Box<dyn BufReadSeek> {
         self.reader
     }
 
-    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek + Send>) -> Box<dyn BufReadSeek + Send> {
+    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek> {
         self.limit = u64::MAX;
         self.pos = 0;
         mem::replace(&mut self.reader, new_reader)

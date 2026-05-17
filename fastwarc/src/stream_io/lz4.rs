@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, impl_stream_from_path};
+use crate::stream_io::{
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
+use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 
 // ===========================================================
@@ -88,6 +91,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
     }
 }
 
+impl_fastwarc_stream!(Lz4Reader, WarcRead, ReadSeek);
 impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
@@ -165,7 +169,7 @@ impl<T: ReadSeek> BufRead for Lz4Reader<T> {
 // ===========================================================
 
 /// Writer for LZ4-compressed streams.
-pub struct Lz4Writer<T: Write> {
+pub struct Lz4Writer<T: Write + 'static> {
     inner: Option<FrameEncoder<BufWriter<T>>>,
     frame_started: bool,
 }
@@ -186,7 +190,7 @@ impl Default for Lz4WriterOptions {
     }
 }
 
-impl<T: Write> Lz4Writer<T> {
+impl<T: Write + 'static> Lz4Writer<T> {
     /// Create a new [`Lz4Writer`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -240,9 +244,10 @@ impl<T: Write> Lz4Writer<T> {
     }
 }
 
+impl_fastwarc_stream!(Lz4Writer, WarcWrite, Write + 'static);
 impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
 
-impl<T: Write> CompressingWriter for Lz4Writer<T> {
+impl<T: Write + 'static> CompressingWriter for Lz4Writer<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.frame_started {
             return Ok(());
@@ -254,7 +259,7 @@ impl<T: Write> CompressingWriter for Lz4Writer<T> {
     }
 }
 
-impl<T: Write> Write for Lz4Writer<T> {
+impl<T: Write + 'static> Write for Lz4Writer<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.frame_started = true;
         self.inner.as_mut().unwrap().write(buf)
@@ -268,7 +273,7 @@ impl<T: Write> Write for Lz4Writer<T> {
     }
 }
 
-impl<T: Write> Drop for Lz4Writer<T> {
+impl<T: Write + 'static> Drop for Lz4Writer<T> {
     // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {

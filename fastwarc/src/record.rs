@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::stream_io::{BufReadSeek, LimitedBufReadSeek, LimitedBufReader};
+use super::stream_io::{BufReadSeek, LimitedBufReadSeek, LimitedBufReader, WarcRead, brotli, gzip, zstd};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -706,6 +706,7 @@ pub struct WarcRecord {
     http_headers: Option<HeaderMap>,
     reader: Option<LimitedBufReader>,
     reader_frozen: Option<LimitedBufReader>,
+    reader_wrapped: Option<Box<dyn WarcRead>>,
     stream_pos: u64,
 }
 
@@ -716,6 +717,23 @@ pub enum DigestError {
     FormatError(String),
     NoPayload(String),
     StreamError(String),
+}
+
+/// Auto-decode options for [`WarcRecord::parse_http()`].
+///
+/// # Options:
+///
+/// * `None` - Do not auto-decode content stream.
+/// * `TransferEncoding` - Auto-decode `Transfer-Encoding`.
+/// * `ContentEncoding` - Auto-decode `Content-Encoding`.
+/// * `All` - Auto-decode both.
+#[derive(Debug, Clone, Default)]
+pub enum AutoDecode {
+    #[default]
+    None,
+    TransferEncoding,
+    ContentEncoding,
+    All,
 }
 
 impl Display for DigestError {
@@ -777,6 +795,7 @@ impl WarcRecord {
             content_length: 0,
             reader: None,
             reader_frozen: None,
+            reader_wrapped: None,
             stream_pos: 0,
         }
     }
@@ -795,7 +814,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// WARC record parsed from the stream.
-    pub fn from_reader(reader: Box<dyn BufReadSeek + Send>) -> Result<Self, io::Error> {
+    pub fn from_reader(reader: Box<dyn BufReadSeek>) -> Result<Self, io::Error> {
         match Self::_from_reader_internal(reader)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
@@ -814,7 +833,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn _from_reader_internal(reader: Box<dyn BufReadSeek + Send>) -> Result<Option<Self>, io::Error> {
+    fn _from_reader_internal(reader: Box<dyn BufReadSeek>) -> Result<Option<Self>, io::Error> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
         if record.parse_warc_headers()? == 0 {
@@ -846,9 +865,10 @@ impl WarcRecord {
     /// # Arguments
     ///
     /// * `reader` - Shared pointer to a buffered reader instance
-    pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek + Send>) {
+    pub fn attach_reader(&mut self, reader: Box<dyn BufReadSeek>) {
         self.reader = Some(LimitedBufReader::new(reader, None));
         self.reader_frozen = None;
+        self.reader_wrapped = None;
     }
 
     /// Set the WARC payload as bytes.
@@ -881,9 +901,36 @@ impl WarcRecord {
     /// # Returns
     ///
     /// Reader instance or `None`
-    pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek + Send>> {
+    pub fn detach_reader(&mut self) -> Option<Box<dyn BufReadSeek>> {
         self.reader_frozen = None;
-        Some(self.reader.take().unwrap().into_inner())
+
+        // Unwrap content decoders
+        if let Some(reader) = self.reader_wrapped.take() {
+            macro_rules! downcast {
+                ($reader: ident, $($Type:tt)::+) => {{
+                    $reader
+                        .downcast::<$($Type)::+<Box<dyn WarcRead>>>()
+                        .unwrap()
+                        .into_inner()
+                        .into_any()
+                }};
+            }
+            let mut reader_any = reader.into_any();
+            loop {
+                if reader_any.is::<gzip::GzipReader<Box<dyn WarcRead>>>() {
+                    reader_any = downcast!(reader_any, gzip::GzipReader);
+                } else if reader_any.is::<brotli::BrotliReader<Box<dyn WarcRead>>>() {
+                    reader_any = downcast!(reader_any, brotli::BrotliReader);
+                } else if reader_any.is::<zstd::ZstdReader<Box<dyn WarcRead>>>() {
+                    reader_any = downcast!(reader_any, zstd::ZstdReader);
+                } else {
+                    break;
+                }
+            }
+            Some(reader_any.downcast::<LimitedBufReader>().unwrap().into_inner())
+        } else {
+            Some(self.reader.take().unwrap().into_inner())
+        }
     }
 
     /// Get a mutable reference to the attached buffered reader.
@@ -1204,7 +1251,27 @@ impl WarcRecord {
     /// Parse HTTP headers and advance content reader.
     ///
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
+    ///
+    /// If the HTTP payload is still transfer- or content-encoded, use [`Self::parse_http_with_decode_opts()`]
+    /// to automatically wrap the payload reader in the required [`DecompressingReader(s)`](DecompressingReader).
+    /// Usually, web archivers already decode the contents, so in most cases, this shouldn't be necessary.
     pub fn parse_http(&mut self) -> Result<(), io::Error> {
+        self.parse_http_with_decode_opts(AutoDecode::None)
+    }
+
+    /// Parse HTTP headers, advance content reader, and wrap it in a decoder.
+    ///
+    /// It is safe to call this method multiple times, even if the record is not an HTTP record.
+    ///
+    /// If `auto_decode` is not `None` and the HTTP payload is still transfer- or content-encoded,
+    /// the payload reader is wrapped automatically in the required [`DecompressingReader(s)`](DecompressingReader).
+    /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
+    /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
+    ///
+    /// # Arguments
+    ///
+    /// * `auto_decode` - whether to auto-decode `Transfer-Encoding`, `Content-Encoding`, both, or none
+    pub fn parse_http_with_decode_opts(&mut self, auto_decode: AutoDecode) -> Result<(), io::Error> {
         if self.http_parsed || !self.is_http {
             return Ok(());
         }
@@ -1228,8 +1295,76 @@ impl WarcRecord {
         // Update content to skip HTTP headers
         self.content_length -= bytes_consumed as u64;
         reader.set_limit(self.content_length);
-        self.http_headers = Some(http_headers);
         self.http_parsed = true;
+
+        // Wrap readers for transfer- or content-encoded payloads
+        if matches!(auto_decode, AutoDecode::All | AutoDecode::TransferEncoding) {
+            if let Some(enc) = http_headers.get_bytes(b"Transfer-Encoding").map(|e| e.into_owned()) {
+                self.wrap_reader_in_payload_decoders(&enc, true)?
+            }
+        }
+        if matches!(auto_decode, AutoDecode::All | AutoDecode::ContentEncoding) {
+            if let Some(enc) = http_headers.get_bytes(b"Content-Encoding").map(|e| e.into_owned()) {
+                self.wrap_reader_in_payload_decoders(&enc, true)?
+            }
+        }
+
+        self.http_headers = Some(http_headers);
+
+        Ok(())
+    }
+
+    /// Helper for wrapping the reader in decompressing readers for handling
+    /// Transfer-Encoding and Content-Encoding.
+    ///
+    /// # Arguments
+    ///
+    /// * `encoding_str` - comma-separated list of encodings as ASCII bytes
+    /// * `transfer` - whether this is transfer- or content-encoding
+    fn wrap_reader_in_payload_decoders(&mut self, encoding_str: &[u8], transfer: bool) -> io::Result<()> {
+        let reader = if self.reader_frozen.is_some() {
+            &mut self.reader_frozen
+        } else {
+            &mut self.reader
+        };
+        let wrapped = reader
+            .take()
+            .ok_or_else(|| io::Error::other("Record has no reader set"))?;
+        let mut wrapped: Box<dyn WarcRead> = Box::new(wrapped);
+
+        let encoding_it = encoding_str
+            .split(|c| *c == b',')
+            .map(|enc| enc.trim_ascii().to_ascii_lowercase())
+            .rev();
+        for enc in encoding_it {
+            match enc.as_slice() {
+                b"gzip" => wrapped = Box::new(gzip::GzipReader::new(wrapped)),
+                b"deflate" => {
+                    wrapped = Box::new(gzip::GzipReader::with_options(
+                        wrapped,
+                        gzip::GzipReaderOptions {
+                            window_bits: gzip::MAX_WBITS,
+                            ..gzip::GzipReaderOptions::default()
+                        },
+                    ))
+                }
+                b"br" => wrapped = Box::new(brotli::BrotliReader::new(wrapped)),
+                b"zstd" => wrapped = Box::new(zstd::ZstdReader::new(wrapped)),
+                b"chunked" if transfer => {
+                    todo!("Implement chunked transfer encoding")
+                }
+                b"identity" | b"" => (),
+                _ => {
+                    return Err(io::Error::other(format!(
+                        "Unsupported {}-Encoding: {}",
+                        if transfer { "Transfer" } else { "Content" },
+                        String::from_utf8_lossy(&enc)
+                    )));
+                }
+            }
+        }
+
+        self.reader_wrapped = Some(wrapped);
         Ok(())
     }
 
@@ -1589,7 +1724,7 @@ where
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance to attach to records
-    pub fn new(reader: Box<dyn BufReadSeek + Send>) -> Self {
+    pub fn new(reader: Box<dyn BufReadSeek>) -> Self {
         let empty = R::new(WarcRecord::new());
         empty.with_mut(|record| record.attach_reader(reader));
         Self {
@@ -1615,7 +1750,7 @@ where
     ///
     /// * `reader` - buffered reader instance to attach to records
     /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
-    pub fn with_filter<F>(reader: Box<dyn BufReadSeek + Send>, filter: F) -> FilteredArchiveIteratorImpl<R, F>
+    pub fn with_filter<F>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIteratorImpl<R, F>
     where
         F: Fn(&mut WarcRecord) -> bool,
     {
@@ -1630,7 +1765,7 @@ where
     /// # Returns
     ///
     /// Reader instances originally attached to this iterator.
-    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek + Send>> {
+    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek>> {
         self.cur.with_mut(WarcRecord::detach_reader)
     }
 }

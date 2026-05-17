@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::impl_stream_from_path;
-use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek};
+use super::{impl_fastwarc_stream, impl_stream_from_path};
+use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite};
+use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
 
@@ -162,6 +163,7 @@ impl<T: ReadSeek> GzipReader<T> {
     }
 }
 
+impl_fastwarc_stream!(GzipReader, WarcRead, ReadSeek);
 impl_stream_from_path!(GzipReader, GzipReaderOptions);
 
 impl<T: ReadSeek> io::Read for GzipReader<T> {
@@ -281,7 +283,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
 // ===========================================================
 
 /// Writer for Gzip-compressed streams.
-pub struct GzipWriter<T: Write> {
+pub struct GzipWriter<T: Write + 'static> {
     inner: Option<T>,
     deflate: Deflate,
     member_started: bool,
@@ -323,7 +325,7 @@ impl Default for GzipWriterOptions {
     }
 }
 
-impl<T: Write> GzipWriter<T> {
+impl<T: Write + 'static> GzipWriter<T> {
     /// Create a new [`GzipWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -461,9 +463,10 @@ impl<T: Write> GzipWriter<T> {
     }
 }
 
+impl_fastwarc_stream!(GzipWriter, WarcWrite, Write + 'static);
 impl_stream_from_path!(GzipWriter, GzipWriterOptions);
 
-impl<T: Write> CompressingWriter for GzipWriter<T> {
+impl<T: Write + 'static> CompressingWriter for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.member_started {
             return Ok(());
@@ -474,7 +477,7 @@ impl<T: Write> CompressingWriter for GzipWriter<T> {
     }
 }
 
-impl<T: Write> Write for GzipWriter<T> {
+impl<T: Write + 'static> Write for GzipWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.write_with_flush_opt(buf, DeflateFlush::NoFlush)
     }
@@ -489,7 +492,7 @@ impl<T: Write> Write for GzipWriter<T> {
     }
 }
 
-impl<T: Write> Drop for GzipWriter<T> {
+impl<T: Write + 'static> Drop for GzipWriter<T> {
     // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {

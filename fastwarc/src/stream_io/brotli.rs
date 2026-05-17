@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, impl_stream_from_path};
+use crate::stream_io::{
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+};
 use brotli::{CompressorWriter, Decompressor};
+use std::any::Any;
 use std::io::{self, BufRead, Seek, SeekFrom, Write};
 
 // ===========================================================
@@ -85,6 +88,7 @@ impl<T: ReadSeek> BrotliReader<T> {
     }
 }
 
+impl_fastwarc_stream!(BrotliReader, WarcRead, ReadSeek);
 impl_stream_from_path!(BrotliReader, BrotliReaderOptions);
 
 impl<T: ReadSeek> io::Read for BrotliReader<T> {
@@ -147,7 +151,7 @@ impl<T: ReadSeek> BufRead for BrotliReader<T> {
 // ===========================================================
 
 /// Writer for Brotli-compressed streams.
-pub struct BrotliWriter<T: Write> {
+pub struct BrotliWriter<T: Write + 'static> {
     inner: Option<CompressorWriter<T>>,
 }
 
@@ -173,7 +177,9 @@ impl Default for BrotliWriterOptions {
     }
 }
 
-impl<T: Write> BrotliWriter<T> {
+impl_fastwarc_stream!(BrotliWriter, WarcWrite, Write + 'static);
+
+impl<T: Write + 'static> BrotliWriter<T> {
     /// Create a new [`BrotliWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -233,13 +239,13 @@ impl<T: Write> BrotliWriter<T> {
 
 impl_stream_from_path!(BrotliWriter, BrotliWriterOptions);
 
-impl<T: Write> CompressingWriter for BrotliWriter<T> {
+impl<T: Write + 'static> CompressingWriter for BrotliWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
 
-impl<T: Write> Write for BrotliWriter<T> {
+impl<T: Write + 'static> Write for BrotliWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.as_mut().unwrap().write(buf)
     }
@@ -250,7 +256,7 @@ impl<T: Write> Write for BrotliWriter<T> {
     }
 }
 
-impl<T: Write> Drop for BrotliWriter<T> {
+impl<T: Write + 'static> Drop for BrotliWriter<T> {
     // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
