@@ -146,7 +146,7 @@ impl<T: ReadSeek> BufRead for BrotliReader<T> {
 // BrotliWriter
 // ===========================================================
 
-/// Writer for LZ4-compressed streams.
+/// Writer for Brotli-compressed streams.
 pub struct BrotliWriter<T: Write> {
     inner: Option<CompressorWriter<T>>,
 }
@@ -197,8 +197,8 @@ impl<T: Write> BrotliWriter<T> {
     ///
     /// # Arguments
     ///
-    /// * `capacity` - write buffer size
     /// * `inner` - inner stream to write compressed output to
+    /// * `capacity` - write buffer size
     pub fn with_capacity(inner: T, capacity: usize) -> Self {
         Self::with_options(
             inner,
@@ -209,7 +209,7 @@ impl<T: Write> BrotliWriter<T> {
         )
     }
 
-    /// Create a new [`BrotliWriter`] a the supplied options.
+    /// Create a new [`BrotliWriter`] with the supplied options.
     ///
     /// # Arguments
     ///

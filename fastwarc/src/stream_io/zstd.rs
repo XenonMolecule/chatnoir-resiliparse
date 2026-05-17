@@ -20,7 +20,7 @@ use zstd::stream::{Decoder, Encoder};
 // ZstdReader
 // ===========================================================
 
-/// Reader for Brotli-compressed streams.
+/// Reader for Zstd-compressed streams.
 pub struct ZstdReader<T: ReadSeek> {
     inner: Option<BufReader<Decoder<'static, BufReader<T>>>>,
     stream_pos: u64,
@@ -172,7 +172,7 @@ impl<T: ReadSeek> BufRead for ZstdReader<T> {
 // ZstdWriter
 // ===========================================================
 
-/// Writer for LZ4-compressed streams.
+/// Writer for Zstd-compressed streams.
 pub struct ZstdWriter<T: Write> {
     inner: Option<Encoder<'static, BufWriter<T>>>,
     options: ZstdWriterOptions,
@@ -230,8 +230,8 @@ impl<T: Write> ZstdWriter<T> {
     ///
     /// # Arguments
     ///
-    /// * `capacity` - write buffer size
     /// * `inner` - inner stream to write compressed output to
+    /// * `capacity` - write buffer size
     pub fn with_capacity(inner: T, capacity: usize) -> Self {
         Self::with_options(
             inner,
@@ -249,7 +249,7 @@ impl<T: Write> ZstdWriter<T> {
         Ok(encoder)
     }
 
-    /// Create a new [`ZstdWriter`] a the supplied options.
+    /// Create a new [`ZstdWriter`] with the supplied options.
     ///
     /// # Arguments
     ///

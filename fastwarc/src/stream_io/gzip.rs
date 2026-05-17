@@ -100,7 +100,7 @@ impl<T: ReadSeek> GzipReader<T> {
         )
     }
 
-    /// Create a new [`GzipReader`] with a the supplied options..
+    /// Create a new [`GzipReader`] with the supplied options.
     ///
     /// Allocates an internal buffer holding chunks of the uncompressed inner
     /// stream. A second, larger buffer is allocated for the decompressed data.

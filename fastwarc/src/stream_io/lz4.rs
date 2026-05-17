@@ -210,13 +210,13 @@ impl<T: Write> Lz4Writer<T> {
     ///
     /// # Arguments
     ///
-    /// * `capacity` - write buffer size
     /// * `inner` - inner stream to write compressed output to
+    /// * `capacity` - write buffer size
     pub fn with_capacity(inner: T, capacity: usize) -> Self {
         Self::with_options(inner, Lz4WriterOptions { capacity })
     }
 
-    /// Create a new [`Lz4Writer`] a the supplied options.
+    /// Create a new [`Lz4Writer`] with the supplied options.
     ///
     /// # Arguments
     ///
