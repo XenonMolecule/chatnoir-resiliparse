@@ -48,7 +48,7 @@ impl Default for BrotliReaderOptions {
 impl<T: ReadSeek> BrotliReader<T> {
     /// Create a new [`BrotliReader`].
     ///
-    /// Allocates an internal buffer holding chunks of the uncompressed inner stream.
+    /// Allocates an internal buffer holding chunks of the inner stream.
     ///
     /// The default buffer size is 4096 bytes. For custom buffer sizes, use [`Self::with_capacity()`].
     pub fn new(inner: T) -> Self {
@@ -57,7 +57,7 @@ impl<T: ReadSeek> BrotliReader<T> {
 
     /// Create a new [`BrotliReader`] with a given buffer capacity.
     ///
-    /// Allocates an internal buffer holding chunks of the uncompressed inner stream.
+    /// Allocates an internal buffer holding chunks of the inner stream.
     ///
     /// # Arguments
     ///
@@ -197,9 +197,6 @@ impl<T: Write + 'static> BrotliWriter<T> {
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
     /// to the underlying stream.
-    ///
-    /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom
-    /// compression levels.
     ///
     /// # Arguments
     ///

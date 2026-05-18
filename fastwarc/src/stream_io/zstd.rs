@@ -229,9 +229,6 @@ impl<T: Write + 'static> ZstdWriter<T> {
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
     /// to the underlying stream.
     ///
-    /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom
-    /// compression levels.
-    ///
     /// # Arguments
     ///
     /// * `inner` - inner stream to write compressed output to

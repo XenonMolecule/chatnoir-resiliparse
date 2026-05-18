@@ -69,8 +69,8 @@ impl Default for GzipReaderOptions {
 impl<T: ReadSeek> GzipReader<T> {
     /// Create a new [`GzipReader`].
     ///
-    /// Allocates an internal buffer holding chunks of the uncompressed inner
-    /// stream. A second, larger buffer is allocated for the decompressed data.
+    /// Allocates an internal buffer holding chunks of the inner stream.
+    /// A second, larger buffer is allocated for the decompressed data.
     /// Initially, the decompressed buffer will be twice the size of the
     /// uncompressed buffer, but its size can change based on demand.
     ///
@@ -82,8 +82,8 @@ impl<T: ReadSeek> GzipReader<T> {
 
     /// Create a new [`GzipReader`] with a given buffer capacity.
     ///
-    /// Allocates an internal buffer holding chunks of the uncompressed inner
-    /// stream. A second, larger buffer is allocated for the decompressed data.
+    /// Allocates an internal buffer holding chunks of the inner stream.
+    /// A second, larger buffer is allocated for the decompressed data.
     /// Initially, the decompressed buffer will be twice the size of the
     /// uncompressed buffer, but its size can change based on demand.
     ///
@@ -103,8 +103,8 @@ impl<T: ReadSeek> GzipReader<T> {
 
     /// Create a new [`GzipReader`] with the supplied options.
     ///
-    /// Allocates an internal buffer holding chunks of the uncompressed inner
-    /// stream. A second, larger buffer is allocated for the decompressed data.
+    /// Allocates an internal buffer holding chunks of the inner stream.
+    /// A second, larger buffer is allocated for the decompressed data.
     /// Initially, the decompressed buffer will be twice the size of the
     /// uncompressed buffer, but its size can change based on demand.
     ///
@@ -332,9 +332,6 @@ impl<T: Write + 'static> GzipWriter<T> {
     /// to the underlying stream. The default buffer size is 8192 bytes. Use [`Self::with_capacity()`]
     /// for custom buffer sizes.
     ///
-    /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`]
-    /// for custom compression levels.
-    ///
     /// # Arguments
     ///
     /// * `inner` - inner stream to write compressed output to
@@ -357,9 +354,6 @@ impl<T: Write + 'static> GzipWriter<T> {
     }
 
     /// Create a new [`GzipWriter`] a custom write buffer size.
-    ///
-    /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom
-    /// compression levels.
     ///
     /// # Arguments
     ///
