@@ -20,6 +20,7 @@ use std::io;
 // ===========================================================
 
 pub mod brotli;
+pub mod chunked;
 pub mod gzip;
 pub mod lz4;
 pub mod zstd;
