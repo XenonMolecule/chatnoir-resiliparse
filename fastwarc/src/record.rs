@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::stream_io::{BufReadSeek, LimitedBufReadSeek, LimitedBufReader, WarcRead, brotli, gzip, zstd};
+use super::stream_io::{
+    BufReadSeek, LimitedBufReadSeek, LimitedBufReader, LimitedBufReaderOuterWrap, WarcRead, brotli, gzip, zstd,
+};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -932,8 +934,13 @@ impl WarcRecord {
                             .into_any()
                     }};
                 }
-                // Unwrap content decoders
-                let mut reader_any = reader.into_any();
+                // Unwrap content decoders. The first one in the chain is always a `LimitedBufReaderOuterWrap`.
+                let mut reader_any = reader
+                    .into_any()
+                    .downcast::<LimitedBufReaderOuterWrap>()
+                    .unwrap()
+                    .into_inner_warc()
+                    .into_any();
                 loop {
                     if reader_any.is::<gzip::GzipReader<Box<dyn WarcRead>>>() {
                         reader_any = downcast!(reader_any, gzip::GzipReader);
@@ -945,7 +952,7 @@ impl WarcRecord {
                         break;
                     }
                 }
-                // Last one in the chain is always the original reader wrapped in a `LimitedBufReader`.
+                // Last one is always the original reader wrapped in a `LimitedBufReader`.
                 Some(reader_any.downcast::<LimitedBufReader>().unwrap().into_inner())
             }
             ReaderType::Original(reader) => Some(reader.into_inner()),
@@ -1393,11 +1400,12 @@ impl WarcRecord {
             }
         }
 
-        let wrapped = LimitedBufReader::new(wrapped, None);
         if is_frozen {
             // Frozen records don't need to be unwrapped again later
+            let wrapped = LimitedBufReader::new(wrapped, None);
             self.reader = Some(ReaderType::Frozen((wrapped, frozen_orig)));
         } else {
+            let wrapped = LimitedBufReaderOuterWrap::new(wrapped, None);
             self.reader = Some(ReaderType::Wrapped(Box::new(wrapped)));
         }
         Ok(())

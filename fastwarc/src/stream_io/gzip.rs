@@ -342,6 +342,20 @@ impl<T: Write + 'static> GzipWriter<T> {
         Self::with_options(inner, GzipWriterOptions::default())
     }
 
+    /// Create a new [`GzipWriter`] in DEFLATE mode (i.e., with zlib header).
+    ///
+    /// This is equivalent to calling [`Self::with_options()`] and setting `window_flags`
+    /// to [`MAX_WBITS`].
+    pub fn new_deflate(inner: T) -> Self {
+        Self::with_options(
+            inner,
+            GzipWriterOptions {
+                window_bits: MAX_WBITS,
+                ..GzipWriterOptions::default()
+            },
+        )
+    }
+
     /// Create a new [`GzipWriter`] a custom write buffer size.
     ///
     /// The default compression level is 9 (best). Use [`Self::with_capacity_comp_level()`] for custom

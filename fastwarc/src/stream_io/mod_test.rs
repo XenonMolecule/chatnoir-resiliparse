@@ -227,6 +227,7 @@ pub(crate) mod helpers {
     pub fn test_reader_inner_seek_inner_stream_position_and_member_tracking<C, R, S>(
         compress_fn: C,
         reader_new_fn: R,
+        supported_members: bool,
     ) -> io::Result<()>
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
@@ -235,19 +236,27 @@ pub(crate) mod helpers {
     {
         let first_plain = b"first member data\n".repeat(32);
         let second_plain = b"second member payload\n".repeat(24);
+
         let first_member = compress_fn(&first_plain)?;
         let second_member = compress_fn(&second_plain)?;
 
-        let mut combined = first_member.clone();
-        combined.extend_from_slice(&second_member);
+        let mut combined;
+        if supported_members {
+            combined = first_member.clone();
+            combined.extend_from_slice(&second_member);
+        } else {
+            combined = first_member.clone();
+        }
         let combined_len = combined.len();
 
         // Read everything but the last byte of the first member.
-        let mut reader = reader_new_fn(Cursor::new(combined));
+        let mut reader = reader_new_fn(Cursor::new(combined.clone()));
         let mut first_out = vec![0; first_plain.len() - 1];
         reader.read_exact(&mut first_out)?;
         assert_eq!(first_out, first_plain[..first_plain.len() - 1]);
-        assert_eq!(reader.member_start_position()?, 0);
+        if supported_members {
+            assert_eq!(reader.member_start_position()?, 0);
+        }
         assert_eq!(reader.stream_position()?, first_out.len() as u64);
         let inner_pos_first = reader.inner_stream_position()?;
         assert!(inner_pos_first > 0);
@@ -256,9 +265,15 @@ pub(crate) mod helpers {
         let mut one_more_byte = [0; 1];
         reader.read_exact(&mut one_more_byte)?;
         assert_eq!(one_more_byte, first_plain[first_plain.len() - 1..]);
-        assert_eq!(reader.member_start_position()?, 0);
+        if supported_members {
+            assert_eq!(reader.member_start_position()?, 0);
+        }
         assert_eq!(reader.stream_position()?, (first_out.len() + 1) as u64);
         assert!(reader.inner_stream_position()? >= inner_pos_first);
+
+        if !supported_members {
+            return Ok(());
+        }
 
         // Read another byte. The member offset should jump once the second member starts, and
         // stream_position() keeps counting up beyond member boundaries.

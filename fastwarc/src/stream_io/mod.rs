@@ -86,7 +86,7 @@ pub(crate) use impl_fastwarc_stream;
 
 /// Trait for [`io::Read`] stream implementations reading from
 /// compressed input streams.
-pub trait DecompressingReader: WarcRead + ReadSeek {
+pub trait DecompressingReader: WarcRead {
     /// Seek to an offset, in bytes, in the compressed inner stream.
     /// The semantics are the same as [`io::Seek::seek()`].
     ///
@@ -247,6 +247,36 @@ impl LimitedBufReadSeek for LimitedBufReader {
     }
 
     fn into_inner(self) -> Box<dyn BufReadSeek> {
+        self.reader
+    }
+}
+
+/// Internal type for wrapped payload readers.
+/// This is only there to fulfil the type contracts on `WarcRecord.reader` and it implements an
+/// `into_inner()` method that doesn't erase the [`WarcRead`] trait (important for unwrapping via [`Any`]).
+pub(crate) type LimitedBufReaderOuterWrap = LimitedBufReaderImpl<Box<dyn WarcRead>>;
+
+impl LimitedBufReadSeek for LimitedBufReaderOuterWrap {
+    fn set_limit(&mut self, limit: u64) {
+        self.limit = limit;
+        self.pos = 0;
+    }
+
+    fn limit(&mut self) -> u64 {
+        self.limit
+    }
+
+    fn real_stream_position(&mut self) -> io::Result<u64> {
+        self.reader.stream_position()
+    }
+
+    fn into_inner(self) -> Box<dyn BufReadSeek> {
+        self.reader
+    }
+}
+
+impl LimitedBufReaderOuterWrap {
+    pub(crate) fn into_inner_warc(self) -> Box<dyn WarcRead> {
         self.reader
     }
 }

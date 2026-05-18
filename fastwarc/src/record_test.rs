@@ -14,9 +14,7 @@
 
 use super::*;
 use crate::stream_io::BufReadSeek;
-use crate::stream_io::LimitedBufReader;
-use crate::stream_io::gzip::GzipReader;
-use crate::stream_io::lz4::Lz4Reader;
+use crate::stream_io::{LimitedBufReader, gzip, lz4};
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
 use pretty_assertions::assert_eq;
@@ -24,8 +22,7 @@ use sha1::{Digest, Sha1};
 use sha2::{Sha256, Sha512};
 use std::borrow::Cow;
 use std::fs::File;
-use std::io;
-use std::io::{BufRead, Read, Seek, SeekFrom};
+use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 /// Helper for getting path to external test fixture.
@@ -37,7 +34,7 @@ fn get_fixture_path(name: &str) -> PathBuf {
 }
 
 /// Test fixture: WARC record as String.
-fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&str>, payload: &str) -> String {
+fn warc_record_data(record_type: &str, record_id: &str, content_type: Option<&str>, payload: &[u8]) -> Vec<u8> {
     warc_record_data_with_headers(record_type, record_id, content_type, "", payload)
 }
 
@@ -47,30 +44,32 @@ fn warc_record_data_with_headers(
     record_id: &str,
     content_type: Option<&str>,
     extra_headers: &str,
-    payload: &str,
-) -> String {
-    format!(
+    payload: &[u8],
+) -> Vec<u8> {
+    let mut bytes = format!(
         "WARC/1.1\r\n\
          WARC-Type: {}\r\n\
          WARC-Record-ID: {}\r\n\
          {}\
          {}\
          Content-Length: {}\r\n\
-         \r\n\
-         {}\r\n\r\n",
+         \r\n",
         record_type,
         record_id,
         content_type
             .map(|value| format!("Content-Type: {value}\r\n"))
             .unwrap_or_default(),
         extra_headers,
-        payload.len(),
-        payload
+        payload.len()
     )
+    .into_bytes();
+    bytes.extend_from_slice(payload);
+    bytes.extend_from_slice(b"\r\n\r\n");
+    bytes
 }
 
 /// Test fixture: WARC record of an HTTP response record as String.
-fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
+fn http_response_warc_data(record_id: &str, payload: &str) -> Vec<u8> {
     let http_data = format!(
         "HTTP/1.1 200 OK\r\n\
          Content-Type: text/plain; charset=utf-8\r\n\
@@ -81,7 +80,39 @@ fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
         payload.len(),
         payload
     );
-    warc_record_data("response", record_id, Some("application/http; msgtype=response"), &http_data).into_bytes()
+    warc_record_data("response", record_id, Some("application/http; msgtype=response"), http_data.as_bytes())
+}
+
+/// Test fixture: WARC record of an HTTP response record as String.
+fn http_response_warc_data_encoded(
+    record_id: &str,
+    payload: &[u8],
+    transfer_encoding: Option<&str>,
+    content_encoding: Option<&str>,
+) -> Vec<u8> {
+    let mut transfer_enc_header = "".to_string();
+    let mut content_enc_header = "".to_string();
+    let mut content_len_header = format!("Content-Length: {}\r\n", payload.len());
+
+    if let Some(enc) = transfer_encoding {
+        transfer_enc_header = format!("Transfer-Encoding: {}\r\n", enc);
+        if enc == "chunked" {
+            content_len_header = "".to_string();
+        }
+    };
+    if let Some(enc) = content_encoding {
+        content_enc_header = format!("Content-Encoding: {}\r\n", enc);
+    };
+    let http_data = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\
+         Server: nginx\r\n\
+         {}{}{}\
+         \r\n",
+        transfer_enc_header, content_enc_header, content_len_header
+    );
+    let payload = [http_data.as_bytes(), payload].concat();
+    warc_record_data("response", record_id, Some("application/http; msgtype=response"), payload.as_slice())
 }
 
 #[test]
@@ -432,9 +463,9 @@ fn new_empty_header_encoding() -> io::Result<()> {
 
 #[test]
 fn parse_warc_headers() -> io::Result<()> {
-    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, "ABC");
-    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, "DEFGHI");
-    let warc_data = format!("{}{}", record_data1, record_data2).into_bytes();
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
+    let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
 
     let reader = Box::new(io::Cursor::new(warc_data));
     let mut record1 = WarcRecord::new();
@@ -492,7 +523,7 @@ fn parse_warc_headers() -> io::Result<()> {
 #[test]
 fn parse_http_headers() -> io::Result<()> {
     let payload = "Hello World";
-    let warc_data = http_response_warc_data(payload, "<urn:uuid:record-id>");
+    let warc_data = http_response_warc_data("<urn:uuid:record-id>", payload);
 
     let reader = Box::new(io::Cursor::new(warc_data));
     let mut record = WarcRecord::new();
@@ -564,8 +595,7 @@ fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
 
 #[test]
 fn record_init_from_bytes() -> io::Result<()> {
-    let record_bytes =
-        warc_record_data("response", "<urn:uuid:42e5b12c-3396-4b7e-b4b3-c88b7000cf43>", None, "ABC").into_bytes();
+    let record_bytes = warc_record_data("response", "<urn:uuid:42e5b12c-3396-4b7e-b4b3-c88b7000cf43>", None, b"ABC");
     let record = WarcRecord::from_bytes(record_bytes)?;
     assert!(record.is_frozen());
     assert_eq!(record.record_type(), WarcRecordType::Response);
@@ -610,7 +640,7 @@ fn warc_record_debug_format() -> io::Result<()> {
     assert!(!non_http_debug.contains("http_charset"));
     assert!(!non_http_debug.contains("http_headers"));
 
-    let mut http = WarcRecord::from_bytes(http_response_warc_data("Hello", "<urn:uuid:debug-http>"))?;
+    let mut http = WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:debug-http>", "Hello"))?;
     http.parse_http()?;
 
     let http_debug = format!("{http:?}");
@@ -681,7 +711,7 @@ fn write_record_with_block_size() -> io::Result<()> {
 
 #[test]
 fn write_record_with_checksum() -> io::Result<()> {
-    let mut checksummed = WarcRecord::from_bytes(http_response_warc_data("Hello", "<urn:uuid:write-checksum>"))?;
+    let mut checksummed = WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:write-checksum>", "Hello"))?;
     checksummed.parse_http()?;
 
     let http_headers = b"HTTP/1.1 200 OK\r\n\
@@ -773,7 +803,7 @@ fn verify_record_digests() -> io::Result<()> {
     assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
 
     let mut http_without_payload_digest =
-        WarcRecord::from_bytes(http_response_warc_data("Hello", "<urn:uuid:missing-payload-digest>"))?;
+        WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:missing-payload-digest>", "Hello"))?;
     http_without_payload_digest.parse_http()?;
     assert!(matches!(http_without_payload_digest.verify_payload_digest(false), Err(DigestError::Missing(_))));
 
@@ -787,21 +817,18 @@ fn verify_record_digests() -> io::Result<()> {
         http_payload.len(),
         http_payload
     );
-    let mut http_with_digests = WarcRecord::from_bytes(
-        warc_record_data_with_headers(
-            "response",
-            "<urn:uuid:payload-digest-consume>",
-            Some("application/http; msgtype=response"),
-            &format!(
-                "WARC-Block-Digest: sha1:{}\r\n\
+    let mut http_with_digests = WarcRecord::from_bytes(warc_record_data_with_headers(
+        "response",
+        "<urn:uuid:payload-digest-consume>",
+        Some("application/http; msgtype=response"),
+        &format!(
+            "WARC-Block-Digest: sha1:{}\r\n\
                  WARC-Payload-Digest: sha1:{}\r\n",
-                BASE32.encode(&Sha1::digest(http_data.as_bytes())),
-                BASE32.encode(&Sha1::digest(http_payload.as_bytes()))
-            ),
-            &http_data,
-        )
-        .into_bytes(),
-    )?;
+            BASE32.encode(&Sha1::digest(http_data.as_bytes())),
+            BASE32.encode(&Sha1::digest(http_payload.as_bytes()))
+        ),
+        http_data.as_bytes(),
+    ))?;
     assert!(http_with_digests.verify_block_digest(false).unwrap());
     http_with_digests.parse_http()?;
     assert!(http_with_digests.verify_payload_digest(true).unwrap());
@@ -829,9 +856,9 @@ fn verify_record_digests() -> io::Result<()> {
 
 #[test]
 fn archive_iterator() -> io::Result<()> {
-    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, "ABC");
-    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, "DEFGHI");
-    let warc_data = format!("{}{}", record_data1, record_data2).into_bytes();
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
+    let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
 
     let reader = Box::new(io::Cursor::new(warc_data));
 
@@ -841,7 +868,7 @@ fn archive_iterator() -> io::Result<()> {
     assert_eq!(record1.record_id().unwrap(), "<urn:uuid:record1>");
     let mut record2 = record1.next().unwrap()?;
     assert_eq!(record2.record_id().unwrap(), "<urn:uuid:record2>");
-    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, "ABC").len() as u64);
+    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, b"ABC").len() as u64);
     assert!(record2.next().is_none());
 
     // ArchiveIterator (without reading payload -> consumed automatically)
@@ -881,23 +908,23 @@ fn archive_iterator() -> io::Result<()> {
 
 #[test]
 fn archive_iterator_into_inner() -> io::Result<()> {
-    let record_data = warc_record_data("resource", "<urn:uuid:into-inner>", None, "ABC");
-    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone().into_bytes())))
+    let record_data = warc_record_data("resource", "<urn:uuid:into-inner>", None, b"ABC");
+    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone())))
         .into_inner()
         .unwrap();
 
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
-    assert_eq!(buf, record_data.as_bytes());
+    assert_eq!(buf, record_data);
 
     Ok(())
 }
 
 #[test]
 fn archive_iterator_thread_safe() -> io::Result<()> {
-    let record_data1 = warc_record_data("resource", "<urn:uuid:threadsafe-1>", None, "ABC");
-    let record_data2 = warc_record_data("metadata", "<urn:uuid:threadsafe-2>", None, "XYZ");
-    let reader = Box::new(io::Cursor::new(format!("{record_data1}{record_data2}").into_bytes()));
+    let record_data1 = warc_record_data("resource", "<urn:uuid:threadsafe-1>", None, b"ABC");
+    let record_data2 = warc_record_data("metadata", "<urn:uuid:threadsafe-2>", None, b"XYZ");
+    let reader = Box::new(io::Cursor::new([record_data1.as_slice(), record_data2.as_slice()].concat()));
 
     let mut it = ArchiveIteratorThreadSafe::new(reader);
     let record1 = it.next().unwrap()?;
@@ -913,11 +940,12 @@ fn archive_iterator_thread_safe() -> io::Result<()> {
 
 #[test]
 fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
-    let record_data1 = warc_record_data("resource", "<urn:uuid:consume-freeze-1>", None, "ABCDEF");
-    let record_data2 = warc_record_data("metadata", "<urn:uuid:consume-freeze-2>", None, "XYZ");
+    let record_data1 = warc_record_data("resource", "<urn:uuid:consume-freeze-1>", None, b"ABCDEF");
+    let record_data2 = warc_record_data("metadata", "<urn:uuid:consume-freeze-2>", None, b"XYZ");
 
-    let mut consumed =
-        WarcRecord::from_reader(Box::new(io::Cursor::new(format!("{record_data1}{record_data2}").into_bytes())))?;
+    let mut consumed = WarcRecord::from_reader(Box::new(io::Cursor::new(
+        [record_data1.as_slice(), record_data2.as_slice()].concat(),
+    )))?;
     assert_eq!(consumed.consume_n(2)?, 2);
     assert_eq!(consumed.reader_mut().unwrap().stream_position()?, 2);
     assert_eq!(consumed.consume()?, 4);
@@ -926,7 +954,7 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
     let next = consumed.next().unwrap()?;
     assert_eq!(next.record_id().as_deref(), Some("<urn:uuid:consume-freeze-2>"));
 
-    let mut frozen = WarcRecord::from_reader(Box::new(io::Cursor::new(record_data1.into_bytes())))?;
+    let mut frozen = WarcRecord::from_reader(Box::new(io::Cursor::new(record_data1)))?;
     let mut prefix = [0u8; 2];
     frozen.reader_mut().unwrap().read_exact(&mut prefix)?;
     assert_eq!(&prefix, b"AB");
@@ -939,6 +967,112 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
     frozen.reader_mut().unwrap().read_to_end(&mut remaining)?;
     assert_eq!(remaining, b"CDEF");
 
+    Ok(())
+}
+
+#[test]
+fn record_encoded_http_payload() -> io::Result<()> {
+    let payload_raw = b"ABCDEF".repeat(2000);
+
+    let read_record = |payload_encoded: &[u8], tenc, cenc, dec_opts| -> io::Result<Vec<u8>> {
+        let data = http_response_warc_data_encoded("<urn:uuid:abc>", payload_encoded, tenc, cenc);
+        let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(data)))?;
+        rec.parse_http_with_decode_opts(dec_opts)?;
+        let mut buf = Vec::with_capacity(payload_raw.len());
+        rec.reader_mut().unwrap().read_to_end(&mut buf)?;
+        Ok(buf)
+    };
+
+    // Transfer-Encoding: gzip (decode: None)
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let decoded = read_record(encoded.as_slice(), Some("gzip"), None, AutoDecode::None)?;
+    assert_eq!(decoded, encoded);
+
+    // Transfer-Encoding: gzip, Content-Encoding: gzip (decode: All)
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    let decoded = read_record(encoded.as_slice(), Some("gzip"), Some("gzip"), AutoDecode::All)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Transfer-Encoding: gzip, Content-Encoding: br (decode: Transfer)
+    let mut w = brotli::BrotliWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    let mut w = brotli::BrotliWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded_content = w.into_inner()?;
+    let decoded = read_record(encoded.as_slice(), Some("gzip"), Some("br"), AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, encoded_content);
+
+    // Transfer-Encoding: zstd, deflate (decode: Transfer)
+    let mut w = zstd::ZstdWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let mut w = gzip::GzipWriter::new_deflate(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    let decoded = read_record(encoded.as_slice(), Some("zstd, deflate"), None, AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Transfer-Encoding: identity (decode: Transfer)
+    let decoded = read_record(payload_raw.as_slice(), Some("identity"), None, AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Content-Encoding: unsupported (decode: Transfer)
+    let decoded = read_record(payload_raw.as_slice(), None, Some("unsupported"), AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Content-Encoding: unsupported (decode: Content)
+    let decoded = read_record(payload_raw.as_slice(), None, Some("unsupported"), AutoDecode::ContentEncoding);
+    assert!(decoded.is_err());
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
+    let payload_raw = [b"ABCDEF".repeat(2000), b"UVWXYZ".repeat(2000), b"ABCXYZ".repeat(2000)];
+    let mut data = Vec::new();
+
+    // Record 1
+    let mut w = zstd::ZstdWriter::new(Vec::new());
+    w.write_all(&payload_raw[0])?;
+    let encoded = w.into_inner()?;
+    let mut w = brotli::BrotliWriter::new(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &encoded, Some("zstd, br"), None));
+
+    // Record 2
+    let mut w = brotli::BrotliWriter::new(Vec::new());
+    w.write_all(&payload_raw[1])?;
+    let encoded = w.into_inner()?;
+    data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &encoded, None, Some("br")));
+
+    // Record 3
+    data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &payload_raw[2], None, None));
+
+    let mut count = 0;
+    for (i, rec) in ArchiveIterator::new(Box::new(io::Cursor::new(data.concat()))).enumerate() {
+        rec?.with_mut(|r| -> io::Result<()> {
+            r.parse_http_with_decode_opts(AutoDecode::All)?;
+            let mut buf = Vec::with_capacity(payload_raw[i].len());
+            r.reader_mut().unwrap().read_to_end(&mut buf)?;
+            assert_eq!(buf, payload_raw[i]);
+            Ok(())
+        })?;
+        count += 1;
+    }
+    assert_eq!(count, data.len());
     Ok(())
 }
 
@@ -961,7 +1095,9 @@ fn filtered_archive_iterator() -> io::Result<()> {
 /// Test fixture: WARC records for testing filter predicates.
 fn filter_test_warc_data() -> Vec<u8> {
     let warc10 =
-        warc_record_data("warcinfo", "<urn:uuid:filter-warc10>", None, "INFO").replacen("WARC/1.1", "WARC/1.0", 1);
+        String::from_utf8_lossy(warc_record_data("warcinfo", "<urn:uuid:filter-warc10>", None, b"INFO").as_slice())
+            .replacen("WARC/1.1", "WARC/1.0", 1)
+            .into_bytes();
 
     let http_payload = "Hello";
     let http_data = format!(
@@ -972,18 +1108,19 @@ fn filter_test_warc_data() -> Vec<u8> {
          {}",
         http_payload.len(),
         http_payload
-    );
+    )
+    .into_bytes();
     let payload_digest = BASE32.encode(&Sha1::digest(http_payload.as_bytes()));
     let http = warc_record_data_with_headers(
         "response",
         "<urn:uuid:filter-http>",
         Some("application/http; msgtype=response"),
         &format!("WARC-Payload-Digest: sha1:{payload_digest}\r\n"),
-        &http_data,
+        http_data.as_slice(),
     );
 
-    let block_payload = "BLOCK";
-    let block_digest = BASE32.encode(&Sha1::digest(block_payload.as_bytes()));
+    let block_payload = b"BLOCK";
+    let block_digest = BASE32.encode(&Sha1::digest(block_payload));
     let block = warc_record_data_with_headers(
         "resource",
         "<urn:uuid:filter-block>",
@@ -995,9 +1132,15 @@ fn filter_test_warc_data() -> Vec<u8> {
         block_payload,
     );
 
-    let metadata = warc_record_data("metadata", "<urn:uuid:filter-metadata>", None, "LONGER");
+    let metadata = warc_record_data("metadata", "<urn:uuid:filter-metadata>", None, b"LONGER");
 
-    format!("{warc10}{http}{block}{metadata}").into_bytes()
+    [
+        warc10.as_slice(),
+        http.as_slice(),
+        block.as_slice(),
+        metadata.as_slice(),
+    ]
+    .concat()
 }
 
 /// Helper for running iterator checks on both [`ArchiveIterator`] and [`ArchiveIteratorThreadSafe`].
@@ -1096,7 +1239,7 @@ fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
     for parse_http in [true, false] {
         let mut rec_count = 0;
         run_archive_iterator_variants(
-            || Ok(GzipReader::new(File::open(clipped.clone())?)),
+            || Ok(gzip::GzipReader::new(File::open(clipped.clone())?)),
             |r| -> io::Result<()> {
                 let mut content = Vec::with_capacity(r.content_length() as usize);
                 r.reader_mut().unwrap().read_to_end(&mut content)?;
@@ -1214,10 +1357,10 @@ fn archive_iterator_record_offsets() -> io::Result<()> {
     iterate_archive_members_with_offsets(|| Ok(io::BufReader::new(File::open(warc.clone())?)))?;
 
     let warc_gz = get_fixture_path("warcfile.warc.gz");
-    iterate_archive_members_with_offsets(|| Ok(GzipReader::new(File::open(warc_gz.clone())?)))?;
+    iterate_archive_members_with_offsets(|| Ok(gzip::GzipReader::new(File::open(warc_gz.clone())?)))?;
 
     let warc_lz4 = get_fixture_path("warcfile.warc.lz4");
-    iterate_archive_members_with_offsets(|| Ok(Lz4Reader::new(File::open(warc_lz4.clone())?)))?;
+    iterate_archive_members_with_offsets(|| Ok(lz4::Lz4Reader::new(File::open(warc_lz4.clone())?)))?;
 
     Ok(())
 }
