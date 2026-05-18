@@ -119,7 +119,7 @@ impl<T: ReadSeek> Seek for BrotliReader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for BrotliReader<T> {
+impl<T: ReadSeek + 'static> DecompressingReader for BrotliReader<T> {
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let capacity = self.inner.as_ref().unwrap().capacity();
         let mut inner = self.inner.take().unwrap().into_inner().into_inner();

@@ -85,7 +85,7 @@ fn http_response_warc_data(payload: &str, record_id: &str) -> Vec<u8> {
 }
 
 #[test]
-fn limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
+fn limited_buf_read_seek_limit_seek() -> io::Result<()> {
     let mut limited = LimitedBufReader::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
 
     assert_eq!(limited.fill_buf()?, b"abcd");
@@ -100,14 +100,6 @@ fn limited_buf_read_seek_limit_seek_and_replace_reader() -> io::Result<()> {
 
     limited.set_limit(3);
     assert_eq!(limited.stream_position()?, 0);
-
-    let old_reader = limited.replace_reader(Box::new(io::Cursor::new(b"xyz".to_vec())));
-    let mut old_reader = old_reader;
-    assert_eq!(old_reader.stream_position()?, 4);
-
-    assert_eq!(limited.seek(io::SeekFrom::Start(2))?, 2);
-    assert_eq!(limited.read(&mut buf[..2])?, 1);
-    assert_eq!(&buf[..1], b"z");
 
     Ok(())
 }

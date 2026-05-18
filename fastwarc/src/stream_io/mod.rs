@@ -14,7 +14,6 @@
 
 use std::any::Any;
 use std::io;
-use std::mem;
 
 // ===========================================================
 // Submodules
@@ -179,7 +178,7 @@ pub(crate) use impl_stream_from_path;
 /// logical stream positions.
 ///
 /// Does not allocate a new buffer. All calls are passed directly to the underlying reader.
-pub trait LimitedBufReadSeek: BufReadSeek {
+pub trait LimitedBufReadSeek: WarcRead + 'static {
     /// Change the limit of the reader.
     /// Also resets the logical stream position to 0. Use [`Self::real_stream_position()`] to get
     /// the real position on the original stream.
@@ -197,18 +196,6 @@ pub trait LimitedBufReadSeek: BufReadSeek {
 
     /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
     fn into_inner(self) -> Box<dyn BufReadSeek>;
-
-    /// Replace the internal stream with a new one and hand ownership of the previous
-    /// stream back to the caller. Resets `limit` and `pos`.
-    ///
-    /// # Arguments
-    ///
-    /// * `new_reader` - new inner reader to put limit on
-    ///
-    /// # Returns
-    ///
-    /// Previous reader instance (unlimited)
-    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek>;
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.
     /// The results are appended to the provided buffer.
@@ -243,41 +230,7 @@ pub trait LimitedBufReadSeek: BufReadSeek {
     }
 }
 
-pub struct LimitedBufReader {
-    reader: Box<dyn BufReadSeek>,
-    limit: u64,
-    pos: u64,
-}
-
-impl LimitedBufReader {
-    /// Create a new limited reader from a buffered reader instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `reader` - inner reader to put the limit on
-    /// * `limit` - limit in bytes at which EOF is returned
-    pub fn new(reader: Box<dyn BufReadSeek>, limit: Option<u64>) -> Self {
-        Self {
-            reader,
-            limit: limit.unwrap_or(u64::MAX),
-            pos: 0,
-        }
-    }
-}
-
-impl WarcRead for LimitedBufReader {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-}
+pub type LimitedBufReader = LimitedBufReaderImpl<Box<dyn BufReadSeek>>;
 
 impl LimitedBufReadSeek for LimitedBufReader {
     fn set_limit(&mut self, limit: u64) {
@@ -296,15 +249,57 @@ impl LimitedBufReadSeek for LimitedBufReader {
     fn into_inner(self) -> Box<dyn BufReadSeek> {
         self.reader
     }
+}
 
-    fn replace_reader(&mut self, new_reader: Box<dyn BufReadSeek>) -> Box<dyn BufReadSeek> {
-        self.limit = u64::MAX;
-        self.pos = 0;
-        mem::replace(&mut self.reader, new_reader)
+pub struct LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
+    reader: T,
+    limit: u64,
+    pos: u64,
+}
+
+impl<T> LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
+    /// Create a new limited reader from a buffered reader instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - inner reader to put the limit on
+    /// * `limit` - limit in bytes at which EOF is returned
+    pub fn new(reader: T, limit: Option<u64>) -> Self {
+        Self {
+            reader,
+            limit: limit.unwrap_or(u64::MAX),
+            pos: 0,
+        }
     }
 }
 
-impl io::Read for LimitedBufReader {
+impl<T> WarcRead for LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+impl<T> io::Read for LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let l = buf.len();
         let buf_limited = &mut buf[..(l as u64).min(self.limit - self.pos) as usize];
@@ -314,7 +309,10 @@ impl io::Read for LimitedBufReader {
     }
 }
 
-impl io::BufRead for LimitedBufReader {
+impl<T> io::BufRead for LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         let buf = self.reader.fill_buf()?;
         let buf_limited = &buf[..(buf.len() as u64).min(self.limit - self.pos) as usize];
@@ -328,7 +326,10 @@ impl io::BufRead for LimitedBufReader {
     }
 }
 
-impl io::Seek for LimitedBufReader {
+impl<T> io::Seek for LimitedBufReaderImpl<T>
+where
+    T: BufReadSeek,
+{
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         if pos == io::SeekFrom::Current(0) {
             return Ok(self.pos);
