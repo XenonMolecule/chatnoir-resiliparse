@@ -30,12 +30,13 @@ pub struct ZstdReaderPy {
 #[pymethods]
 impl ZstdReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None))]
+    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None, dictionary=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
         buffer_size: usize,
         fsspec_args: Option<Py<PyAny>>,
+        dictionary: Option<Vec<u8>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = zstd::ZstdReaderOptions { capacity: buffer_size };
         let inner = wrap_reader_stream(
@@ -43,7 +44,10 @@ impl ZstdReaderPy {
             inner,
             fsspec_args,
             |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
-                Ok(Box::new(zstd::ZstdReader::with_options(reader, options)))
+                match dictionary {
+                    Some(d) => Ok(Box::new(zstd::ZstdReader::with_dictionary(reader, d, Some(options)))),
+                    _ => Ok(Box::new(zstd::ZstdReader::with_options(reader, options))),
+                }
             },
             |path| Ok(Box::new(zstd::ZstdReader::from_path_with_options(path, options)?)),
         )?;
@@ -94,15 +98,18 @@ pub struct ZstdWriterPy {
 #[pymethods]
 impl ZstdWriterPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=8192, fsspec_args=None,))]
+    #[pyo3(signature = (inner, buffer_size=8192, fsspec_args=None, dictionary=None, compress_dictionary_frame=false))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
         buffer_size: usize,
         fsspec_args: Option<Py<PyAny>>,
+        dictionary: Option<Vec<u8>>,
+        compress_dictionary_frame: bool,
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = zstd::ZstdWriterOptions {
             capacity: buffer_size,
+            compress_dictionary_frame,
             ..zstd::ZstdWriterOptions::default()
         };
         let inner = wrap_writer_stream(
@@ -110,7 +117,10 @@ impl ZstdWriterPy {
             inner,
             fsspec_args,
             |reader| -> io::Result<Box<dyn CompressingWriter + Send>> {
-                Ok(Box::new(zstd::ZstdWriter::with_options(reader, options)))
+                match dictionary {
+                    Some(d) => Ok(Box::new(zstd::ZstdWriter::with_dictionary(reader, d, Some(options)))),
+                    _ => Ok(Box::new(zstd::ZstdWriter::with_options(reader, options))),
+                }
             },
             |path| Ok(Box::new(zstd::ZstdWriter::from_path_with_options(path, options)?)),
         )?;
