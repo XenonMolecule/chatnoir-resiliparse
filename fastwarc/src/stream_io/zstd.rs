@@ -311,6 +311,7 @@ pub struct ZstdWriter<T: Write + 'static> {
 /// * `multithread_workers` - number of threads to use for compression (0 to disable).
 /// * `include_checksum` - include `Content_Checksum` in each frame (required for WARCs).
 /// * `include_content_size` - include `Frame_Content_Size` in each frame (required for WARCs).
+/// * `include_dictid` - include dictionary ID when using one.
 /// * `compress_dictionary_frame` - if given a custom dictionary (with [`ZstdWriter::with_dictionary()`]),
 ///    compress the dictionary frame contents
 /// * `write_dictionary_frame` - write a dictionary frame at the start of the stream if a custom
@@ -322,6 +323,7 @@ pub struct ZstdWriterOptions {
     pub multithread_workers: u32,
     pub include_checksum: bool,
     pub include_content_size: bool,
+    pub include_dictid: bool,
     pub write_dictionary_frame: bool,
     pub compress_dictionary_frame: bool,
 }
@@ -334,6 +336,7 @@ impl Default for ZstdWriterOptions {
             multithread_workers: 4,
             include_checksum: true,
             include_content_size: true,
+            include_dictid: true,
             write_dictionary_frame: true,
             compress_dictionary_frame: false,
         }
@@ -441,6 +444,7 @@ impl<T: Write + 'static> ZstdWriter<T> {
         encoder.multithread(options.multithread_workers)?;
         encoder.include_checksum(options.include_checksum)?;
         encoder.include_contentsize(options.include_content_size)?;
+        encoder.include_dictid(options.include_dictid)?;
         Ok(encoder)
     }
 

@@ -1388,7 +1388,10 @@ fn archive_iterator_record_offsets() -> io::Result<()> {
 
 #[test]
 fn archive_iterator_zstd_dict() -> io::Result<()> {
-    let dict = zstd::train_dictionary_from_samples(&[&b"ABC"].repeat(100), 32 * 1024)?;
+    let dict = zstd::train_dictionary_from_samples(
+        &[&b"The quick brown fox jumps over the lazy dog."].repeat(100),
+        32 * 1024,
+    )?;
 
     // Frame 1 (+ Dictionary)
     let mut writer = zstd::ZstdWriter::with_dictionary(io::Cursor::new(Vec::new()), dict.clone(), None);
