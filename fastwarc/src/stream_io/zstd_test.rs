@@ -148,7 +148,6 @@ fn zstd_read_write_with_dictionary() -> io::Result<()> {
     encoded.rewind()?;
 
     // Try to decompress
-    // TODO: Fix failing test
     let decoded = decode(encoded.clone(), None)?;
     assert_eq!(decoded, plain);
 
