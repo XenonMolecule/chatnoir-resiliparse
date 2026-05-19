@@ -51,6 +51,9 @@ pub mod _fastwarc_rs {
 
         #[pymodule_export]
         pub use crate::stream_io::zstd::{ZstdReaderPy, ZstdWriterPy};
+
+        #[pymodule_export]
+        pub use crate::stream_io::chunked::{ChunkedReaderPy, ChunkedWriterPy};
     }
 
     #[pymodule]
