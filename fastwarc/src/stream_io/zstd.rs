@@ -16,7 +16,7 @@ use crate::stream_io::{
     CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
 };
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use zstd::stream::{Decoder, Encoder};
 
 // ===========================================================
@@ -26,9 +26,15 @@ use zstd::stream::{Decoder, Encoder};
 /// Reader for Zstd-compressed streams.
 pub struct ZstdReader<T: ReadSeek> {
     inner: Option<BufReader<Decoder<'static, BufReader<T>>>>,
+    dict: Option<Vec<u8>>,
     stream_pos: u64,
     member_pos: u64,
 }
+
+pub use zstd::dict::from_continuous as train_dictionary_from_continuous;
+pub use zstd::dict::from_files as train_dictionary_from_files;
+pub use zstd::dict::from_sample_iterator as train_dictionary_sample_iterator;
+pub use zstd::dict::from_samples as train_dictionary_from_samples;
 
 /// Options for constructing a new [`ZstdReader`].
 ///
@@ -84,9 +90,27 @@ impl<T: ReadSeek> ZstdReader<T> {
         );
         Self {
             inner: Some(decoder),
+            dict: None,
             stream_pos: 0,
             member_pos,
         }
+    }
+
+    /// Create a new [`ZstdReader`] with the supplied decompression dictionary and options.
+    ///
+    /// The dictionary used during decompression must be the same the stream was originally
+    /// compressed with. If the stream starts with a WARC dictionary frame, the dictionary
+    /// is loaded from it automatically.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - input (inner) stream to read from
+    /// * `dict` - zstd dictionary
+    /// * `options` - reader options
+    pub fn with_dictionary(inner: T, dict: Vec<u8>, options: Option<ZstdReaderOptions>) -> Self {
+        let mut obj = Self::with_options(inner, options.unwrap_or_default());
+        obj.dict = Some(dict);
+        obj
     }
 
     /// Unwraps this [`ZstdReader`], returning the underlying reader.
@@ -95,6 +119,69 @@ impl<T: ReadSeek> ZstdReader<T> {
     pub fn into_inner(self) -> T {
         self.inner.unwrap().into_inner().finish().into_inner()
     }
+
+    /// Internal method: Read a dictionary frame.
+    /// Assumes the frame magic number has already been consumed.
+    ///
+    /// Dictionary frame format: [https://iipc.github.io/warc-specifications/specifications/warc-zstd/#dictionary-frame-format]
+    fn read_dict_frame(&mut self) -> io::Result<Option<Vec<u8>>> {
+        // Reach through Decoder to inner stream
+        let inner = self.inner.as_mut().unwrap().get_mut().get_mut();
+        let buf = inner.fill_buf()?;
+        // Check dictionary frame magic number
+        if buf.len() < 4 || buf[..4] != 0x184D2A5Du32.to_le_bytes() {
+            return Ok(None);
+        }
+
+        // Read dictionary length
+        inner.consume(4);
+        let mut dict_len = [0u8; 4];
+        inner
+            .read_exact(&mut dict_len)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Failed to read dictionary size."))?;
+        let dict_len = u32::from_le_bytes(dict_len) as usize;
+        if dict_len > 16 * 1024 * 1024 {
+            // Safeguard: Don't allow dicts above 16MB (spec says 8MB should be max)
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Dictionary size too large."));
+        } else if dict_len < 4 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Dictionary size too small."));
+        }
+
+        // Read dictionary contents
+        let mut dict = vec![0u8; dict_len];
+        inner
+            .read_exact(&mut dict)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Failed to read dictionary (wrong size)."))?;
+        match dict[..4] {
+            // Uncompressed
+            [0x37, 0xA4, 0x30, 0xEC] => Ok(Some(dict)),
+            // Compressed
+            [0x28, 0xB5, 0x2F, 0xFD] => {
+                let dict_dec = Vec::with_capacity(dict_len * 2);
+                let mut decoder = Decoder::new(io::Cursor::new(dict_dec))?;
+                decoder.read_to_end(&mut dict)?;
+                Ok(Some(decoder.finish().into_inner().into_inner()))
+            }
+            _ => Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid dictionary.")),
+        }
+    }
+
+    /// Internal: Reset the Decoder at a frame boundary and advance `self.member_pos`.
+    ///
+    /// # Arguments
+    ///
+    /// * `seek_pos` - optional seek position on inner buffered reader before Decoder construction
+    ///
+    /// # Returns
+    ///
+    /// Member start position
+    fn reset_decoder(&mut self, seek_pos: Option<SeekFrom>) -> io::Result<u64> {
+        let mut inner = self.inner.take().unwrap().into_inner().finish();
+        let mpos = inner.seek(seek_pos.unwrap_or(SeekFrom::Current(0)))?;
+        self.inner = Some(BufReader::new(Decoder::with_dictionary(inner, self.dict.as_deref().unwrap_or_default())?));
+        self.member_pos = mpos;
+        Ok(mpos)
+    }
 }
 
 impl_fastwarc_stream!(ZstdReader, WarcRead, ReadSeek);
@@ -102,17 +189,28 @@ impl_stream_from_path!(ZstdReader, ZstdReaderOptions);
 
 impl<T: ReadSeek> io::Read for ZstdReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // Stream start: Check for dictionary frame (don't override an explicitly set one).
+        if self.stream_pos == 0
+            && self.member_pos == 0
+            && self.dict.is_none()
+            && let Some(dict) = self.read_dict_frame()?
+        {
+            self.dict = Some(dict);
+            self.reset_decoder(None)?;
+        }
+
         let n = match self.inner.as_mut().unwrap().read(buf) {
             Ok(0) if !self.inner.as_mut().unwrap().get_mut().get_mut().fill_buf()?.is_empty() => {
                 // Frame end: Reset Decoder and read again (keep self.stream_pos counting up).
                 let old_pos = self.stream_pos;
-                self.inner_seek(SeekFrom::Current(0))?;
+                self.reset_decoder(None)?;
                 self.stream_pos = old_pos;
                 self.inner.as_mut().unwrap().read(buf)?
             }
             Ok(b) => b,
             Err(e) => return Err(e),
         };
+
         self.stream_pos += n as u64;
         Ok(n)
     }
@@ -142,10 +240,7 @@ impl<T: ReadSeek> Seek for ZstdReader<T> {
 
 impl<T: ReadSeek> DecompressingReader for ZstdReader<T> {
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        let mut inner = self.inner.take().unwrap().into_inner().finish();
-        let new_pos = inner.seek(pos)?;
-        self.inner = Some(BufReader::new(Decoder::with_buffer(inner)?));
-        self.member_pos = new_pos;
+        let new_pos = self.reset_decoder(Some(pos))?;
         self.stream_pos = 0;
         Ok(new_pos)
     }
@@ -181,6 +276,8 @@ pub struct ZstdWriter<T: Write + 'static> {
     inner: Option<Encoder<'static, BufWriter<T>>>,
     options: ZstdWriterOptions,
     frame_started: bool,
+    stream_started: bool,
+    dict: Option<Vec<u8>>,
 }
 
 /// Options for constructing a new [`ZstdWriter`].
@@ -189,14 +286,19 @@ pub struct ZstdWriter<T: Write + 'static> {
 ///
 /// * `capacity` - sets the internal buffer size.
 /// * `level` - compression level
-/// * `include_checksum` - include checksums at the end of frames
 /// * `multithread_workers` - number of threads to use for compression (0 to disable)
+/// * `include_checksum` - include `Content_Checksum` in each frame (required for WARCs)
+/// * `include_content_size` - include `Frame_Content_Size` in each frame (required for WARCs)
+/// * `compress_dictionary_frame` - if given a custom dictionary (with [`ZstdWriter::with_dictionary()`],
+///   compress the dictionary frame contents
 #[derive(Debug, Copy, Clone)]
 pub struct ZstdWriterOptions {
     pub capacity: usize,
     pub level: i32,
-    pub include_checksum: bool,
     pub multithread_workers: u32,
+    pub include_checksum: bool,
+    pub include_content_size: bool,
+    pub compress_dictionary_frame: bool,
 }
 
 impl Default for ZstdWriterOptions {
@@ -204,8 +306,10 @@ impl Default for ZstdWriterOptions {
         Self {
             capacity: 8192,
             level: 3,
-            include_checksum: false,
             multithread_workers: 4,
+            include_checksum: true,
+            include_content_size: true,
+            compress_dictionary_frame: false,
         }
     }
 }
@@ -243,13 +347,6 @@ impl<T: Write + 'static> ZstdWriter<T> {
         )
     }
 
-    fn new_with_options(inner: BufWriter<T>, options: ZstdWriterOptions) -> io::Result<Encoder<'static, BufWriter<T>>> {
-        let mut encoder = Encoder::new(inner, options.level)?;
-        encoder.multithread(options.multithread_workers)?;
-        encoder.include_checksum(options.include_checksum)?;
-        Ok(encoder)
-    }
-
     /// Create a new [`ZstdWriter`] with the supplied options.
     ///
     /// # Arguments
@@ -259,10 +356,40 @@ impl<T: Write + 'static> ZstdWriter<T> {
     pub fn with_options(inner: T, options: ZstdWriterOptions) -> Self {
         Self {
             inner: Some(
-                Self::new_with_options(BufWriter::new(inner), options).expect("Failed to set Zstd encoder options."),
+                Self::new_encoder_with_options(BufWriter::new(inner), None, options)
+                    .expect("Failed to set Zstd encoder options."),
             ),
             options,
             frame_started: false,
+            stream_started: false,
+            dict: None,
+        }
+    }
+
+    /// Create a new [`ZstdWriter`] with the supplied compression dictionary and options.
+    ///
+    /// Specifying a custom dictionary will write a dictionary frame before the first record frame.
+    /// `options.compress_dictionary_frame` determines whether that dictionary frame is compressed.
+    ///
+    /// Per the spec, a dictionary should not be larger than 8MB (usually *much* less). Use one of
+    /// the `train_dictionary_*` functions for training one.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - inner stream to write compressed output to
+    /// * `dict` - zstd dictionary
+    /// * `options` - writer options
+    pub fn with_dictionary(inner: T, dict: Vec<u8>, options: Option<ZstdWriterOptions>) -> Self {
+        let options = options.unwrap_or_default();
+        Self {
+            inner: Some(
+                Self::new_encoder_with_options(BufWriter::new(inner), Some(&dict), options)
+                    .expect("Failed to set Zstd encoder options."),
+            ),
+            options,
+            frame_started: false,
+            stream_started: false,
+            dict: Some(dict),
         }
     }
 
@@ -273,6 +400,43 @@ impl<T: Write + 'static> ZstdWriter<T> {
         let mut writer = self.inner.take().unwrap().finish()?.into_inner()?;
         writer.flush()?;
         Ok(writer)
+    }
+
+    /// Internal method: Create a new Zstd encoded with the supplied options and dictionary.
+    fn new_encoder_with_options(
+        inner: BufWriter<T>,
+        dict: Option<&[u8]>,
+        options: ZstdWriterOptions,
+    ) -> io::Result<Encoder<'static, BufWriter<T>>> {
+        let mut encoder = match dict {
+            Some(d) => Encoder::with_dictionary(inner, options.level, &d)?,
+            None => Encoder::new(inner, options.level)?,
+        };
+        encoder.multithread(options.multithread_workers)?;
+        encoder.include_checksum(options.include_checksum)?;
+        encoder.include_contentsize(options.include_content_size)?;
+        Ok(encoder)
+    }
+
+    /// Internal method: Write out a dictionary frame.
+    ///
+    /// Dictionary frame format: [https://iipc.github.io/warc-specifications/specifications/warc-zstd/#dictionary-frame-format]
+    fn write_dict_frame(&mut self) -> io::Result<()> {
+        let inner = self.inner.as_mut().unwrap().get_mut();
+        let mut dict = self.dict.as_ref().unwrap().clone();
+
+        if self.options.compress_dictionary_frame {
+            let dict_enc = Vec::with_capacity(dict.len() / 2);
+            let mut encoder = Encoder::new(dict_enc, self.options.level)?;
+            encoder.include_contentsize(true)?;
+            encoder.include_checksum(true)?;
+            dict = encoder.finish()?;
+        }
+
+        // Write magic number, frame length, and (compressed) User_Data
+        inner.write_all(&0x184D2A5Du32.to_le_bytes())?;
+        inner.write_all(&(dict.len() as u32).to_le_bytes())?;
+        inner.write_all(&dict)
     }
 }
 
@@ -285,7 +449,7 @@ impl<T: Write + 'static> CompressingWriter for ZstdWriter<T> {
             return Ok(());
         }
         let inner = self.inner.take().unwrap().finish()?;
-        self.inner = Some(Self::new_with_options(inner, self.options)?);
+        self.inner = Some(Self::new_encoder_with_options(inner, self.dict.as_deref(), self.options)?);
         self.frame_started = false;
         Ok(())
     }
@@ -293,6 +457,10 @@ impl<T: Write + 'static> CompressingWriter for ZstdWriter<T> {
 
 impl<T: Write + 'static> Write for ZstdWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !self.stream_started && self.dict.is_some() {
+            self.write_dict_frame()?;
+            self.stream_started = true;
+        }
         self.frame_started = true;
         self.inner.as_mut().unwrap().write(buf)
     }

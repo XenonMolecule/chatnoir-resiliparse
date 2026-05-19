@@ -82,3 +82,71 @@ fn zstd_writer_propagates_inner_flush_errors() -> io::Result<()> {
 fn zstd_writer_propagates_inner_write_errors() -> io::Result<()> {
     test_writer_propagates_inner_write_errors(ZstdWriter::with_capacity)
 }
+
+// ===========================================================
+// Specific tests.
+// ===========================================================
+
+#[test]
+fn zstd_read_write_with_dictionary() -> io::Result<()> {
+    let plain = sample_data();
+
+    let decode = |encoded: io::Cursor<Vec<u8>>, dict| -> io::Result<Vec<u8>> {
+        let mut decoder = ZstdReader::with_dictionary(encoded, dict, None);
+        let mut decoded = Vec::with_capacity(plain.len());
+        decoder.read_to_end(&mut decoded)?;
+        Ok(decoded)
+    };
+
+    let dict = train_dictionary_from_samples(&[&plain].repeat(20), 50000)?;
+    let encoded = io::Cursor::new(Vec::new());
+    let mut encoder = ZstdWriter::with_dictionary(encoded, dict.clone(), None);
+    encoder.write_all(&plain)?;
+    let mut encoded = encoder.into_inner()?;
+
+    // Check dictionary frame being written.
+    assert!(encoded.get_ref().len() > 4);
+    assert_eq!(&encoded.get_ref()[..4], &0x184D2A5Du32.to_le_bytes());
+    assert_eq!(&encoded.get_ref()[8..12], [0x37, 0xA4, 0x30, 0xEC]);
+    encoded.rewind()?;
+
+    // Cannot decode with wrong dictionary.
+    assert_eq!(decompress(encoded.get_ref(), plain.len()).unwrap_err().to_string(), "Dictionary mismatch");
+
+    // Reader should automatically read dictionary frame.
+    let decoded = decode(encoded.clone(), dict.clone())?;
+    assert_eq!(decoded, plain);
+
+    // Overriding with wrong dictionary should break decompression.
+    let mut plain2 = plain.clone();
+    plain2.reverse();
+    let dict2 = train_dictionary_from_samples(&[&plain2].repeat(20), 50000)?;
+    let result = decode(encoded.clone(), dict2);
+    assert_eq!(result.unwrap_err().to_string(), "Dictionary mismatch");
+
+    // But work with correct dictionary.
+    let decoded = decode(encoded, dict.clone())?;
+    assert_eq!(decoded, plain);
+
+    // Test compressed dictionary frame
+    let encoded = io::Cursor::new(Vec::new());
+    let options = ZstdWriterOptions {
+        compress_dictionary_frame: true,
+        ..ZstdWriterOptions::default()
+    };
+    let mut encoder = ZstdWriter::with_dictionary(encoded, dict.clone(), Some(options));
+    encoder.write_all(&plain)?;
+    let mut encoded = encoder.into_inner()?;
+
+    // Check compressed dictionary frame being written.
+    assert!(encoded.get_ref().len() > 4);
+    assert_eq!(&encoded.get_ref()[..4], &0x184D2A5Du32.to_le_bytes());
+    assert_eq!(&encoded.get_ref()[8..12], &[0x28, 0xB5, 0x2F, 0xFD]);
+    encoded.rewind()?;
+
+    // Try to decompress
+    let decoded = decode(encoded.clone(), dict.clone())?;
+    assert_eq!(decoded, plain);
+
+    Ok(())
+}
