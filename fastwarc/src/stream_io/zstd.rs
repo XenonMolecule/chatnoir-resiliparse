@@ -157,10 +157,10 @@ impl<T: ReadSeek> ZstdReader<T> {
             [0x37, 0xA4, 0x30, 0xEC] => Ok(Some(dict)),
             // Compressed
             [0x28, 0xB5, 0x2F, 0xFD] => {
-                let dict_dec = Vec::with_capacity(dict_len * 2);
-                let mut decoder = Decoder::new(io::Cursor::new(dict_dec))?;
-                decoder.read_to_end(&mut dict)?;
-                Ok(Some(decoder.finish().into_inner().into_inner()))
+                let mut decoder = Decoder::new(io::Cursor::new(dict))?;
+                let mut dict_dec = Vec::with_capacity(dict_len * 2);
+                decoder.read_to_end(&mut dict_dec)?;
+                Ok(Some(dict_dec))
             }
             _ => Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid dictionary.")),
         }
@@ -430,6 +430,7 @@ impl<T: Write + 'static> ZstdWriter<T> {
             let mut encoder = Encoder::new(dict_enc, self.options.level)?;
             encoder.include_contentsize(true)?;
             encoder.include_checksum(true)?;
+            encoder.write_all(&dict)?;
             dict = encoder.finish()?;
         }
 
