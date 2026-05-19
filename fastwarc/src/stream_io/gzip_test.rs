@@ -58,12 +58,13 @@ fn gzip_reader_new_read_seek_and_stream_position() -> io::Result<()> {
 }
 
 #[test]
-fn gzip_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
-    test_reader_with_capacity_fill_buf_consume_and_into_inner(
-        compress_member,
-        GzipReader::with_capacity,
-        GzipReader::into_inner,
-    )
+fn gzip_reader_with_capacity_fill_buf_consume() -> io::Result<()> {
+    test_reader_with_capacity_fill_buf_consume(compress_member, GzipReader::with_capacity)
+}
+
+#[test]
+fn gzip_reader_inner_stream_position_and_into_inner() -> io::Result<()> {
+    test_reader_inner_stream_position_and_into_inner(compress_member, GzipReader::with_capacity, GzipReader::into_inner)
 }
 
 #[test]

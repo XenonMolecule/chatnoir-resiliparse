@@ -45,12 +45,13 @@ fn lz4_reader_new_read_seek_and_stream_position() -> io::Result<()> {
 }
 
 #[test]
-fn lz4_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
-    test_reader_with_capacity_fill_buf_consume_and_into_inner(
-        compress_frame,
-        Lz4Reader::with_capacity,
-        Lz4Reader::into_inner,
-    )
+fn lz4_reader_with_capacity_fill_buf_consume() -> io::Result<()> {
+    test_reader_with_capacity_fill_buf_consume(compress_frame, Lz4Reader::with_capacity)
+}
+
+#[test]
+fn lz4_reader_inner_stream_position_and_into_inner() -> io::Result<()> {
+    test_reader_inner_stream_position_and_into_inner(compress_frame, Lz4Reader::with_capacity, Lz4Reader::into_inner)
 }
 
 #[test]

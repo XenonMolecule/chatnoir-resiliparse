@@ -81,8 +81,8 @@ impl<T: ReadSeek> BrotliReader<T> {
     }
 
     /// Unwraps this [`BrotliReader`], returning the underlying reader.
-    ///
-    /// Note that any leftover data in the internal buffer is lost.
+    ///.
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
         self.inner.unwrap().into_inner().into_inner()
     }

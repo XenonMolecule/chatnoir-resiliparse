@@ -145,16 +145,14 @@ pub(crate) mod helpers {
         Ok(())
     }
 
-    pub fn test_reader_with_capacity_fill_buf_consume_and_into_inner<C, R, S, I>(
+    pub fn test_reader_with_capacity_fill_buf_consume<C, R, S>(
         compress_fn: C,
         reader_with_capacity_fn: R,
-        into_inner_fn: I,
     ) -> io::Result<()>
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
         S: DecompressingReader + BufReadSeek,
-        I: Fn(S) -> Cursor<Vec<u8>>,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -170,11 +168,39 @@ pub(crate) mod helpers {
         let buf = reader.fill_buf()?.to_vec();
         assert_eq!(buf, plain[3..3 + buf.len()]);
 
-        let fresh_reader = reader_with_capacity_fn(Cursor::new(compressed.clone()), 128);
-        let mut inner = into_inner_fn(fresh_reader);
-        assert_eq!(inner.stream_position()?, 0);
+        Ok(())
+    }
+
+    pub fn test_reader_inner_stream_position_and_into_inner<C, R, S, I>(
+        compress_fn: C,
+        reader_with_capacity_fn: R,
+        into_inner_fn: I,
+    ) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        R: Fn(Cursor<Vec<u8>>, usize) -> S,
+        S: DecompressingReader + BufReadSeek,
+        I: Fn(S) -> Cursor<Vec<u8>>,
+    {
+        let plain = sample_data();
+        let compressed = compress_fn(&plain)?;
+
+        // Test inner_stream_position()
+        let mut reader = reader_with_capacity_fn(Cursor::new(compressed.clone()), 128);
+        assert_eq!(reader.stream_position()?, 0);
+        assert_eq!(reader.inner_stream_position()?, 0);
+        let _ = reader.read(&mut [0; 5])?;
+        assert_eq!(reader.stream_position()?, 5);
+        assert!(reader.inner_stream_position()? >= 5);
+        assert_eq!(reader.inner_seek(SeekFrom::Start(0))?, 0);
+        assert_eq!(reader.inner_stream_position()?, 0);
+
+        let inner_pos = reader.inner_stream_position()?;
+        let mut inner = into_inner_fn(reader);
+        assert!(inner.stream_position()? >= inner_pos);
 
         let mut compressed_roundtrip = Vec::new();
+        inner.rewind()?;
         inner.read_to_end(&mut compressed_roundtrip)?;
         assert_eq!(compressed_roundtrip, compressed);
 

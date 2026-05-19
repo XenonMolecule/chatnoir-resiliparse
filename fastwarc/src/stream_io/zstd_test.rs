@@ -39,12 +39,13 @@ fn zstd_reader_new_read_seek_and_stream_position() -> io::Result<()> {
 }
 
 #[test]
-fn zstd_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
-    test_reader_with_capacity_fill_buf_consume_and_into_inner(
-        compress,
-        ZstdReader::with_capacity,
-        ZstdReader::into_inner,
-    )
+fn zstd_reader_with_capacity_fill_buf_consume() -> io::Result<()> {
+    test_reader_with_capacity_fill_buf_consume(compress, ZstdReader::with_capacity)
+}
+
+#[test]
+fn zstd_reader_inner_stream_position_and_into_inner() -> io::Result<()> {
+    test_reader_inner_stream_position_and_into_inner(compress, ZstdReader::with_capacity, ZstdReader::into_inner)
 }
 
 #[test]

@@ -98,10 +98,14 @@ pub trait DecompressingReader: WarcRead {
 
     /// Return the current seek position from the start of the compressed inner stream.
     /// The semantics are the same as [`io::Seek::stream_position()`].
+    ///
+    /// The returned position is the logical position on the compressed inner stream,
+    /// which does not consider input buffer sizes. The physical reader position may be
+    /// larger than this.
     fn inner_stream_position(&mut self) -> io::Result<u64>;
 
     /// Return the start position, in bytes, of the current member / frame
-    /// in the inner stream. If the compression format does not support
+    /// in the compressed inner stream. If the compression format does not support
     /// multi-member streams, this is always the beginning of the stream.
     ///
     /// # Returns
@@ -196,6 +200,8 @@ pub trait LimitedBufReadSeek: WarcRead + 'static {
     fn real_stream_position(&mut self) -> io::Result<u64>;
 
     /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
+    ///
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     fn into_inner(self) -> Box<dyn BufReadSeek>;
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.

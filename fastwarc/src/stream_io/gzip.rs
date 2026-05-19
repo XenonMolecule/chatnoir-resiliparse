@@ -131,7 +131,7 @@ impl<T: ReadSeek> GzipReader<T> {
 
     /// Unwraps this [`GzipReader`], returning the underlying reader.
     ///
-    /// Note that any leftover data in the internal buffer is lost.
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }

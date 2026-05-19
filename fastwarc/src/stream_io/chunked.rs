@@ -89,7 +89,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
 
     /// Unwraps this [`ChunkedReader`], returning the underlying reader.
     ///
-    /// Note that any leftover data in the internal buffer is lost.
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
         self.inner.unwrap().into_inner()
     }
@@ -138,7 +138,7 @@ impl<T: ReadSeek> DecompressingReader for ChunkedReader<T> {
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        self.inner.as_mut().unwrap().get_mut().stream_position()
+        self.inner.as_mut().unwrap().stream_position()
     }
 }
 
@@ -197,7 +197,7 @@ impl<T: ReadSeek> BufRead for ChunkedReader<T> {
                 self.chunk_read += n;
                 inner.consume(n);
 
-                // End of chunk, consume trailing \r\n and read again
+                // End of chunk, consume trailing CRLF
                 if self.chunk_read == self.chunk_size {
                     self.consume_chunk_end()?;
                 }

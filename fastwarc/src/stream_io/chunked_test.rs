@@ -77,12 +77,13 @@ fn chunked_reader_new_read_seek_and_stream_position() -> io::Result<()> {
 }
 
 #[test]
-fn chunked_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
-    test_reader_with_capacity_fill_buf_consume_and_into_inner(
-        chunk,
-        ChunkedReader::with_capacity,
-        ChunkedReader::into_inner,
-    )
+fn chunked_reader_with_capacity_fill_buf_consume() -> io::Result<()> {
+    test_reader_with_capacity_fill_buf_consume(chunk, ChunkedReader::with_capacity)
+}
+
+#[test]
+fn chunked_reader_inner_stream_position_and_into_inner() -> io::Result<()> {
+    test_reader_inner_stream_position_and_into_inner(chunk, ChunkedReader::with_capacity, ChunkedReader::into_inner)
 }
 
 #[test]

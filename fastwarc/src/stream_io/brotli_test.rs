@@ -43,12 +43,13 @@ fn brotli_reader_new_read_seek_and_stream_position() -> io::Result<()> {
 }
 
 #[test]
-fn brotli_reader_with_capacity_fill_buf_consume_and_into_inner() -> io::Result<()> {
-    test_reader_with_capacity_fill_buf_consume_and_into_inner(
-        compress,
-        BrotliReader::with_capacity,
-        BrotliReader::into_inner,
-    )
+fn brotli_reader_with_capacity_fill_buf_consume() -> io::Result<()> {
+    test_reader_with_capacity_fill_buf_consume(compress, BrotliReader::with_capacity)
+}
+
+#[test]
+fn brotli_reader_inner_stream_position_and_into_inner() -> io::Result<()> {
+    test_reader_inner_stream_position_and_into_inner(compress, BrotliReader::with_capacity, BrotliReader::into_inner)
 }
 
 #[test]
