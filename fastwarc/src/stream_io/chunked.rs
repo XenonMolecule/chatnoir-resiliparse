@@ -16,7 +16,7 @@ use crate::stream_io::{
     CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
 };
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Decoder for HTTP Transfer-Encoding: chunked
@@ -25,6 +25,8 @@ use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 /// Reader for chunked HTTP streams.
 pub struct ChunkedReader<T: ReadSeek> {
     inner: Option<BufReader<T>>,
+    out_buf: Vec<u8>,
+    out_buf_pos: usize,
     stream_pos: u64,
     chunk_size: usize,
     chunk_read: usize,
@@ -42,7 +44,7 @@ pub struct ChunkedReaderOptions {
 
 impl Default for ChunkedReaderOptions {
     fn default() -> Self {
-        Self { capacity: 8192 }
+        Self { capacity: 1024 }
     }
 }
 
@@ -51,7 +53,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
     ///
     /// Allocates an internal buffer holding chunks of the chunked inner stream.
     ///
-    /// The default buffer size is 8192 bytes. For custom buffer sizes, use [`Self::with_capacity()`].
+    /// The default buffer size is 1024 bytes. For custom buffer sizes, use [`Self::with_capacity()`].
     pub fn new(inner: T) -> Self {
         Self::with_options(inner, ChunkedReaderOptions::default())
     }
@@ -77,6 +79,8 @@ impl<T: ReadSeek> ChunkedReader<T> {
     pub fn with_options(inner: T, options: ChunkedReaderOptions) -> Self {
         Self {
             inner: Some(BufReader::with_capacity(options.capacity, inner)),
+            out_buf: Vec::with_capacity(options.capacity),
+            out_buf_pos: 0,
             stream_pos: 0,
             chunk_size: 0,
             chunk_read: 0,
@@ -94,60 +98,11 @@ impl<T: ReadSeek> ChunkedReader<T> {
 impl_fastwarc_stream!(ChunkedReader, WarcRead, ReadSeek);
 impl_stream_from_path!(ChunkedReader, ChunkedReaderOptions);
 
-impl<T: ReadSeek> ChunkedReader<T> {
-    fn read_chunk(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let inner = self.inner.as_mut().unwrap();
-
-        // New chunk
-        if self.chunk_read == 0 && self.chunk_size == 0 {
-            let mut header = Vec::with_capacity(8);
-            inner.read_until(b'\n', &mut header)?;
-            if header.is_empty() {
-                return Ok(0);
-            }
-            let header = String::from_utf8_lossy(&header);
-            let header = header.trim_ascii();
-            self.chunk_size = usize::from_str_radix(&header, 16)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid chunk header: {}", header)))?;
-
-            // EOF
-            if self.chunk_size == 0 {
-                return Ok(0);
-            }
-        }
-
-        // Within chunk
-        if self.chunk_read < self.chunk_size {
-            let remaining = self.chunk_size - self.chunk_read;
-            let in_buf = self.fill_buf()?;
-            let n = buf.len().min(remaining).min(in_buf.len());
-            buf.copy_from_slice(&in_buf[..n]);
-            self.chunk_read += n;
-            self.consume(n);
-            return Ok(n);
-        }
-
-        Ok(0)
-    }
-}
-
 impl<T: ReadSeek> io::Read for ChunkedReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = self.read_chunk(buf)?;
-        if n > 0 || self.chunk_size == 0 {
-            return Ok(n);
-        }
-
-        // End of chunk, consume trailing \r\n and read again
-        if self.chunk_read == self.chunk_size {
-            let l = self.fill_buf()?.len().min(1);
-            self.consume(l);
-            let l = self.fill_buf()?.len().min(1);
-            self.consume(l);
-            self.chunk_read = 0;
-            self.chunk_size = 0;
-        }
-        self.read_chunk(buf)
+        let n = self.fill_buf()?.read(buf)?;
+        self.consume(n);
+        Ok(n)
     }
 }
 
@@ -178,6 +133,7 @@ impl<T: ReadSeek> DecompressingReader for ChunkedReader<T> {
         let new_pos = self.inner.as_mut().unwrap().seek(pos)?;
         self.stream_pos = 0;
         self.chunk_size = 0;
+        self.out_buf_pos = 0;
         Ok(new_pos)
     }
 
@@ -186,14 +142,74 @@ impl<T: ReadSeek> DecompressingReader for ChunkedReader<T> {
     }
 }
 
+impl<T: ReadSeek> ChunkedReader<T> {
+    fn consume_chunk_end(&mut self) -> io::Result<()> {
+        let mut buf = [0u8; 2];
+        self.inner
+            .as_mut()
+            .unwrap()
+            .read_exact(&mut buf)
+            .map_err(|_| io::ErrorKind::UnexpectedEof)?;
+        self.chunk_read = 0;
+        self.chunk_size = 0;
+        Ok(())
+    }
+}
 impl<T: ReadSeek> BufRead for ChunkedReader<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner.as_mut().unwrap().fill_buf()
+        if !self.out_buf[self.out_buf_pos..].is_empty() {
+            return Ok(&self.out_buf[self.out_buf_pos..]);
+        }
+        loop {
+            let inner = self.inner.as_mut().unwrap();
+
+            // New chunk
+            if self.chunk_read == self.chunk_size {
+                let mut header = Vec::with_capacity(8);
+                inner.read_until(b'\n', &mut header)?;
+                if header.is_empty() {
+                    return Ok(&self.out_buf[..0]);
+                }
+                let header = String::from_utf8_lossy(&header);
+                let header = header.trim_ascii();
+                self.chunk_size = usize::from_str_radix(header, 16).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, format!("Invalid chunk header: '{}'", header))
+                })?;
+
+                // EOF
+                if self.chunk_size == 0 {
+                    self.consume_chunk_end()?;
+                    return Ok(&self.out_buf[..0]);
+                }
+            }
+
+            // Within chunk
+            if self.chunk_read < self.chunk_size {
+                let remaining = self.chunk_size - self.chunk_read;
+                let in_buf = inner.fill_buf()?;
+                let n = in_buf.len().min(remaining);
+                if n == 0 {
+                    return Err(io::ErrorKind::UnexpectedEof.into());
+                }
+                self.out_buf.resize(n, 0);
+                self.out_buf_pos = 0;
+                self.out_buf[..n].copy_from_slice(&in_buf[..n]);
+                self.chunk_read += n;
+                inner.consume(n);
+
+                // End of chunk, consume trailing \r\n and read again
+                if self.chunk_read == self.chunk_size {
+                    self.consume_chunk_end()?;
+                }
+
+                return Ok(&self.out_buf);
+            }
+        }
     }
 
     fn consume(&mut self, amount: usize) {
         self.stream_pos += amount as u64;
-        self.inner.as_mut().unwrap().consume(amount);
+        self.out_buf_pos += amount;
     }
 }
 
@@ -334,6 +350,6 @@ impl<T: Write + 'static> Drop for ChunkedWriter<T> {
 // Tests
 // ===========================================================
 
-// #[cfg(test)]
-// #[path = "chunked_test.rs"]
-// mod chunked_test;
+#[cfg(test)]
+#[path = "chunked_test.rs"]
+mod chunked_test;

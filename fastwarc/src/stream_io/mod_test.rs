@@ -95,6 +95,18 @@ pub(crate) mod helpers {
     // Test generics.
     // ===========================================================
 
+    pub fn test_compress_decompress_roundtrip_validation<C, D>(compress_fn: C, decompress_fn: D) -> io::Result<()>
+    where
+        C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+        D: Fn(&[u8], usize) -> io::Result<Vec<u8>>,
+    {
+        let data = b"ABC".repeat(200);
+        let compressed = compress_fn(&data)?;
+        assert_ne!(data, compressed);
+        assert_eq!(data, decompress_fn(&compressed, data.len())?);
+        Ok(())
+    }
+
     pub fn test_reader_new_read_seek_and_stream_position<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,

@@ -28,6 +28,11 @@ fn decompress(mut data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
+#[test]
+fn brotli_compress_decompress_roundtrip_validation() -> io::Result<()> {
+    test_compress_decompress_roundtrip_validation(compress, decompress)
+}
+
 // ===========================================================
 // Generic tests.
 // ===========================================================

@@ -43,6 +43,11 @@ fn decompress_member(data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
     Ok(decompressed.to_vec())
 }
 
+#[test]
+fn gzip_compress_decompress_roundtrip_validation() -> io::Result<()> {
+    test_compress_decompress_roundtrip_validation(compress_member, decompress_member)
+}
+
 // ===========================================================
 // Generic tests.
 // ===========================================================

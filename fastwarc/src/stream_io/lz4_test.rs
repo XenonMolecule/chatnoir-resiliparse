@@ -30,6 +30,11 @@ fn decompress_frame(data: &[u8], expected_len: usize) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
+#[test]
+fn lz4_compress_decompress_roundtrip_validation() -> io::Result<()> {
+    test_compress_decompress_roundtrip_validation(compress_frame, decompress_frame)
+}
+
 // ===========================================================
 // Generic tests.
 // ===========================================================

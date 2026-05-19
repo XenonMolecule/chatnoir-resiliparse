@@ -24,6 +24,11 @@ fn decompress(data: &[u8], _expected_len: usize) -> io::Result<Vec<u8>> {
     decode_all(data)
 }
 
+#[test]
+fn zstd_compress_decompress_roundtrip_validation() -> io::Result<()> {
+    test_compress_decompress_roundtrip_validation(compress, decompress)
+}
+
 // ===========================================================
 // Generic tests.
 // ===========================================================
