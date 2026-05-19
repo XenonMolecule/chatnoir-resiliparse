@@ -88,6 +88,31 @@ fn zstd_writer_propagates_inner_write_errors() -> io::Result<()> {
 // ===========================================================
 
 #[test]
+fn zstd_reader_fill_buf_crosses_frame_boundaries() -> io::Result<()> {
+    let first_plain = b"first member data\n".repeat(32);
+    let second_plain = b"second member payload\n".repeat(24);
+
+    let mut combined = compress(&first_plain)?;
+    combined.extend_from_slice(&compress(&second_plain)?);
+
+    let mut reader = ZstdReader::with_capacity(io::Cursor::new(combined), 32);
+    let mut out = Vec::with_capacity(first_plain.len() + second_plain.len());
+
+    loop {
+        let buf = reader.fill_buf()?;
+        if buf.is_empty() {
+            break;
+        }
+        let chunk_len = buf.len().min(7);
+        out.extend_from_slice(&buf[..chunk_len]);
+        reader.consume(chunk_len);
+    }
+
+    assert_eq!(out, [first_plain, second_plain].concat());
+    Ok(())
+}
+
+#[test]
 fn zstd_read_write_with_dictionary() -> io::Result<()> {
     let plain = sample_data();
 

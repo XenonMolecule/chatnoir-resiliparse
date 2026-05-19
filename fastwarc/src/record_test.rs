@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::BufReadSeek;
+use crate::stream_io::zstd::ZstdWriterOptions;
+use crate::stream_io::{BufReadSeek, CompressingWriter};
 use crate::stream_io::{LimitedBufReader, gzip, lz4};
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
@@ -1381,6 +1382,58 @@ fn archive_iterator_record_offsets() -> io::Result<()> {
 
     let warc_lz4 = get_fixture_path("warcfile.warc.lz4");
     iterate_archive_members_with_offsets(|| Ok(lz4::Lz4Reader::new(File::open(warc_lz4.clone())?)))?;
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_zstd_dict() -> io::Result<()> {
+    let dict = zstd::train_dictionary_from_samples(&[&b"ABC"].repeat(100), 32 * 1024)?;
+
+    // Frame 1 (+ Dictionary)
+    let mut writer = zstd::ZstdWriter::with_dictionary(io::Cursor::new(Vec::new()), dict.clone(), None);
+    writer.write_all(&warc_record_data("response", "<urn:uuid:rec0>", None, b"ABC"))?;
+    writer.finish()?;
+
+    // Frame 2: skippable frame with arbitrary content (allowed by spec, must be skipped)
+    // Zstd frames with magic numbers 0x184D2A50..0x184D2A5F are skippable.
+    let mut writer = writer.into_inner()?;
+    writer.write_all(&0x184D2A5Fu32.to_le_bytes())?;
+    writer.write_all(&20u32.to_le_bytes())?;
+    writer.write_all(&b"A".repeat(20))?;
+
+    // Frame 3
+    let opts = Some(ZstdWriterOptions {
+        write_dictionary_frame: false,
+        ..ZstdWriterOptions::default()
+    });
+    let mut writer = zstd::ZstdWriter::with_dictionary(writer, dict.clone(), opts);
+    writer.write_all(&warc_record_data("response", "<urn:uuid:rec1>", None, b"ABC"))?;
+    writer.finish()?;
+
+    // Frame 4: empty (allowed by spec, must be skipped)
+    writer.write(b"")?;
+    writer.finish()?;
+
+    // Frame 5
+    writer.write_all(&warc_record_data("response", "<urn:uuid:rec2>", None, b"ABC"))?;
+    writer.finish()?;
+
+    let mut encoded = writer.into_inner()?;
+    encoded.rewind()?;
+
+    // Confirm that decompression without dictionary fails.
+    assert_eq!(::zstd::decode_all(encoded.clone()).unwrap_err().to_string(), "Dictionary mismatch");
+
+    // ZstdReader should load dictionary frame automatically and keep it for all iterations.
+    let reader = Box::new(zstd::ZstdReader::new(encoded));
+    let mut count = 0;
+    for (i, rec) in ArchiveIterator::new(reader).enumerate() {
+        let rec = rec?;
+        assert_eq!(rec.borrow().record_id().unwrap().to_string(), format!("<urn:uuid:rec{}>", i));
+        count += 1;
+    }
+    assert_eq!(count, 3);
 
     Ok(())
 }
