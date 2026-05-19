@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::stream_io::{
-    BufReadSeek, LimitedBufReadSeek, LimitedBufReader, LimitedBufReaderOuterWrap, WarcRead, brotli, gzip, zstd,
+    BufReadSeek, LimitedBufReadSeek, LimitedBufReader, LimitedBufReaderOuterWrap, WarcRead, brotli, chunked, gzip, zstd,
 };
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
@@ -948,6 +948,8 @@ impl WarcRecord {
                         reader_any = downcast!(reader_any, brotli::BrotliReader);
                     } else if reader_any.is::<zstd::ZstdReader<Box<dyn WarcRead>>>() {
                         reader_any = downcast!(reader_any, zstd::ZstdReader);
+                    } else if reader_any.is::<chunked::ChunkedReader<Box<dyn WarcRead>>>() {
+                        reader_any = downcast!(reader_any, chunked::ChunkedReader);
                     } else {
                         break;
                     }
@@ -1386,9 +1388,7 @@ impl WarcRecord {
                 }
                 b"br" => wrapped = Box::new(brotli::BrotliReader::new(wrapped)),
                 b"zstd" => wrapped = Box::new(zstd::ZstdReader::new(wrapped)),
-                b"chunked" if transfer => {
-                    todo!("Implement chunked transfer encoding")
-                }
+                b"chunked" if transfer => wrapped = Box::new(chunked::ChunkedReader::new(wrapped)),
                 b"identity" | b"" => (),
                 _ => {
                     return Err(io::Error::other(format!(

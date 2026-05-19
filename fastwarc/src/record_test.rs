@@ -987,7 +987,7 @@ fn record_encoded_http_payload() -> io::Result<()> {
     let mut w = gzip::GzipWriter::new(Vec::new());
     w.write_all(&payload_raw)?;
     let encoded = w.into_inner()?;
-    let decoded = read_record(encoded.as_slice(), Some("gzip"), None, AutoDecode::None)?;
+    let decoded = read_record(&encoded, Some("gzip"), None, AutoDecode::None)?;
     assert_eq!(decoded, encoded);
 
     // Transfer-Encoding: gzip, Content-Encoding: gzip (decode: All)
@@ -997,7 +997,7 @@ fn record_encoded_http_payload() -> io::Result<()> {
     let mut w = gzip::GzipWriter::new(Vec::new());
     w.write_all(&encoded)?;
     let encoded = w.into_inner()?;
-    let decoded = read_record(encoded.as_slice(), Some("gzip"), Some("gzip"), AutoDecode::All)?;
+    let decoded = read_record(&encoded, Some("gzip"), Some("gzip"), AutoDecode::All)?;
     assert_eq!(decoded, payload_raw);
 
     // Transfer-Encoding: gzip, Content-Encoding: br (decode: Transfer)
@@ -1010,7 +1010,7 @@ fn record_encoded_http_payload() -> io::Result<()> {
     let mut w = brotli::BrotliWriter::new(Vec::new());
     w.write_all(&payload_raw)?;
     let encoded_content = w.into_inner()?;
-    let decoded = read_record(encoded.as_slice(), Some("gzip"), Some("br"), AutoDecode::TransferEncoding)?;
+    let decoded = read_record(&encoded, Some("gzip"), Some("br"), AutoDecode::TransferEncoding)?;
     assert_eq!(decoded, encoded_content);
 
     // Transfer-Encoding: zstd, deflate (decode: Transfer)
@@ -1020,7 +1020,24 @@ fn record_encoded_http_payload() -> io::Result<()> {
     let mut w = gzip::GzipWriter::new_deflate(Vec::new());
     w.write_all(&encoded)?;
     let encoded = w.into_inner()?;
-    let decoded = read_record(encoded.as_slice(), Some("zstd, deflate"), None, AutoDecode::TransferEncoding)?;
+    let decoded = read_record(&encoded, Some("zstd, deflate"), None, AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Transfer-Encoding: chunked (decode: Transfer)
+    let mut w = chunked::ChunkedWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let decoded = read_record(&encoded, Some("chunked"), None, AutoDecode::TransferEncoding)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Transfer-Encoding: chunked, Content-Encoding: gzip (decode: All)
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let encoded = w.into_inner()?;
+    let mut w = chunked::ChunkedWriter::new(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    let decoded = read_record(&encoded, Some("chunked"), Some("gzip"), AutoDecode::All)?;
     assert_eq!(decoded, payload_raw);
 
     // Transfer-Encoding: identity (decode: Transfer)
@@ -1050,7 +1067,10 @@ fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
     let mut w = brotli::BrotliWriter::new(Vec::new());
     w.write_all(&encoded)?;
     let encoded = w.into_inner()?;
-    data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &encoded, Some("zstd, br"), None));
+    let mut w = chunked::ChunkedWriter::new(Vec::new());
+    w.write_all(&encoded)?;
+    let encoded = w.into_inner()?;
+    data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &encoded, Some("zstd, br, chunked"), None));
 
     // Record 2
     let mut w = brotli::BrotliWriter::new(Vec::new());
