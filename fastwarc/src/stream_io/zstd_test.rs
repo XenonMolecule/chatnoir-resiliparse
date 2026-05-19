@@ -101,7 +101,7 @@ fn zstd_read_write_with_dictionary() -> io::Result<()> {
         Ok(decoded)
     };
 
-    let dict = train_dictionary_from_samples(&[&plain].repeat(20), 50000)?;
+    let dict = train_dictionary_from_samples(&[&plain].repeat(20), 32 * 1024)?;
     let encoded = io::Cursor::new(Vec::new());
     let mut encoder = ZstdWriter::with_dictionary(encoded, dict.clone(), None);
     encoder.write_all(&plain)?;
@@ -123,7 +123,7 @@ fn zstd_read_write_with_dictionary() -> io::Result<()> {
     // Overriding with wrong dictionary should break decompression.
     let mut plain2 = plain.clone();
     plain2.reverse();
-    let dict2 = train_dictionary_from_samples(&[&plain2].repeat(20), 50000)?;
+    let dict2 = train_dictionary_from_samples(&[&plain2].repeat(20), 32 * 1024)?;
     let result = decode(encoded.clone(), Some(dict2));
     assert_eq!(result.unwrap_err().to_string(), "Dictionary mismatch");
 

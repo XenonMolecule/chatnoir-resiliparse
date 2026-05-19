@@ -140,11 +140,10 @@ impl<T: ReadSeek> ZstdReader<T> {
             .read_exact(&mut dict_len)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Failed to read dictionary size."))?;
         let dict_len = u32::from_le_bytes(dict_len) as usize;
-        if dict_len > 16 * 1024 * 1024 {
-            // Safeguard: Don't allow dicts above 16MB (spec says 8MB should be max)
+        if dict_len > 1024 * 1024 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Dictionary size too large."));
         } else if dict_len < 4 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Dictionary size too small."));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Dictionary truncated."));
         }
 
         // Read dictionary contents
@@ -371,8 +370,7 @@ impl<T: Write + 'static> ZstdWriter<T> {
     /// Specifying a custom dictionary will write a dictionary frame before the first record frame.
     /// `options.compress_dictionary_frame` determines whether that dictionary frame is compressed.
     ///
-    /// Per the spec, a dictionary should not be larger than 8MB (usually *much* less). Use one of
-    /// the `train_dictionary_*` functions for training one.
+    /// Use one of the `train_dictionary_*` functions for training a custom dictionary.
     ///
     /// # Arguments
     ///
