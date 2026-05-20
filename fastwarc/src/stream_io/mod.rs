@@ -208,6 +208,8 @@ pub trait LimitedBufReadSeek: WarcRead + 'static {
     /// The results are appended to the provided buffer.
     ///
     /// Apart from the line length limitation, the behavior is the same as [`io::BufRead::read_line()`].
+    /// Unlike `Read::take(max_line_len).read_until(b'\n', buf)`, the read is guaranteed to be complete.
+    /// The function will not return until a linefeed is found or EOF is reached.
     ///
     /// # Arguments
     ///

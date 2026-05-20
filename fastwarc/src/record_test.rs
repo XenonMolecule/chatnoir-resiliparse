@@ -1045,6 +1045,30 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
 }
 
 #[test]
+fn archive_iterator_quirks_mode() -> io::Result<()> {
+    let mut record_data = warc_record_data("resource", "<urn:uuid:a>", None, b"ABC");
+    record_data.extend_from_slice(b"corrupted-data-without-linefeed");
+    record_data.extend_from_slice(&warc_record_data("resource", "<urn:uuid:b>", None, b"ABC"));
+    record_data.extend_from_slice(b"foo\n");
+    record_data.extend_from_slice(&warc_record_data("resource", "<urn:uuid:c>", None, b"ABC"));
+    record_data.extend_from_slice(b"bar\r\n\r\n");
+    record_data.extend_from_slice(&warc_record_data("resource", "<urn:uuid:d>", None, b"ABC"));
+
+    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone())));
+    assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
+    assert!(reader.next().unwrap().is_err());
+
+    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone()))).with_quirks_mode(true);
+    assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
+    // b skipped due to corrupted WARC/1.1 header start
+    assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:c>");
+    assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:d>");
+    assert!(reader.next().is_none());
+
+    Ok(())
+}
+
+#[test]
 fn record_encoded_http_payload() -> io::Result<()> {
     let payload_raw = b"ABCDEF".repeat(2000);
 

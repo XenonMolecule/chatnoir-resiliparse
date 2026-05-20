@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -288,14 +288,17 @@ impl HeaderMap {
     /// Number of bytes read from the reader or IO error
     pub fn parse(&mut self, reader: &mut dyn BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
         let mut bytes_consumed = 0;
-        let mut line = Vec::with_capacity(64);
+        let mut line = Vec::with_capacity(128);
         let mut expect_first_line = has_status_line;
+        const MAX_LINE_LEN: usize = 8192;
 
         loop {
             line.clear();
-            let n = reader.read_until(b'\n', &mut line)?;
+            let n = reader.take(MAX_LINE_LEN as u64).read_until(b'\n', &mut line)?;
             if n == 0 {
                 break;
+            } else if n == MAX_LINE_LEN && !line.ends_with(b"\n") {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Header line length out of range."));
             }
             bytes_consumed += n;
 
@@ -1137,21 +1140,15 @@ impl WarcRecord {
         let mut line = Vec::with_capacity(256);
         self.headers.clear();
 
-        let mut is_first_line = true;
         loop {
             line.clear();
 
             // Try to find first WARC/* header
             self.stream_pos = reader.real_stream_position()?;
-            let n = reader.read_until(b'\n', &mut line)?;
+            let n = reader.take(256).read_until(b'\n', &mut line)?;
             if n == 0 {
-                return if is_first_line {
-                    // Indicate regular EOF with Ok(0) if this is before the first line.
-                    Ok(0)
-                } else {
-                    // Otherwise indicate unexpected EOF if header lines have already been read.
-                    Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Stream ended while reading WARC header"))
-                };
+                // EOF
+                return Ok(0);
             }
             bytes_read += n;
 
@@ -1161,7 +1158,6 @@ impl WarcRecord {
                 // Skip empty lines
                 continue;
             }
-            is_first_line = false;
 
             // WARC/1.x header
             if matches!(trimmed, b"WARC/1.1" | b"WARC/1.0")
