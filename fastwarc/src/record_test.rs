@@ -1058,7 +1058,7 @@ fn archive_iterator_quirks_mode() -> io::Result<()> {
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
     assert!(reader.next().unwrap().is_err());
 
-    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone()))).with_quirks_mode(true);
+    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data))).with_quirks_mode(true);
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
     // b skipped due to corrupted WARC/1.1 header start
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:c>");
