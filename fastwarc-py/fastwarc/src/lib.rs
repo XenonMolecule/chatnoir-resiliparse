@@ -18,8 +18,8 @@ mod warc;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-#[pymodule(name = "_fastwarc")]
-pub mod fastwarc {
+#[pymodule]
+pub mod _fastwarc {
     use super::*;
 
     #[pymodule_init]
@@ -37,7 +37,7 @@ pub mod fastwarc {
         Ok(())
     }
 
-    #[pymodule]
+    #[pymodule(module = "fastwarc")]
     pub mod stream_io {
         #[pymodule_export]
         pub use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, ReaderPy, WriterPy};
@@ -58,7 +58,7 @@ pub mod fastwarc {
         pub use crate::stream_io::chunked::{ChunkedReaderPy, ChunkedWriterPy};
     }
 
-    #[pymodule]
+    #[pymodule(module = "fastwarc")]
     pub mod warc {
         use super::*;
 
