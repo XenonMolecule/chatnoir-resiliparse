@@ -151,7 +151,7 @@ macro_rules! impl_stream_from_path {
             #[doc = ""]
             #[doc = "* `path` - file path"]
             pub fn from_path(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
-                Ok(Self::new(std::fs::File::open(path)?))
+                Self::from_path_with_options(path, Default::default())
             }
 
             #[doc = concat!("Create a [`", stringify!($StreamType), "`] from a file path.")]
@@ -206,6 +206,8 @@ pub trait LimitedBufReadSeek: WarcRead + 'static {
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.
     /// The results are appended to the provided buffer.
+    ///
+    /// Apart from the line length limitation, the behavior is the same as [`io::BufRead::read_line()`].
     ///
     /// # Arguments
     ///

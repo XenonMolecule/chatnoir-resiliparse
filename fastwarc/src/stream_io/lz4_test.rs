@@ -36,6 +36,19 @@ fn lz4_compress_decompress_roundtrip_validation() -> io::Result<()> {
 }
 
 // ===========================================================
+// Specific tests.
+// ===========================================================
+
+#[test]
+fn lz4_reader_from_path() {
+    let warc_file = get_fixture_path("warcfile.warc.lz4");
+    let mut reader = Lz4Reader::from_path(warc_file).unwrap();
+    let mut buf = vec![0; 5];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, b"WARC/");
+}
+
+// ===========================================================
 // Generic tests.
 // ===========================================================
 

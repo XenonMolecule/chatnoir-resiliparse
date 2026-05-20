@@ -26,7 +26,7 @@ use std::fs::File;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
-/// Helper for getting path to external test fixture.
+/// Helper for getting path to external test fixtures.
 fn get_fixture_path(name: &str) -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests/fixtures");

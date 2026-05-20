@@ -107,6 +107,15 @@ fn gzip_writer_propagates_inner_write_errors() -> io::Result<()> {
 // ===========================================================
 
 #[test]
+fn gzip_reader_from_path() {
+    let warc_file = get_fixture_path("warcfile.warc.gz");
+    let mut reader = GzipReader::from_path(warc_file).unwrap();
+    let mut buf = vec![0; 5];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, b"WARC/");
+}
+
+#[test]
 fn gzip_reader_returns_error_for_invalid_gzip_data() {
     let mut reader = GzipReader::new(Cursor::new(vec![0, 1, 2, 3, 4, 5, 6, 7]));
     let err = reader.fill_buf().unwrap_err();
