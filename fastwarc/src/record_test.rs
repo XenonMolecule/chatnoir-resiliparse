@@ -879,10 +879,7 @@ fn verify_record_digest_error_kinds() -> io::Result<()> {
     let mut stream_error_record = WarcRecord::new();
     stream_error_record.init_headers(3, Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-stream-error"));
     stream_error_record.headers_mut().set("WARC-Block-Digest", "sha1:AAAA");
-    assert!(matches!(
-        stream_error_record.verify_block_digest(false),
-        Err(DigestError::StreamError(_))
-    ));
+    assert!(matches!(stream_error_record.verify_block_digest(false), Err(DigestError::StreamError(_))));
 
     Ok(())
 }
@@ -1084,6 +1081,46 @@ fn record_encoded_http_payload() -> io::Result<()> {
     // Content-Encoding: unsupported (decode: Content)
     let decoded = read_record(payload_raw.as_slice(), None, Some("unsupported"), AutoDecode::ContentEncoding);
     assert!(decoded.is_err());
+
+    Ok(())
+}
+
+#[test]
+fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
+    let payload_raw = b"ABCDEF".repeat(2000);
+
+    // Encode payload and check that output starts with Gzip magic bytes.
+    let mut w = gzip::GzipWriter::new(Vec::new());
+    w.write_all(&payload_raw)?;
+    let payload_encoded = w.into_inner()?;
+    assert_eq!(payload_encoded[..2], [0x1F, 0x8B]);
+
+    // Create HTTP WARC record with encoded payload.
+    let data = http_response_warc_data_encoded("<urn:uuid:abc>", &payload_encoded, Some("gzip"), None);
+    let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(data)))?;
+
+    // Freeze record
+    rec.freeze()?;
+
+    // Parse HTTP and decode content.
+    rec.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
+    let mut decoded = Vec::with_capacity(payload_raw.len());
+    rec.reader_mut().unwrap().read_to_end(&mut decoded)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Detach and rewind reader.
+    let mut detached = rec.detach_reader().unwrap();
+    detached.rewind()?;
+
+    // Create new record from stream and HTTP without content decoding.
+    let mut rec = WarcRecord::from_reader(detached)?;
+    rec.parse_http_with_decode_opts(AutoDecode::None)?;
+
+    // Test that stream begins with Gzip magic bytes
+    let mut magic_bytes = [0u8; 2];
+    rec.reader_mut().unwrap().read_exact(&mut magic_bytes)?;
+    assert_eq!(magic_bytes, payload_encoded[..2]);
+    assert_ne!(magic_bytes, payload_raw[..2]);
 
     Ok(())
 }
