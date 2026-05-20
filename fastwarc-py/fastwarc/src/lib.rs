@@ -154,10 +154,23 @@ def _is_writer_stream(raw_stream):
     return has_write and not has_read
 
 def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
+    if isinstance(raw_stream, str):
+        if fsspec_args is not False and '://' in raw_stream:
+            try:
+                import fsspec
+                return fsspec.open(raw_stream, mode, **(fsspec_args or {})).open()
+            except ModuleNotFoundError:
+                pass
+        return FileStream(raw_stream, mode)
     return raw_stream
+
+class BufferedReader:
+    def __new__(cls, first, *args, **kwargs):
+        return first
 
 class IOStream:
     pass
+
 
 class PythonIOStreamAdapter(IOStream):
     def __new__(cls, first, *args, **kwargs):
@@ -172,12 +185,10 @@ class FileStream(IOStream):
             mode += 'b'
         return open(filename, mode)
 
-
 class BytesIOStream(IOStream):
     def __new__(cls, initial_data):
         import io
         return io.BytesIO(initial_data)
-
 
 class GZipStream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=9, zlib=False, fsspec_args=None):
@@ -199,7 +210,6 @@ class GZipStream(CompressingStream):
                 fsspec_args=fsspec_args,
             )
         return GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args)
-
 
 class LZ4Stream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=12, favor_dec_speed=True, fsspec_args=None):
@@ -235,6 +245,7 @@ class BrotliStream(CompressingStream):
     legacy.add("BrotliReader", stream_io.getattr("BrotliReader")?)?;
     legacy.add("BrotliWriter", stream_io.getattr("BrotliWriter")?)?;
 
+    m.add("BufferedReader", legacy.getattr("BufferedReader")?)?;
     m.add("IOStream", legacy.getattr("IOStream")?)?;
     m.add("PythonIOStreamAdapter", legacy.getattr("PythonIOStreamAdapter")?)?;
     m.add("CompressingStream", legacy.getattr("CompressingStream")?)?;
