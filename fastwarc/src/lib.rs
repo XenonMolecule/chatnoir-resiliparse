@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod record;
 pub mod stream_io;
+pub mod warc;

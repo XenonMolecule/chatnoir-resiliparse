@@ -2138,5 +2138,5 @@ fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
 // ===========================================================
 
 #[cfg(test)]
-#[path = "record_test.rs"]
-mod record_test;
+#[path = "warc_test.rs"]
+mod warc_test;

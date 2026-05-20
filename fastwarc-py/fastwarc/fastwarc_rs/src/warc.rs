@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, ReaderPy, python_whence_to_seekfrom, wrap_reader_stream};
-use fastwarc::record::DigestError::StreamError;
-use fastwarc::record::{ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use fastwarc::stream_io::{BufReadSeek, LimitedBufReadSeek};
+use fastwarc::warc::DigestError::StreamError;
+use fastwarc::warc::{ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
