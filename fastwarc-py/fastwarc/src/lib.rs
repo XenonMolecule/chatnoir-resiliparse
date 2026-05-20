@@ -15,29 +15,16 @@
 mod stream_io;
 mod warc;
 
-use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
-use std::ffi::CString;
-use std::path::PathBuf;
+use pyo3::types::PyModule;
 
-#[pymodule]
+#[pymodule(name = "_fastwarc")]
 pub mod fastwarc {
     use super::*;
 
     #[pymodule_init]
     pub fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
         let stream_io = m.getattr("stream_io")?;
-        let warc = m.getattr("warc")?;
-
-        // Register submodules to make them importable.
-        // https://github.com/PyO3/pyo3/issues/759#issuecomment-2282197848
-        let parent_name: String = m.getattr("__name__")?.extract()?;
-        let sys_modules = m.py().import("sys")?.getattr("modules")?;
-        sys_modules.set_item(format!("{parent_name}.stream_io"), &stream_io)?;
-        sys_modules.set_item(format!("{parent_name}.warc"), &warc)?;
-
-        enable_submodule_imports(m)?;
 
         // Top-level exports
         m.add("GzipReader", stream_io.getattr("GzipReader")?)?;
@@ -47,25 +34,11 @@ pub mod fastwarc {
         m.add("ZstdReader", stream_io.getattr("ZstdReader")?)?;
         m.add("ZstdWriter", stream_io.getattr("ZstdWriter")?)?;
 
-        // Legacy exports
-        m.add("FileStream", stream_io.getattr("FileStream")?)?;
-        m.add("GZipStream", stream_io.getattr("GZipStream")?)?;
-        m.add("LZ4Stream", stream_io.getattr("LZ4Stream")?)?;
-        m.add("FastWARCError", stream_io.getattr("FastWARCError")?)?;
-        m.add("StreamError", stream_io.getattr("StreamError")?)?;
-
         Ok(())
     }
 
     #[pymodule]
     pub mod stream_io {
-        use super::*;
-
-        #[pymodule_init]
-        fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
-            create_legacy_shims(m, m)
-        }
-
         #[pymodule_export]
         pub use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, ReaderPy, WriterPy};
 
@@ -110,57 +83,4 @@ pub mod fastwarc {
         #[pymodule_export]
         pub use crate::warc::{ArchiveIteratorPy, HeaderMapPy, WarcRecordPy, WarcRecordTypePy};
     }
-}
-
-/// Helper for making on-disk submodules importable by making the extension behave like a package..
-fn enable_submodule_imports(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let py = m.py();
-    let module_file: String = m.getattr("__file__")?.extract()?;
-    let Some(package_dir) = PathBuf::from(module_file).parent().map(|p| p.to_path_buf()) else {
-        return Ok(());
-    };
-    let package_dir = package_dir.to_string_lossy().into_owned();
-    let submodule_search_locations = PyList::new(py, [&package_dir])?;
-
-    // Mark extension as package-like by adding __path__ and __spec__.
-    m.setattr("__path__", &submodule_search_locations)?;
-    let spec = m.getattr("__spec__")?;
-    if !spec.is_none() {
-        spec.setattr("submodule_search_locations", &submodule_search_locations)?;
-    }
-
-    Ok(())
-}
-
-/// Helper for creating legacy shims in stream_io module
-fn create_legacy_shims(m: &Bound<'_, PyModule>, stream_io: &Bound<'_, PyAny>) -> PyResult<()> {
-    let py = m.py();
-
-    m.add("FastWARCError", py.get_type::<PyOSError>())?;
-    m.add("StreamError", py.get_type::<PyOSError>())?;
-
-    let filename = CString::new("<fastwarc_legacy_shims>")?;
-    let module_name = CString::new("fastwarc_legacy_shims")?;
-    let code = CString::new(include_str!("stream_io/legacy_shims.py"))?;
-    let legacy = PyModule::from_code(py, code.as_c_str(), filename.as_c_str(), module_name.as_c_str())?;
-
-    legacy.add("GzipReader", stream_io.getattr("GzipReader")?)?;
-    legacy.add("GzipWriter", stream_io.getattr("GzipWriter")?)?;
-    legacy.add("Lz4Reader", stream_io.getattr("Lz4Reader")?)?;
-    legacy.add("Lz4Writer", stream_io.getattr("Lz4Writer")?)?;
-    legacy.add("BrotliReader", stream_io.getattr("BrotliReader")?)?;
-    legacy.add("BrotliWriter", stream_io.getattr("BrotliWriter")?)?;
-
-    m.add("BufferedReader", legacy.getattr("BufferedReader")?)?;
-    m.add("IOStream", legacy.getattr("IOStream")?)?;
-    m.add("PythonIOStreamAdapter", legacy.getattr("PythonIOStreamAdapter")?)?;
-    m.add("CompressingStream", legacy.getattr("CompressingStream")?)?;
-    m.add("FileStream", legacy.getattr("FileStream")?)?;
-    m.add("BytesIOStream", legacy.getattr("BytesIOStream")?)?;
-    m.add("GZipStream", legacy.getattr("GZipStream")?)?;
-    m.add("LZ4Stream", legacy.getattr("LZ4Stream")?)?;
-    m.add("BrotliStream", legacy.getattr("BrotliStream")?)?;
-    m.add("wrap_stream", legacy.getattr("wrap_stream")?)?;
-
-    Ok(())
 }

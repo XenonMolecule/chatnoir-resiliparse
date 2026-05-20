@@ -2,11 +2,10 @@ import os
 import pytest
 import html as pyhtml
 
-from fastwarc.warc import ArchiveIterator, WarcRecordType
-from fastwarc.stream_io import FileStream
+from fastwarc.legacy.warc import ArchiveIterator, WarcRecordType
+from fastwarc.legacy.stream_io import FileStream
 from resiliparse.parse.encoding import detect_encoding
 from resiliparse.parse.html import *
-
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
 
@@ -293,7 +292,7 @@ def test_empty_attributes():
     assert input_tree.body.get_element_by_id('foo') is not None
     assert input_tree.body.get_element_by_id('foox') is None
     assert len(input_tree.body.get_elements_by_class_name('foo')) == 1
-    assert len(input_tree.body.get_elements_by_class_name('')) == 0     # This doesn't match anything
+    assert len(input_tree.body.get_elements_by_class_name('')) == 0  # This doesn't match anything
     assert len(input_tree.body.get_elements_by_attr('class', 'foo')) == 1
     assert len(input_tree.body.get_elements_by_attr('class', '')) == 2
     assert len(input_tree.body.get_elements_by_attr('id', '')) == 2

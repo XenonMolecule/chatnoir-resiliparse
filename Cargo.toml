@@ -1,14 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "fastwarc",
+    "fastwarc-rs",
     "fastwarc-py/fastwarc",
-    "resiliparse",
+    "resiliparse-rs",
     "resiliparse-py/resiliparse/parse/_html_rs",
 ]
 default-members = [
-    "fastwarc",
-    "resiliparse",
+    "fastwarc-rs",
+    "resiliparse-rs",
 ]
 
 [workspace.package]

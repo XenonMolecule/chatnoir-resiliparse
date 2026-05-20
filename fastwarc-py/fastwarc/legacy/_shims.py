@@ -1,4 +1,37 @@
-# from fastwarc.stream_io import *
+# Copyright 2026 Janek Bevendorff
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Legacy shims for making the new Rust extension work with the old type names
+
+__all__ = [
+    'wrap_stream',
+    'BufferedReader',
+    'IOStream',
+    'PythonIOStreamAdapter',
+    'CompressingStream',
+    'FileStream',
+    'BytesIOStream',
+    'GZipStream',
+    'LZ4Stream',
+    'BrotliStream',
+    'FastWARCError',
+    'StreamError',
+]
+
+FastWARCError = OSError
+
+StreamError = OSError
 
 
 def _is_writer_stream(raw_stream):
@@ -23,6 +56,7 @@ def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
             except ModuleNotFoundError:
                 pass
         return FileStream(raw_stream, mode)
+
     return raw_stream
 
 
@@ -59,6 +93,8 @@ class BytesIOStream(IOStream):
 
 class GZipStream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=9, zlib=False, fsspec_args=None):
+        from fastwarc.stream_io import GzipReader, GzipWriter
+
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
         if isinstance(raw_stream, str):
             if is_writer:
@@ -69,6 +105,7 @@ class GZipStream(CompressingStream):
                     fsspec_args=fsspec_args,
                 )
             return GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args)
+
         if is_writer or _is_writer_stream(raw_stream):
             return GzipWriter(
                 raw_stream,
@@ -81,11 +118,14 @@ class GZipStream(CompressingStream):
 
 class LZ4Stream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=12, favor_dec_speed=True, fsspec_args=None):
+        from fastwarc.stream_io import Lz4Reader, Lz4Writer
+
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
         if isinstance(raw_stream, str):
             if is_writer:
                 return Lz4Writer(raw_stream, fsspec_args=fsspec_args)
             return Lz4Reader(raw_stream, fsspec_args=fsspec_args)
+
         if is_writer or _is_writer_stream(raw_stream):
             return Lz4Writer(raw_stream, fsspec_args=fsspec_args)
         return Lz4Reader(raw_stream, fsspec_args=fsspec_args)
@@ -93,11 +133,15 @@ class LZ4Stream(CompressingStream):
 
 class BrotliStream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', fsspec_args=None):
+        from fastwarc.stream_io import BrotliReader, BrotliWriter
+
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
+
         if isinstance(raw_stream, str):
             if is_writer:
                 return BrotliWriter(raw_stream, fsspec_args=fsspec_args)
             return BrotliReader(raw_stream, fsspec_args=fsspec_args)
+
         if is_writer or _is_writer_stream(raw_stream):
             return BrotliWriter(raw_stream, fsspec_args=fsspec_args)
         return BrotliReader(raw_stream, fsspec_args=fsspec_args)

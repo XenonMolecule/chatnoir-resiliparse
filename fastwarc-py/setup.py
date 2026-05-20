@@ -131,7 +131,7 @@ def main():
         ext_modules=get_ext_modules(),
         rust_extensions=[
             RustExtension(
-                target="fastwarc",
+                target="fastwarc._fastwarc",
                 path="fastwarc/Cargo.toml",
                 binding=Binding.PyO3
             )
