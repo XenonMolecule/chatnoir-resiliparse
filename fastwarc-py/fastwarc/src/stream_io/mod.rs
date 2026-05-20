@@ -16,7 +16,7 @@ use self::gzip::{GzipReaderPy, GzipWriterPy};
 use self::lz4::{Lz4ReaderPy, Lz4WriterPy};
 use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyString};
+use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyString};
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
@@ -311,12 +311,19 @@ impl BufRead for PyReaderAdapter {
                 PyReaderType::Lz4Reader(inner) => native_read_call!(inner, py, Lz4ReaderPy, self.buf),
                 PyReaderType::Other(inner) => {
                     let bound = inner.bind(py).call_method1("read", (self.buf.len(),))?;
-                    let data = bound
-                        .cast::<PyBytes>()
-                        .map_err(|_| PyTypeError::new_err("read() must return bytes"))?
-                        .as_bytes();
-                    self.buf[..data.len()].copy_from_slice(data);
-                    Ok(data.len())
+
+                    let len = if let Ok(bytes) = bound.cast::<PyBytes>() {
+                        let data = bytes.as_bytes();
+                        self.buf[..data.len()].copy_from_slice(data);
+                        data.len()
+                    } else if let Ok(bytearray) = bound.cast::<PyByteArray>() {
+                        let data = bytearray.to_vec();
+                        self.buf[..data.len()].copy_from_slice(&data);
+                        data.len()
+                    } else {
+                        return Err(PyTypeError::new_err("read() must return bytes").into());
+                    };
+                    Ok(len)
                 }
             }
         })?;
