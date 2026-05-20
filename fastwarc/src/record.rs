@@ -765,28 +765,6 @@ pub enum AutoDecode {
     All,
 }
 
-impl TryFrom<&str> for AutoDecode {
-    type Error = &'static str;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(match value {
-            "none" => AutoDecode::None,
-            "transfer" => AutoDecode::TransferEncoding,
-            "content" => AutoDecode::ContentEncoding,
-            "all" => AutoDecode::All,
-            _ => return Err("Invalid auto-decode mode"),
-        })
-    }
-}
-
-impl TryFrom<String> for AutoDecode {
-    type Error = &'static str;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        AutoDecode::try_from(value.as_ref())
-    }
-}
-
 impl fmt::Debug for WarcRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut dbg = f.debug_struct("WarcRecord");

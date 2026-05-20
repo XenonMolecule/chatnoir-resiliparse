@@ -14,7 +14,7 @@
 
 use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, ReaderPy, python_whence_to_seekfrom, wrap_reader_stream};
 use fastwarc::record::DigestError::StreamError;
-use fastwarc::record::{ArchiveIteratorThreadSafe, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use fastwarc::record::{ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use fastwarc::stream_io::{BufReadSeek, LimitedBufReadSeek};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
@@ -690,7 +690,13 @@ impl ArchiveIteratorPy {
             .with_quirks_mode(quirks_mode)
             .with_parse_http(parse_http)
             .with_verify_digests(verify_digests)
-            .with_decode_http_payload(auto_decode.try_into().map_err(PyValueError::new_err)?);
+            .with_decode_http_payload(match auto_decode {
+                "none" => AutoDecode::None,
+                "transfer" => AutoDecode::TransferEncoding,
+                "content" => AutoDecode::ContentEncoding,
+                "all" => AutoDecode::All,
+                _ => return Err(PyValueError::new_err(format!("Invalid value for auto_decode: '{}'", auto_decode))),
+            });
 
         Ok(Self {
             inner,
