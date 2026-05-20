@@ -132,10 +132,10 @@ def get_ext_modules():
 
 
 # Copy FastWARC headers
-fastwarc_headers = glob.glob(os.path.join(ROOT_DIR, '..', 'fastwarc-py', 'fastwarc', "*.pxd"))
+fastwarc_headers = glob.glob(os.path.join(ROOT_DIR, '..', 'fastwarc-py', 'fastwarc', 'legacy', "*.pxd"))
 if fastwarc_headers:
-    os.makedirs(os.path.join(ROOT_DIR, 'fastwarc'), exist_ok=True)
-    [shutil.copy2(f, os.path.join(ROOT_DIR, 'fastwarc')) for f in fastwarc_headers]
+    os.makedirs(os.path.join(ROOT_DIR, 'fastwarc', 'legacy'), exist_ok=True)
+    [shutil.copy2(f, os.path.join(ROOT_DIR, 'fastwarc', 'legacy')) for f in fastwarc_headers]
 
 setup(
     ext_modules=get_ext_modules(),
