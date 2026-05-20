@@ -1388,8 +1388,12 @@ impl WarcRecord {
         }
 
         if is_frozen {
-            // Frozen records don't need to be unwrapped again later
-            let wrapped = LimitedBufReader::new(wrapped, None);
+            // Frozen records don't need to be unwrapped later: eagerly decode stream to enable backward seeking.
+            let mut buf = Vec::with_capacity(self.content_length as usize * 4);
+            wrapped.read_to_end(&mut buf)?;
+            buf.shrink_to_fit();
+            self.content_length = buf.len() as u64;
+            let wrapped = LimitedBufReader::new(Box::new(io::Cursor::new(buf)), None);
             self.reader = Some(ReaderType::Frozen((wrapped, frozen_orig)));
         } else {
             let wrapped = LimitedBufReaderOuterWrap::new(wrapped, None);

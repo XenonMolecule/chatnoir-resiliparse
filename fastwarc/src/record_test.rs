@@ -1096,8 +1096,8 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     assert_eq!(payload_encoded[..2], [0x1F, 0x8B]);
 
     // Create HTTP WARC record with encoded payload.
-    let data = http_response_warc_data_encoded("<urn:uuid:abc>", &payload_encoded, Some("gzip"), None);
-    let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(data)))?;
+    let record_data = http_response_warc_data_encoded("<urn:uuid:abc>", &payload_encoded, Some("gzip"), None);
+    let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(record_data.clone())))?;
 
     // Freeze record
     rec.freeze()?;
@@ -1105,6 +1105,12 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     // Parse HTTP and decode content.
     rec.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
     let mut decoded = Vec::with_capacity(payload_raw.len());
+    rec.reader_mut().unwrap().read_to_end(&mut decoded)?;
+    assert_eq!(decoded, payload_raw);
+
+    // Rewind frozen stream and read again (same result)
+    decoded.clear();
+    rec.reader_mut().unwrap().rewind()?;
     rec.reader_mut().unwrap().read_to_end(&mut decoded)?;
     assert_eq!(decoded, payload_raw);
 
@@ -1121,6 +1127,22 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     rec.reader_mut().unwrap().read_exact(&mut magic_bytes)?;
     assert_eq!(magic_bytes, payload_encoded[..2]);
     assert_ne!(magic_bytes, payload_raw[..2]);
+
+    // Test freezing and eager decoding don't mess with record boundaries.
+    let record_data = [record_data.clone(), record_data].concat();
+    let mut count = 0;
+    for r in ArchiveIterator::new(Box::new(io::Cursor::new(record_data))) {
+        r?.with_mut(|r| -> io::Result<()> {
+            r.freeze()?;
+            r.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
+            let mut buf = Vec::with_capacity(r.content_length() as usize);
+            r.reader_mut().unwrap().read_to_end(&mut buf)?;
+            assert_eq!(buf, payload_raw);
+            count += 1;
+            Ok(())
+        })?;
+    }
+    assert_eq!(count, 2);
 
     Ok(())
 }
