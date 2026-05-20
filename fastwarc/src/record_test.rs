@@ -856,6 +856,38 @@ fn verify_record_digests() -> io::Result<()> {
 }
 
 #[test]
+fn verify_record_digest_error_kinds() -> io::Result<()> {
+    let payload = b"ABC".to_vec();
+    let mut record = WarcRecord::new();
+    record.init_headers(payload.len() as u64, Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-errors"));
+    record.set_bytes_payload(payload);
+
+    record.headers_mut().remove("WARC-Block-Digest");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::Missing(_))));
+
+    record.headers_mut().set("WARC-Block-Digest", "sha999:AAAA");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::Unsupported(_))));
+
+    record.headers_mut().set("WARC-Block-Digest", "bad-format");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
+
+    record.headers_mut().set("WARC-Block-Digest", "sha1:_____");
+    assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
+
+    assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
+
+    let mut stream_error_record = WarcRecord::new();
+    stream_error_record.init_headers(3, Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-stream-error"));
+    stream_error_record.headers_mut().set("WARC-Block-Digest", "sha1:AAAA");
+    assert!(matches!(
+        stream_error_record.verify_block_digest(false),
+        Err(DigestError::StreamError(_))
+    ));
+
+    Ok(())
+}
+
+#[test]
 fn archive_iterator() -> io::Result<()> {
     let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
     let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");

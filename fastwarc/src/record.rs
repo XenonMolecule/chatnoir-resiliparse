@@ -24,7 +24,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
-use std::fmt::{Display, Formatter};
 use std::io::{self, Read};
 use std::ops::Deref;
 use std::rc::Rc;
@@ -747,18 +746,6 @@ pub enum AutoDecode {
     TransferEncoding,
     ContentEncoding,
     All,
-}
-
-impl Display for DigestError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            DigestError::Missing(s) => write!(f, "Missing digest header: {}", s),
-            DigestError::Unsupported(s) => write!(f, "Unsupported digest algorithm: {}", s),
-            DigestError::FormatError(s) => write!(f, "Digest format error: {}", s),
-            DigestError::NoPayload(s) => write!(f, "Missing payload: {}", s),
-            DigestError::StreamError(s) => write!(f, "Stream error: {}", s),
-        }
-    }
 }
 
 impl fmt::Debug for WarcRecord {
