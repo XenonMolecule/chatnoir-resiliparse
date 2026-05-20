@@ -14,6 +14,8 @@
 
 # Legacy shims for making the new Rust extension work with the old type names
 
+import warnings
+
 __all__ = [
     'wrap_stream',
     'BufferedReader',
@@ -34,6 +36,10 @@ FastWARCError = OSError
 StreamError = OSError
 
 
+def _warn_deprecated(msg):
+    warnings.warn(msg, FutureWarning, 3)
+
+
 def _is_writer_stream(raw_stream):
     mode = getattr(raw_stream, "mode", None)
     if isinstance(mode, str):
@@ -48,6 +54,7 @@ def _is_writer_stream(raw_stream):
 
 
 def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
+    _warn_deprecated("wrap_stream is deprecated and will be removed in a future version.")
     if isinstance(raw_stream, str):
         if fsspec_args is not False and '://' in raw_stream:
             try:
@@ -62,24 +69,36 @@ def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
 
 class BufferedReader:
     def __new__(cls, first, *args, **kwargs):
+        _warn_deprecated("BufferedReader is deprecated and will be removed in a future version.")
         return first
 
 
 class IOStream:
-    pass
+    def __init__(self, *_, **__):
+        _warn_deprecated(
+            "IOStream is deprecated and will be removed in a future version. "
+            "Use Reader and Writer instead.")
 
 
 class PythonIOStreamAdapter(IOStream):
     def __new__(cls, first, *args, **kwargs):
+        _warn_deprecated("IOStream is deprecated and will be removed in a future version.")
         return first
 
 
 class CompressingStream(IOStream):
-    pass
+    def __init__(self, *_, **__):
+        super().__init__(*_, **__)
+        _warn_deprecated(
+            "CompressingStream is deprecated and will be removed in a future version. "
+            "Use fastwarc.stream_io.DecompressingReader instead.")
 
 
 class FileStream(IOStream):
     def __new__(cls, filename, mode='rb'):
+        _warn_deprecated(
+            "FileStream is deprecated and will be removed in a future version. "
+            "Use open() or raw file paths instead.")
         if 'b' not in mode:
             mode += 'b'
         return open(filename, mode)
@@ -87,12 +106,17 @@ class FileStream(IOStream):
 
 class BytesIOStream(IOStream):
     def __new__(cls, initial_data):
+        _warn_deprecated("BytesIOStream is deprecated and will be removed in a future version.")
         import io
         return io.BytesIO(initial_data)
 
 
 class GZipStream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=9, zlib=False, fsspec_args=None):
+        _warn_deprecated(
+            "GZipStream is deprecated and will be removed in a future version. "
+            "Use GzipReader and GzipWriter instead.")
+
         from fastwarc.stream_io import GzipReader, GzipWriter
 
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
@@ -118,6 +142,10 @@ class GZipStream(CompressingStream):
 
 class LZ4Stream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', compression_level=12, favor_dec_speed=True, fsspec_args=None):
+        _warn_deprecated(
+            "LZ4Stream is deprecated and will be removed in a future version. "
+            "Use Lz4Reader and Lz4Writer instead.")
+
         from fastwarc.stream_io import Lz4Reader, Lz4Writer
 
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
@@ -133,6 +161,10 @@ class LZ4Stream(CompressingStream):
 
 class BrotliStream(CompressingStream):
     def __new__(cls, raw_stream, mode='r', fsspec_args=None):
+        _warn_deprecated(
+            "BrotliStream is deprecated and will be removed in a future version. "
+            "Use BrotliReader and BrotliWriter instead.")
+
         from fastwarc.stream_io import BrotliReader, BrotliWriter
 
         is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
