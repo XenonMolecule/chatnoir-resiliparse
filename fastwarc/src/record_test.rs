@@ -1415,7 +1415,7 @@ fn archive_iterator_zstd_dict() -> io::Result<()> {
     writer.finish()?;
 
     // Frame 4: empty (allowed by spec, must be skipped)
-    writer.write(b"")?;
+    let _ = writer.write(b"")?;
     writer.finish()?;
 
     // Frame 5
