@@ -85,19 +85,49 @@ class CompressingWriter(Writer):
 
 class GzipReader(DecompressingReader):
     def __new__(cls, inner: Union[Reader, BinaryIO, _GenericReader, PathLike, str],
-                buffer_size: int = 4096) -> Self: ...
+                buffer_size=4096, zlib=False, fsspec_args=None) -> Self: ...
 
 
 class GzipWriter(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str], compression_level: int = 9,
-                buffer_size: int = 8192) -> Self: ...
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                compression_level=9, buffer_size=8192, zlib=False, fsspec_args=None) -> Self: ...
+
+
+class ZstdReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, fsspec_args=None, dictionary=None) -> Self: ...
+
+
+class ZstdWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size=8192, fsspec_args=None, dictionary=None, compress_dictionary_frame=False) -> Self: ...
 
 
 class Lz4Reader(DecompressingReader):
     def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
-                buffer_size: int = 4096) -> Self: ...
+                buffer_size=4096, fsspec_args=None) -> Self: ...
 
 
 class Lz4Writer(CompressingWriter):
     def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
-                buffer_size: int = 8192) -> Self: ...
+                buffer_size=8192, fsspec_args=None) -> Self: ...
+
+
+class BrotliReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, fsspec_args=None) -> Self: ...
+
+
+class BrotliWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size=8192, fsspec_args=None) -> Self: ...
+
+
+class ChunkedReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=1024, fsspec_args=None) -> Self: ...
+
+
+class ChunkedWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                min_chunk_size=512, fsspec_args=None) -> Self: ...

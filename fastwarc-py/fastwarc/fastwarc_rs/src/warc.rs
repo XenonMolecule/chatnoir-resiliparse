@@ -162,7 +162,7 @@ impl HeaderMapPy {
         self.inner.append(key, value);
     }
 
-    pub fn asdict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+    pub fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         for (key, value) in self.inner.to_map() {
             dict.set_item(key.as_ref(), value)?;
@@ -170,8 +170,16 @@ impl HeaderMapPy {
         Ok(dict)
     }
 
-    pub fn astuples<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+    pub fn asdict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        self.to_dict(py)
+    }
+
+    pub fn to_tuples<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         self.items(py)
+    }
+
+    pub fn astuples<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        self.to_tuples(py)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -311,7 +319,7 @@ impl HeaderMapPy {
     }
 
     pub fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
-        Ok(PyIterator::from_object(self.items(py)?.as_any())?)
+        PyIterator::from_object(self.items(py)?.as_any())
     }
 
     pub fn __len__(&self) -> usize {
@@ -663,6 +671,7 @@ impl ArchiveIteratorPy {
         func_filter=None,
         verify_digests=false,
         quirks_mode=false,
+        strict_mode=None,
         auto_decode="none",
         fsspec_args=None
     ))]
@@ -676,6 +685,7 @@ impl ArchiveIteratorPy {
         func_filter: Option<Py<PyAny>>,
         verify_digests: bool,
         quirks_mode: bool,
+        strict_mode: Option<bool>, // deprecated
         auto_decode: &str,
         fsspec_args: Option<Py<PyAny>>,
     ) -> PyResult<Self> {
@@ -687,7 +697,7 @@ impl ArchiveIteratorPy {
             |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
         )?;
         let inner = ArchiveIteratorThreadSafe::new(reader)
-            .with_quirks_mode(quirks_mode)
+            .with_quirks_mode(strict_mode.unwrap_or(quirks_mode))
             .with_parse_http(parse_http)
             .with_verify_digests(verify_digests)
             .with_decode_http_payload(match auto_decode {

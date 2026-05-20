@@ -63,8 +63,14 @@ class HeaderMap:
 
     def append(self, key: str, value: str): ...
 
+    def to_dict(self) -> Dict[str, str]: ...
+    
+    # deprecated
     def asdict(self) -> Dict[str, str]: ...
 
+    def to_tuples(self) -> Tuple[Tuple[str, str], ...]: ...
+
+    # deprecated
     def astuples(self) -> Tuple[Tuple[str, str], ...]: ...
 
     def is_empty(self) -> bool: ...
@@ -180,8 +186,10 @@ class ArchiveIterator(Iterable[WarcRecord]):
             max_content_length: int = -1,
             func_filter: Optional[Callable[[WarcRecord], bool]] = None,
             verify_digests: bool = False,
-            strict_mode: bool = True,
+            quirks_mode: bool = False,
+            strict_mode: Optional[bool] = None,  # deprecated
             auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none',
+            fsspec_args=None,
     ) -> Self: ...
 
     def __iter__(self) -> Iterator[WarcRecord]: ...
