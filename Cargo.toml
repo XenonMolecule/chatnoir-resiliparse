@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "fastwarc",
-    "fastwarc-py/fastwarc/fastwarc_rs",
+    "fastwarc-py/fastwarc",
     "resiliparse",
     "resiliparse-py/resiliparse/parse/_html_rs",
 ]

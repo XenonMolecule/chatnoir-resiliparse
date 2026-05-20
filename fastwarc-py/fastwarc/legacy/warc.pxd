@@ -16,7 +16,7 @@ from libc.stdint cimport uint16_t
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
-from fastwarc.stream_io cimport IOStream, BufferedReader
+from fastwarc.legacy.stream_io cimport IOStream, BufferedReader
 
 
 cpdef enum WarcRecordType:

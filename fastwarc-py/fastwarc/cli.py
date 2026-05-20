@@ -24,9 +24,9 @@ import urllib.request
 import click
 from tqdm import tqdm
 
-from fastwarc.stream_io import FileStream, StreamError, FastWARCError, PythonIOStreamAdapter
-from fastwarc.warc import ArchiveIterator, WarcRecordType
-from fastwarc.tools import CompressionAlg, detect_compression_algorithm, wrap_warc_stream, \
+from fastwarc.legacy.stream_io import FileStream, StreamError, FastWARCError, PythonIOStreamAdapter
+from fastwarc.legacy.warc import ArchiveIterator, WarcRecordType
+from fastwarc.legacy.tools import CompressionAlg, detect_compression_algorithm, wrap_warc_stream, \
     recompress_warc_interactive, verify_digests
 
 
@@ -288,7 +288,7 @@ botocore = None
 s3 = None
 
 
-def _init_s3(endpoint_url, aws_access_key,  aws_secret_key=None):
+def _init_s3(endpoint_url, aws_access_key, aws_secret_key=None):
     global boto3, botocore, s3
 
     if s3 is not None:

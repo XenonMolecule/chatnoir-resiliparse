@@ -36,9 +36,9 @@ from resiliparse_inc.cctype cimport isspace
 from resiliparse_inc.cstdlib cimport strtol
 from resiliparse_inc.utility cimport move
 
-from fastwarc.stream_io cimport BufferedReader, BytesIOStream, CompressingStream, GZipStream, BrotliStream, \
+from fastwarc.legacy.stream_io cimport BufferedReader, BytesIOStream, CompressingStream, GZipStream, BrotliStream, \
     IOStream, wrap_stream
-from fastwarc.stream_io import ReaderStaleError
+from fastwarc.legacy.stream_io import ReaderStaleError
 
 __all__ = [
     'ArchiveIterator',

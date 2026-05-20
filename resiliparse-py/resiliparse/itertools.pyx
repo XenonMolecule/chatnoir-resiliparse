@@ -15,7 +15,7 @@
 # distutils: language = c++
 
 import typing as t
-from fastwarc.warc cimport ArchiveIterator
+from fastwarc.legacy.warc cimport ArchiveIterator
 
 __all__ = [
     'progress_loop',

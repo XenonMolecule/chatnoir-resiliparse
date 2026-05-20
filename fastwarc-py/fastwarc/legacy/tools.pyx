@@ -14,9 +14,9 @@
 
 # distutils: language = c++
 
-from fastwarc.stream_io cimport IOStream, GZipStream, LZ4Stream, FileStream, PythonIOStreamAdapter
-from fastwarc.stream_io import StreamError
-from fastwarc.warc cimport ArchiveIterator, WarcRecordType
+from fastwarc.legacy.stream_io cimport IOStream, GZipStream, LZ4Stream, FileStream, PythonIOStreamAdapter
+from fastwarc.legacy.stream_io import StreamError
+from fastwarc.legacy.warc cimport ArchiveIterator, WarcRecordType
 
 __all__ = [
     'CompressionAlg',

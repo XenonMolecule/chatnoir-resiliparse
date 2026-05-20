@@ -43,7 +43,9 @@ impl ReaderPy {
         Self {}
     }
 
-    pub fn read(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (size=-1))]
+    pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Py<PyAny>> {
+        let _ = size;
         Ok(py.NotImplemented())
     }
 

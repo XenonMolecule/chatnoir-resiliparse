@@ -1,17 +1,3 @@
-# Copyright 2026 Janek Bevendorff
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from datetime import datetime
 from typing import (
     Any,
@@ -65,31 +51,18 @@ class WarcHeaderMap:
     status_line: str
 
     def append(self, key: str, value: str) -> None: ...
-
     def asdict(self) -> Dict[str, str]: ...
-
     def astuples(self) -> Tuple[Tuple[str, str], ...]: ...
-
     def clear(self) -> None: ...
-
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]: ...
-
     def items(self) -> Iterator[Tuple[str, str]]: ...
-
     def keys(self) -> KeysView[str]: ...
-
     def values(self) -> ValuesView[str]: ...
-
     def write(self, stream: IOStream) -> None: ...
-
     def __getitem__(self, item: str) -> str: ...
-
     def __iter__(self) -> Iterator[Tuple[str, str]]: ...
-
     def __len__(self) -> int: ...
-
     def __setitem__(self, key: str, value: str) -> None: ...
-
     def __contains__(self, item: str) -> bool: ...
 
 
@@ -110,43 +83,36 @@ class WarcRecord:
     stream_pos: int
 
     def init_headers(
-            self, content_length: int = 0, record_type: WarcRecordType = no_type, record_urn: Optional[bytes] = None
+        self, content_length: int = 0, record_type: WarcRecordType = no_type, record_urn: Optional[bytes] = None
     ) -> None: ...
-
     def freeze(self) -> bool: ...
-
     def set_bytes_content(self, content: bytes) -> None: ...
-
     def parse_http(self, strict_mode: bool = True, auto_decode: str = "none") -> None: ...
-
     def verify_block_digest(self, consume: bool = False) -> bool: ...
-
     def verify_payload_digest(self, consume: bool = False) -> bool: ...
-
     def write(
-            self,
-            stream: Union[IOStream, BinaryIO, _GenericIOStream],
-            checksum_data: bool = False,
-            payload_digest: Optional[bytes] = None,
-            chunk_size: int = 16384
+        self,
+        stream: Union[IOStream, BinaryIO, _GenericIOStream],
+        checksum_data: bool = False,
+        payload_digest: Optional[bytes] = None,
+        chunk_size: int = 16384
     ) -> int: ...
+
 
 
 class ArchiveIterator(Iterable[WarcRecord]):
     def __init__(
-            self,
-            stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
-            record_types: WarcRecordType = any_type,
-            parse_http: bool = True,
-            min_content_length: int = -1,
-            max_content_length: int = -1,
-            func_filter: Optional[Callable[[WarcRecord], bool]] = None,
-            verify_digests: bool = False,
-            strict_mode: bool = True,
-            auto_decode: Literal["none", "content", "transfer", "all"] = "none",
-            fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
+        self,
+        stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
+        record_types: WarcRecordType = any_type,
+        parse_http: bool = True,
+        min_content_length: int = -1,
+        max_content_length: int = -1,
+        func_filter: Optional[Callable[[WarcRecord], bool]] = None,
+        verify_digests: bool = False,
+        strict_mode: bool = True,
+        auto_decode: Literal["none", "content", "transfer", "all"] = "none",
+        fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
     ) -> None: ...
-
     def __iter__(self) -> Iterator[WarcRecord]: ...
-
     def __next__(self) -> WarcRecord: ...

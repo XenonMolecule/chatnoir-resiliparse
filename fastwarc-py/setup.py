@@ -110,10 +110,10 @@ def get_cython_args():
 
 def get_ext_modules():
     fastwarc_extensions = [
-        Extension('fastwarc.warc', sources=['fastwarc/warc.pyx']),
-        Extension('fastwarc.stream_io', sources=['fastwarc/stream_io.pyx'],
+        Extension('fastwarc.legacy.warc', sources=['fastwarc/legacy/warc.pyx']),
+        Extension('fastwarc.legacy.stream_io', sources=['fastwarc/legacy/stream_io.pyx'],
                   libraries=['z', 'lz4']),
-        Extension('fastwarc.tools', sources=['fastwarc/tools.pyx'])
+        Extension('fastwarc.legacy.tools', sources=['fastwarc/legacy/tools.pyx'])
     ]
 
     return cythonize(fastwarc_extensions, **get_cython_args())
@@ -130,8 +130,8 @@ setup(
     ext_modules=get_ext_modules(),
     rust_extensions=[
         RustExtension(
-            target="fastwarc.fastwarc_rs._fastwarc_rs",
-            path="fastwarc/fastwarc_rs/Cargo.toml",
+            target="fastwarc",
+            path="fastwarc/Cargo.toml",
             binding=Binding.PyO3
         )
     ],

@@ -28,7 +28,7 @@ import apache_beam.transforms.window as window
 import boto3
 import botocore.client as boto_client
 
-from fastwarc.warc import ArchiveIterator
+from fastwarc.legacy.warc import ArchiveIterator
 from resiliparse.beam.fileio import MatchFiles
 from resiliparse.itertools import warc_retry
 
@@ -83,6 +83,7 @@ class ReadAllWarcs(beam.PTransform):
     :param always_keep_meta: always return record metadata, even if they exceed ``max_content_length``
                              (from ``warc_args``), but strip them of their payload
     """
+
     def __init__(self,
                  warc_args: t.Dict[str, t.Any] = None,
                  with_filename: bool = True,
@@ -191,7 +192,7 @@ class _ReadWarc(beam.DoFn):
         return io.BufferedReader(DownloaderStream(downloader, mode='rb'), buffer_size=buffer_size)
 
 
-class _Boto3Client(boto3_client.Client):    # pragma: no cover
+class _Boto3Client(boto3_client.Client):  # pragma: no cover
     """Boto3 client with custom settings."""
 
     # noinspection PyMissingConstructor

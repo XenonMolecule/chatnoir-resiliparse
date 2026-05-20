@@ -1,105 +1,133 @@
+# Copyright 2026 Janek Bevendorff
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from os import PathLike
 from types import TracebackType
-from typing import Any, ContextManager, Dict, Literal, Optional, Type, Union, BinaryIO, Protocol
-
-class _GenericIOStream(Protocol):
-    def write(self, data: bytes) -> int: ...
-    def flush(self) -> None: ...
-    def read(self, size: int) -> bytes: ...
-    def seek(self, offset: int) -> int: ...
-    def close(self) -> None: ...
-    def tell(self) -> int: ...
+from typing import BinaryIO, ContextManager, Optional, Protocol, Type, Self, Union
 
 
-class IOStream(ContextManager[IOStream]):
-    def read(self, size: int) -> bytes: ...
-    def write(self, data: bytes) -> int: ...
-    def close(self) -> None: ...
-    def flush(self) -> None: ...
-    def seek(self, offset: int) -> None: ...
-    def tell(self) -> int: ...
-    def __enter__(self) -> IOStream: ...
-    def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        traceback: Optional[TracebackType]
-    ) -> None: ...
-
-
-def wrap_stream(
-        raw_stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
-        mode: str = 'rb',
-        fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
-) -> IOStream: ...
-
-
-class BufferedReader:
-    def __init__(
-        self, stream: IOStream, buf_size: int = 65536, negotiate_stream: bool = True
-    ) -> None: ...
-    def close(self) -> None: ...
-    def consume(self, size: int = -1) -> int: ...
+class _GenericReader(Protocol):
     def read(self, size: int = -1) -> bytes: ...
-    def readline(self, crlf: bool = True, max_line_len: int = 8192) -> bytes: ...
+
+    def seek(self, offset: int, whence: int = 0) -> int: ...
+
     def tell(self) -> int: ...
 
-
-class BytesIOStream(IOStream):
-    def __init__(self, initial_data: Union[bytes, None] = None) -> None: ...
-    def getvalue(self) -> bytes: ...
+    def close(self) -> None: ...
 
 
-class FileStream(IOStream):
-    def __init__(self, filename: str, mode: str = 'rb') -> None: ...
+class _GenericWriter(Protocol):
+    def write(self, data: bytes) -> int: ...
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
 
 
-class CompressingStream(IOStream):
-    def begin_member(self) -> int: ...
-    def end_member(self) -> int: ...
+class Reader(ContextManager[Reader]):
+    def read(self, size: int = -1) -> bytes: ...
 
+    def seek(self, offset: int, whence: int = 0) -> int: ...
 
-class BrotliStream(CompressingStream):
-    def __init__(
+    def tell(self) -> int: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
             self,
-            raw_stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
-            quality: int = 11,
-            lgwin: int = 22,
-            lgblock: int = 0,
-            fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
+            exc_type: Optional[Type[BaseException]],
+            exc: Optional[BaseException],
+            traceback: Optional[TracebackType]
     ) -> None: ...
 
 
-class GZipStream(CompressingStream):
-    def __init__(
-            self, raw_stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
-            compression_level: int = 9,
-            zlib: bool = False,
-            fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
-    ) -> None: ...
+class DecompressingReader(Reader):
+    def inner_seek(self, offset: int, whence: int = 0) -> int: ...
+
+    def inner_tell(self) -> int: ...
+
+    def member_start_position(self) -> int: ...
 
 
-class LZ4Stream(CompressingStream):
-    def __init__(
+class Writer(ContextManager[Writer]):
+    def write(self, data: bytes) -> int: ...
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
             self,
-            raw_stream: Union[IOStream, BinaryIO, _GenericIOStream, str],
-            compression_level: int = 12,
-            favor_dec_speed: bool = True,
-            fsspec_args: Optional[Union[Dict[Any, Any], Literal[False]]] = None
+            exc_type: Optional[Type[BaseException]],
+            exc: Optional[BaseException],
+            traceback: Optional[TracebackType]
     ) -> None: ...
-    def prepopulate(self, initial_data: bytes) -> None: ...
 
 
-class PythonIOStreamAdapter(IOStream):
-    def __init__(self, py_stream: _GenericIOStream) -> None: ...
+class CompressingWriter(Writer):
+    def finish(self) -> None: ...
 
 
-class FastWARCError(Exception):
-    pass
+class GzipReader(DecompressingReader):
+    def __new__(cls, inner: Union[Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, zlib=False, fsspec_args=None) -> Self: ...
 
 
-class ReaderStaleError(FastWARCError):
-    pass
+class GzipWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                compression_level=9, buffer_size=8192, zlib=False, fsspec_args=None) -> Self: ...
 
 
-class StreamError(FastWARCError):
-    pass
+class ZstdReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, fsspec_args=None, dictionary=None) -> Self: ...
+
+
+class ZstdWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size=8192, fsspec_args=None, dictionary=None, compress_dictionary_frame=False) -> Self: ...
+
+
+class Lz4Reader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, fsspec_args=None) -> Self: ...
+
+
+class Lz4Writer(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size=8192, fsspec_args=None) -> Self: ...
+
+
+class BrotliReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=4096, fsspec_args=None) -> Self: ...
+
+
+class BrotliWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                buffer_size=8192, fsspec_args=None) -> Self: ...
+
+
+class ChunkedReader(DecompressingReader):
+    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+                buffer_size=1024, fsspec_args=None) -> Self: ...
+
+
+class ChunkedWriter(CompressingWriter):
+    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+                min_chunk_size=512, fsspec_args=None) -> Self: ...

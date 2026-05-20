@@ -26,12 +26,11 @@ import urllib.request
 from urllib.error import HTTPError
 import sys
 
-from fastwarc import ArchiveIterator, WarcRecordType
+from fastwarc.legacy import ArchiveIterator, WarcRecordType
 from resiliparse.parse.encoding import detect_encoding, bytes_to_str
 # from resiliparse.parse._html_rs import HTMLTree
 from resiliparse.parse.html import HTMLTree
 import resiliparse.parse.lang as rlang
-
 
 # Optional 'cli' dependencies
 MISSING_DEPS = False
@@ -218,14 +217,14 @@ def download_wiki_dumps(dumpdate, langs, outdir, jobs):
             md5hash = hashlib.md5()
             outfilepath = os.path.join(outdir, f'{l}wiki.{url.split(".")[-1]}')
             with open(outfilepath, 'wb') as outf:
-                    with urllib.request.urlopen(f'https://dumps.wikimedia.org{url}') as dumpf:
-                        blocksize = 4096
-                        with tqdm(desc=f'Downloading {l}wiki', unit='b', unit_scale=True, total=total_bytes,
-                                  leave=False) as dlprog:
-                            while buf := dumpf.read(blocksize):
-                                md5hash.update(buf)
-                                outf.write(buf)
-                                dlprog.update(len(buf))
+                with urllib.request.urlopen(f'https://dumps.wikimedia.org{url}') as dumpf:
+                    blocksize = 4096
+                    with tqdm(desc=f'Downloading {l}wiki', unit='b', unit_scale=True, total=total_bytes,
+                              leave=False) as dlprog:
+                        while buf := dumpf.read(blocksize):
+                            md5hash.update(buf)
+                            outf.write(buf)
+                            dlprog.update(len(buf))
             if md5hash.hexdigest() != md5sum:
                 click.echo(f'Output "{os.path.basename(outfilepath)}" corrupted, deleting it.', err=True)
                 os.unlink(outfilepath)
@@ -512,7 +511,8 @@ def evaluate(indir, split, langs, truncate, cutoff, sort_lang, print_cm, fasttex
 
     if print_cm:
         label_width = max(len(l) for l in in_langs)
-        col_width = max(max(max(len(str(l2)) for l2 in l1.values()) for l1 in confusion_matrix.values()), label_width) + 2
+        col_width = max(max(max(len(str(l2)) for l2 in l1.values()) for l1 in confusion_matrix.values()),
+                        label_width) + 2
 
         click.echo(f'\nConfusion matrix:\n' + (' ' * label_width), nl=False)
         for l in in_langs:
@@ -529,7 +529,8 @@ def evaluate(indir, split, langs, truncate, cutoff, sort_lang, print_cm, fasttex
 @lang.command()
 @click.argument('infile', type=click.Path(exists=True, dir_okay=False))
 @click.option('-r', '--rounds', help='Number of rounds to benchmark', type=int, default=10000, show_default=True)
-@click.option('-f', '--fasttext-model', help='FastText model to benchmark', type=click.Path(exists=True, dir_okay=False))
+@click.option('-f', '--fasttext-model', help='FastText model to benchmark',
+              type=click.Path(exists=True, dir_okay=False))
 def benchmark(infile, rounds, fasttext_model):
     """
     Benchmark Resiliparse against FastText and Langid.
