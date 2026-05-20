@@ -131,16 +131,21 @@ def get_ext_modules():
     return cythonize(resiliparse_extensions, **get_cython_args())
 
 
-# Copy FastWARC headers
-fastwarc_headers = glob.glob(os.path.join(ROOT_DIR, '..', 'fastwarc-py', 'fastwarc', 'legacy', "*.pxd"))
-if fastwarc_headers:
-    os.makedirs(os.path.join(ROOT_DIR, 'fastwarc', 'legacy'), exist_ok=True)
-    [shutil.copy2(f, os.path.join(ROOT_DIR, 'fastwarc', 'legacy')) for f in fastwarc_headers]
+def main():
+    # Copy FastWARC headers
+    fastwarc_headers = glob.glob(os.path.join(ROOT_DIR, '..', 'fastwarc-py', 'fastwarc', 'legacy', "*.pxd"))
+    if fastwarc_headers:
+        os.makedirs(os.path.join(ROOT_DIR, 'fastwarc', 'legacy'), exist_ok=True)
+        [shutil.copy2(f, os.path.join(ROOT_DIR, 'fastwarc', 'legacy')) for f in fastwarc_headers]
 
-setup(
-    ext_modules=get_ext_modules(),
-    cmdclass=dict(build_ext=resiliparse_build_ext),
-    exclude_package_data={
-        '': [] if 'sdist' in sys.argv else ['*.pxd', '*.pxi', '*.pyx', '*.h', '*.cpp']
-    }
-)
+    setup(
+        ext_modules=get_ext_modules(),
+        cmdclass=dict(build_ext=resiliparse_build_ext),
+        exclude_package_data={
+            '': [] if 'sdist' in sys.argv else ['*.pxd', '*.pxi', '*.pyx', '*.h', '*.cpp']
+        }
+    )
+
+
+if __name__ == '__main__':
+    main()
