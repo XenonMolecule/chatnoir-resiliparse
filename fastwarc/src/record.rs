@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use time::OffsetDateTime;
@@ -739,7 +739,7 @@ pub enum DigestError {
 /// * `TransferEncoding` - Auto-decode `Transfer-Encoding`.
 /// * `ContentEncoding` - Auto-decode `Content-Encoding`.
 /// * `All` - Auto-decode both.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub enum AutoDecode {
     #[default]
     None,
@@ -1677,8 +1677,32 @@ impl Iterator for WarcRecord {
 /// thread-safe iterator variants.
 pub struct ArchiveIteratorImpl<R> {
     cur: R,
+    options: ArchiveIteratorOptions,
+}
+
+/// Options for constructing a new [`ArchiveIterator`] or [`ArchiveIteratorThreadSafe`]..
+///
+/// # Options
+///
+/// * `parse_http` - automatically parse HTTP headers.
+/// * `decode_http_payload` - automatically decode transfer- or content-encoded HTTP payloads.
+///   Requires `parse_http=true`.to have an effect.
+/// * `verify_digests` - automatically verify record digest.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ArchiveIteratorOptions {
     parse_http: bool,
+    decode_http_payload: AutoDecode,
     verify_digests: bool,
+}
+
+impl Default for ArchiveIteratorOptions {
+    fn default() -> Self {
+        Self {
+            parse_http: true,
+            decode_http_payload: AutoDecode::None,
+            verify_digests: false,
+        }
+    }
 }
 
 /// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
@@ -1757,25 +1781,61 @@ where
     ///
     /// # Arguments
     ///
-    /// * `reader` - buffered reader instance to attach to records
+    /// * `reader` - buffered reader instance to attach to records.
     pub fn new(reader: Box<dyn BufReadSeek>) -> Self {
+        Self::with_options(reader, ArchiveIteratorOptions::default())
+    }
+
+    /// Create a new WARC record iterator from a buffered WARC stream reader with options.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - buffered reader instance to attach to records.
+    /// * `options` - custom iterator options.
+    pub fn with_options(reader: Box<dyn BufReadSeek>, options: ArchiveIteratorOptions) -> Self {
         let empty = R::new(WarcRecord::new());
         empty.with_mut(|record| record.attach_reader(reader));
-        Self {
-            cur: empty,
-            parse_http: false,
-            verify_digests: false,
-        }
+        Self { cur: empty, options }
+    }
+
+    /// Change the iterator options.
+    pub fn set_options(&mut self, options: ArchiveIteratorOptions) {
+        self.options = options;
     }
 
     /// Enable or disable automatic HTTP parsing on iterated records.
     pub fn set_parse_http(&mut self, parse_http: bool) {
-        self.parse_http = parse_http;
+        self.options.parse_http = parse_http;
+    }
+
+    /// Consuming setter: Enable or disable automatic HTTP parsing on iterated records.
+    pub fn with_parse_http(mut self, parse_http: bool) -> Self {
+        self.options.parse_http = parse_http;
+        self
+    }
+
+    /// Enable or disable automatic decoding of transfer- or content-encoded HTTP payloads.
+    /// Has no effect if HTTP parsing is disabled.
+    pub fn set_decode_http_payload(&mut self, auto_decode: AutoDecode) {
+        self.options.decode_http_payload = auto_decode;
+    }
+
+    /// Consuming setter: Enable or disable automatic decoding of transfer- or content-encoded
+    /// HTTP payloads. Has no effect if HTTP parsing is disabled.
+    pub fn with_decode_http_payload(mut self, auto_decode: AutoDecode) -> Self {
+        self.options.decode_http_payload = auto_decode;
+        self
     }
 
     /// Enable or disable skipping records with missing or invalid block digests.
     pub fn set_verify_digests(&mut self, verify_digests: bool) {
-        self.verify_digests = verify_digests;
+        self.options.verify_digests = verify_digests;
+    }
+
+    /// Consuming setter: Enable or disable skipping records with missing or invalid block digests.
+    pub fn with_verify_digests(mut self, verify_digests: bool) -> Self {
+        self.options.verify_digests = verify_digests;
+        self
     }
 
     /// Create a new WARC record iterator with a filter predicate.
@@ -1817,12 +1877,12 @@ where
                 Ok(n) => {
                     self.cur = S::new(n);
                     let keep_record = self.cur.with_mut(|record| {
-                        if self.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
+                        if self.options.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
                             return Ok(false);
                         }
-                        if self.parse_http
+                        if self.options.parse_http
                             && record.is_http()
-                            && let Err(e) = record.parse_http()
+                            && let Err(e) = record.parse_http_with_decode_opts(self.options.decode_http_payload)
                         {
                             return Err(e);
                         }
@@ -1897,6 +1957,16 @@ where
 
     fn deref(&self) -> &Self::Target {
         &self.inner
+    }
+}
+
+impl<S, F> DerefMut for FilteredArchiveIteratorImpl<S, F>
+where
+    S: SharedWarcRecord,
+    F: Fn(&mut WarcRecord) -> bool,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 

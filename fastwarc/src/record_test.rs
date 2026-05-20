@@ -885,6 +885,46 @@ fn verify_record_digest_error_kinds() -> io::Result<()> {
 }
 
 #[test]
+fn archive_iterator_option_setters() -> io::Result<()> {
+    let reader = Box::new(io::Cursor::new(Vec::new()));
+    let it = ArchiveIterator::new(reader.clone());
+    assert_eq!(it.options, ArchiveIteratorOptions::default());
+
+    let new_opts = ArchiveIteratorOptions {
+        parse_http: false,
+        decode_http_payload: AutoDecode::All,
+        verify_digests: true,
+    };
+    assert_ne!(ArchiveIteratorOptions::default().parse_http, new_opts.parse_http);
+    assert_ne!(ArchiveIteratorOptions::default().decode_http_payload, new_opts.decode_http_payload);
+    assert_ne!(ArchiveIteratorOptions::default().verify_digests, new_opts.verify_digests);
+
+    // Test constructor with options
+    let it = ArchiveIterator::with_options(reader.clone(), new_opts);
+    assert_eq!(it.options, new_opts);
+
+    // Test setters
+    let mut it = ArchiveIterator::new(reader.clone());
+    it.set_parse_http(new_opts.parse_http);
+    it.set_decode_http_payload(new_opts.decode_http_payload);
+    it.set_verify_digests(new_opts.verify_digests);
+    assert_eq!(it.options, new_opts);
+
+    let mut it = ArchiveIterator::new(reader.clone());
+    it.set_options(new_opts);
+    assert_eq!(it.options, new_opts);
+
+    // Test consuming setters
+    let it = ArchiveIterator::new(reader.clone())
+        .with_parse_http(new_opts.parse_http)
+        .with_decode_http_payload(new_opts.decode_http_payload)
+        .with_verify_digests(new_opts.verify_digests);
+    assert_eq!(it.options, new_opts);
+
+    Ok(())
+}
+
+#[test]
 fn archive_iterator() -> io::Result<()> {
     let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
     let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
@@ -1131,7 +1171,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     // Test freezing and eager decoding don't mess with record boundaries.
     let record_data = [record_data.clone(), record_data].concat();
     let mut count = 0;
-    for r in ArchiveIterator::new(Box::new(io::Cursor::new(record_data))) {
+    for r in ArchiveIterator::new(Box::new(io::Cursor::new(record_data))).with_parse_http(false) {
         r?.with_mut(|r| -> io::Result<()> {
             r.freeze()?;
             r.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
@@ -1174,9 +1214,11 @@ fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
     data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &payload_raw[2], None, None));
 
     let mut count = 0;
-    for (i, rec) in ArchiveIterator::new(Box::new(io::Cursor::new(data.concat()))).enumerate() {
+    for (i, rec) in ArchiveIterator::new(Box::new(io::Cursor::new(data.concat())))
+        .with_decode_http_payload(AutoDecode::All)
+        .enumerate()
+    {
         rec?.with_mut(|r| -> io::Result<()> {
-            r.parse_http_with_decode_opts(AutoDecode::All)?;
             let mut buf = Vec::with_capacity(payload_raw[i].len());
             r.reader_mut().unwrap().read_to_end(&mut buf)?;
             assert_eq!(buf, payload_raw[i]);
@@ -1194,6 +1236,7 @@ fn filtered_archive_iterator() -> io::Result<()> {
         Box::new(io::Cursor::new(filter_test_warc_data())),
         filter::has_record_type(WarcRecordType::Resource),
     );
+    filtered.set_parse_http(false);
     let _: &ArchiveIterator = &filtered;
 
     let record = filtered.next().unwrap()?;
@@ -1262,11 +1305,15 @@ where
     M: FnMut() -> io::Result<R>,
     F: FnMut(&mut WarcRecord) -> io::Result<()>,
 {
-    for r in ArchiveIterator::new(Box::new(make_reader()?)) {
+    let opts = ArchiveIteratorOptions {
+        parse_http: false,
+        ..Default::default()
+    };
+    for r in ArchiveIterator::with_options(Box::new(make_reader()?), opts) {
         r?.with_mut(|rm| check(rm))?;
     }
 
-    for r in ArchiveIteratorThreadSafe::new(Box::new(make_reader()?)) {
+    for r in ArchiveIteratorThreadSafe::with_options(Box::new(make_reader()?), opts) {
         r?.with_mut(|rm| check(rm))?;
     }
 
