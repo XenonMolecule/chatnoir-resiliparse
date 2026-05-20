@@ -662,7 +662,7 @@ impl ArchiveIteratorPy {
         max_content_length=-1,
         func_filter=None,
         verify_digests=false,
-        strict_mode=true,
+        quirks_mode=false,
         auto_decode="none",
         fsspec_args=None
     ))]
@@ -675,7 +675,7 @@ impl ArchiveIteratorPy {
         max_content_length: i64,
         func_filter: Option<Py<PyAny>>,
         verify_digests: bool,
-        strict_mode: bool,
+        quirks_mode: bool,
         auto_decode: &str,
         fsspec_args: Option<Py<PyAny>>,
     ) -> PyResult<Self> {
@@ -686,15 +686,11 @@ impl ArchiveIteratorPy {
             |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
             |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
         )?;
-        // use crate::_fastwarc_rs::stream_io::GzipReaderPy;
-        // if stream.bind(py).cast::<GzipReaderPy>().is_ok() {
-        //     println!("gzip ok 1");
-        // }
-        let mut inner = ArchiveIteratorThreadSafe::new(reader);
-        inner.set_parse_http(parse_http);
-        inner.set_verify_digests(verify_digests);
-        // TODO: Implement
-        let _ = (auto_decode, strict_mode);
+        let inner = ArchiveIteratorThreadSafe::new(reader)
+            .with_quirks_mode(quirks_mode)
+            .with_parse_http(parse_http)
+            .with_verify_digests(verify_digests)
+            .with_decode_http_payload(auto_decode.try_into().map_err(PyValueError::new_err)?);
 
         Ok(Self {
             inner,

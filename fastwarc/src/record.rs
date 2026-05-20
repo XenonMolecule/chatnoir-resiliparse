@@ -24,6 +24,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -713,6 +714,7 @@ enum ReaderType {
 pub struct WarcRecord {
     record_type: WarcRecordType,
     headers: HeaderMap,
+    quirks_mode: bool,
     content_length: u64,
     is_http: bool,
     http_parsed: bool,
@@ -731,6 +733,18 @@ pub enum DigestError {
     StreamError(String),
 }
 
+impl Display for DigestError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DigestError::Missing(s) => write!(f, "Missing digest header: {}", s),
+            DigestError::Unsupported(s) => write!(f, "Unsupported digest algorithm: {}", s),
+            DigestError::FormatError(s) => write!(f, "Digest format error: {}", s),
+            DigestError::NoPayload(s) => write!(f, "Missing payload: {}", s),
+            DigestError::StreamError(s) => write!(f, "Stream error: {}", s),
+        }
+    }
+}
+
 /// Auto-decode options for [`WarcRecord::parse_http()`].
 ///
 /// # Options:
@@ -746,6 +760,28 @@ pub enum AutoDecode {
     TransferEncoding,
     ContentEncoding,
     All,
+}
+
+impl TryFrom<&str> for AutoDecode {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "none" => AutoDecode::None,
+            "transfer" => AutoDecode::TransferEncoding,
+            "content" => AutoDecode::ContentEncoding,
+            "all" => AutoDecode::All,
+            _ => return Err("Invalid auto-decode mode"),
+        })
+    }
+}
+
+impl TryFrom<String> for AutoDecode {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        AutoDecode::try_from(value.as_ref())
+    }
 }
 
 impl fmt::Debug for WarcRecord {
@@ -790,6 +826,7 @@ impl WarcRecord {
         WarcRecord {
             record_type: WarcRecordType::NoType,
             headers: HeaderMap::new(HeaderEncoding::Unicode),
+            quirks_mode: false,
             is_http: false,
             http_parsed: false,
             http_charset: None,
@@ -809,13 +846,30 @@ impl WarcRecord {
     ///
     /// # Arguments
     ///
-    /// * `reader` - Buffered reader instance
+    /// * `reader` - buffered reader instance
     ///
     /// # Returns
     ///
     /// WARC record parsed from the stream.
     pub fn from_reader(reader: Box<dyn BufReadSeek>) -> Result<Self, io::Error> {
-        match Self::_from_reader_internal(reader)? {
+        Self::from_reader_quirks(reader, false)
+    }
+
+    /// Create a new WARC record instance from a buffered reader.
+    ///
+    /// This constructor is equivalent to [`Self::from_reader()`], but allows enabling quirks mode.
+    /// Quirks mode enables more lenient parsing, which may be required for some ClueWebs.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - buffered reader instance
+    /// * `quirks_mode` - whether to enable lenient parsing ("quirks mode")
+    ///
+    /// # Returns
+    ///
+    /// WARC record parsed from the stream.
+    pub fn from_reader_quirks(reader: Box<dyn BufReadSeek>, quirks_mode: bool) -> Result<Self, io::Error> {
+        match Self::_from_reader_internal(reader, quirks_mode)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
         }
@@ -829,14 +883,16 @@ impl WarcRecord {
     /// # Arguments
     ///
     /// * `reader` - Buffered reader instance
+    /// * `quirks_mode` - whether to enable lenient parsing
     ///
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn _from_reader_internal(reader: Box<dyn BufReadSeek>) -> Result<Option<Self>, io::Error> {
+    fn _from_reader_internal(reader: Box<dyn BufReadSeek>, quirks_mode: bool) -> Result<Option<Self>, io::Error> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
-        if record.parse_warc_headers()? == 0 {
+        record.quirks_mode = quirks_mode;
+        if record.parse_warc_headers_quirks(quirks_mode)? == 0 {
             return Ok(None);
         }
         Ok(Some(record))
@@ -1666,7 +1722,7 @@ impl Iterator for WarcRecord {
             return Some(Err(e));
         }
         let reader = self.detach_reader()?;
-        Self::_from_reader_internal(reader).transpose()
+        Self::_from_reader_internal(reader, self.quirks_mode).transpose()
     }
 }
 
@@ -1688,11 +1744,14 @@ pub struct ArchiveIteratorImpl<R> {
 /// * `decode_http_payload` - automatically decode transfer- or content-encoded HTTP payloads.
 ///   Requires `parse_http=true`.to have an effect.
 /// * `verify_digests` - automatically verify record digest.
+/// * `quirks_mode` - enable strict record parsing (set to `false` for quirks mode --
+///   required for some ClueWebs)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ArchiveIteratorOptions {
     parse_http: bool,
     decode_http_payload: AutoDecode,
     verify_digests: bool,
+    quirks_mode: bool,
 }
 
 impl Default for ArchiveIteratorOptions {
@@ -1701,6 +1760,7 @@ impl Default for ArchiveIteratorOptions {
             parse_http: true,
             decode_http_payload: AutoDecode::None,
             verify_digests: false,
+            quirks_mode: false,
         }
     }
 }
@@ -1793,9 +1853,15 @@ where
     /// * `reader` - buffered reader instance to attach to records.
     /// * `options` - custom iterator options.
     pub fn with_options(reader: Box<dyn BufReadSeek>, options: ArchiveIteratorOptions) -> Self {
-        let empty = R::new(WarcRecord::new());
-        empty.with_mut(|record| record.attach_reader(reader));
-        Self { cur: empty, options }
+        let mut empty = WarcRecord::new();
+        if options.quirks_mode {
+            empty.quirks_mode = true;
+        }
+        empty.attach_reader(reader);
+        Self {
+            cur: R::new(empty),
+            options,
+        }
     }
 
     /// Change the iterator options.
@@ -1810,7 +1876,7 @@ where
 
     /// Consuming setter: Enable or disable automatic HTTP parsing on iterated records.
     pub fn with_parse_http(mut self, parse_http: bool) -> Self {
-        self.options.parse_http = parse_http;
+        self.set_parse_http(parse_http);
         self
     }
 
@@ -1823,7 +1889,7 @@ where
     /// Consuming setter: Enable or disable automatic decoding of transfer- or content-encoded
     /// HTTP payloads. Has no effect if HTTP parsing is disabled.
     pub fn with_decode_http_payload(mut self, auto_decode: AutoDecode) -> Self {
-        self.options.decode_http_payload = auto_decode;
+        self.set_decode_http_payload(auto_decode);
         self
     }
 
@@ -1834,7 +1900,23 @@ where
 
     /// Consuming setter: Enable or disable skipping records with missing or invalid block digests.
     pub fn with_verify_digests(mut self, verify_digests: bool) -> Self {
-        self.options.verify_digests = verify_digests;
+        self.set_verify_digests(verify_digests);
+        self
+    }
+
+    /// Enable or disable lenient record parsing. Enabling this ("quirks mode") may be
+    /// required for some ClueWebs.
+    pub fn set_quirks_mode(&mut self, quirks_mode: bool) {
+        self.options.quirks_mode = quirks_mode;
+        if self.options.quirks_mode {
+            self.cur.with_mut(|record| record.quirks_mode = true);
+        }
+    }
+
+    /// Consuming setter: Enable or disable lenient record parsing. Enabling this ("quirks mode")
+    /// may be required for some ClueWebs.
+    pub fn with_quirks_mode(mut self, quirks_mode: bool) -> Self {
+        self.set_quirks_mode(quirks_mode);
         self
     }
 

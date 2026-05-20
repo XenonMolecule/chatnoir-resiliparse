@@ -894,10 +894,12 @@ fn archive_iterator_option_setters() -> io::Result<()> {
         parse_http: false,
         decode_http_payload: AutoDecode::All,
         verify_digests: true,
+        quirks_mode: true,
     };
     assert_ne!(ArchiveIteratorOptions::default().parse_http, new_opts.parse_http);
     assert_ne!(ArchiveIteratorOptions::default().decode_http_payload, new_opts.decode_http_payload);
     assert_ne!(ArchiveIteratorOptions::default().verify_digests, new_opts.verify_digests);
+    assert_ne!(ArchiveIteratorOptions::default().quirks_mode, new_opts.quirks_mode);
 
     // Test constructor with options
     let it = ArchiveIterator::with_options(reader.clone(), new_opts);
@@ -908,6 +910,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     it.set_parse_http(new_opts.parse_http);
     it.set_decode_http_payload(new_opts.decode_http_payload);
     it.set_verify_digests(new_opts.verify_digests);
+    it.set_quirks_mode(new_opts.quirks_mode);
     assert_eq!(it.options, new_opts);
 
     let mut it = ArchiveIterator::new(reader.clone());
@@ -918,7 +921,8 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     let it = ArchiveIterator::new(reader.clone())
         .with_parse_http(new_opts.parse_http)
         .with_decode_http_payload(new_opts.decode_http_payload)
-        .with_verify_digests(new_opts.verify_digests);
+        .with_verify_digests(new_opts.verify_digests)
+        .with_quirks_mode(new_opts.quirks_mode);
     assert_eq!(it.options, new_opts);
 
     Ok(())
