@@ -306,7 +306,7 @@ pub struct GzipWriter<T: Write + 'static> {
 /// * `expect_header` - specifies whether a zlib or gzip header is expected or
 ///   whether this is a raw stream (equivalent to negative `window_bits` in zlib).
 /// * `compression_level` - gzip / DEFLATE compression level to use (`9` is best)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct GzipWriterOptions {
     pub capacity: usize,
     pub window_bits: u8,

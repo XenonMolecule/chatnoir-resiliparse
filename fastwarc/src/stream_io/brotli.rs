@@ -34,7 +34,7 @@ pub struct BrotliReader<T: ReadSeek> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct BrotliReaderOptions {
     pub capacity: usize,
 }
@@ -160,7 +160,7 @@ pub struct BrotliWriter<T: Write + 'static> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct BrotliWriterOptions {
     pub capacity: usize,
     pub quality: u32,

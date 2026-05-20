@@ -37,7 +37,7 @@ pub struct ChunkedReader<T: ReadSeek> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ChunkedReaderOptions {
     pub capacity: usize,
 }
@@ -230,7 +230,7 @@ pub struct ChunkedWriter<T: Write + 'static> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ChunkedWriterOptions {
     pub min_chunk_size: usize,
 }

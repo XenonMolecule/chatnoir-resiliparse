@@ -41,7 +41,7 @@ pub use zstd::dict::from_samples as train_dictionary_from_samples;
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ZstdReaderOptions {
     pub capacity: usize,
 }
@@ -313,10 +313,10 @@ pub struct ZstdWriter<T: Write + 'static> {
 /// * `include_content_size` - include `Frame_Content_Size` in each frame (required for WARCs).
 /// * `include_dictid` - include dictionary ID when using one.
 /// * `compress_dictionary_frame` - if given a custom dictionary (with [`ZstdWriter::with_dictionary()`]),
-///    compress the dictionary frame contents
+///   compress the dictionary frame contents
 /// * `write_dictionary_frame` - write a dictionary frame at the start of the stream if a custom
 ///   dictionary was given.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ZstdWriterOptions {
     pub capacity: usize,
     pub level: i32,

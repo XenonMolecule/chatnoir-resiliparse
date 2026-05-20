@@ -35,7 +35,7 @@ pub struct Lz4Reader<T: ReadSeek> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Lz4ReaderOptions {
     pub capacity: usize,
 }
@@ -179,7 +179,7 @@ pub struct Lz4Writer<T: Write + 'static> {
 /// # Options
 ///
 /// * `capacity` - sets the internal buffer size.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Lz4WriterOptions {
     pub capacity: usize,
 }
