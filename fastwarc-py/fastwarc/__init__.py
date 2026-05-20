@@ -16,7 +16,7 @@ import importlib
 import sys
 
 _native = importlib.import_module("._fastwarc", __name__)
-_legacy_shims = importlib.import_module(".legacy._shims", __name__)
+_legacy_sio = importlib.import_module(".legacy.stream_io", __name__)
 
 from ._fastwarc import *  # noqa: F401,F403
 
@@ -26,16 +26,20 @@ warc = _native.warc
 sys.modules[__name__ + ".stream_io"] = stream_io
 sys.modules[__name__ + ".warc"] = warc
 
-# Patch legacy shims
-for name in _legacy_shims.__all__:
-    setattr(stream_io, name, getattr(_legacy_shims, name))
-stream_io.__all__ += getattr(_legacy_shims, "__all__", ())
+ArchiveIterator = warc.ArchiveIterator
+WarcRecord = warc.WarcRecord
+WarcRecordType = warc.WarcRecordType
 
-FileStream = _legacy_shims.FileStream
-GZipStream = _legacy_shims.GZipStream
-LZ4Stream = _legacy_shims.LZ4Stream
-FastWARCError = _legacy_shims.FastWARCError
-StreamError = _legacy_shims.StreamError
+# Patch legacy shims
+for name in _legacy_sio.__all__:
+    setattr(stream_io, name, getattr(_legacy_sio, name))
+stream_io.__all__ += getattr(_legacy_sio, "__all__", ())
+
+FileStream = _legacy_sio.FileStream
+GZipStream = _legacy_sio.GZipStream
+LZ4Stream = _legacy_sio.LZ4Stream
+FastWARCError = _legacy_sio.FastWARCError
+StreamError = _legacy_sio.StreamError
 
 __all__ = [
     *_native.__all__,
@@ -44,4 +48,7 @@ __all__ = [
     "LZ4Stream",
     "FastWARCError",
     "StreamError",
+    "ArchiveIterator",
+    "WarcRecord",
+    "WarcRecordType"
 ]
