@@ -1982,7 +1982,7 @@ where
     fn detect_stream_compression_type(&mut self) -> io::Result<()> {
         self.cur.with_mut(|r| -> io::Result<()> {
             let magic_bytes = r.reader_mut().unwrap().fill_buf()?.get(..4).map(|b| b.to_vec());
-            let Some(ReaderType::Original(mut reader)) = r.reader.take() else {
+            let Some(ReaderType::Original(reader)) = r.reader.take() else {
                 return Err(io::Error::other("Inconsistent reader state."));
             };
             let reader = match magic_bytes.as_deref() {
