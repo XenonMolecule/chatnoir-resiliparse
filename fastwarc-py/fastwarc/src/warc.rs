@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{PyReaderAdapter, PyWriterAdapter, ReaderPy, python_whence_to_seekfrom, wrap_reader_stream};
+use crate::stream_io::{
+    PyReaderAdapter, PyWriterAdapter, ReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
+};
 use fastwarc::stream_io::{BufReadSeek, LimitedBufReadSeek};
 use fastwarc::warc::DigestError::StreamError;
-use fastwarc::warc::{ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use fastwarc::warc::{
+    ArchiveIteratorOptions, ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord,
+    WarcRecordType,
+};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyIterator, PyString, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyIterator, PyString, PyTuple};
 use std::io::{self, Read};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -673,6 +678,7 @@ impl ArchiveIteratorPy {
         quirks_mode=false,
         strict_mode=None,
         auto_decode="none",
+        stream_detect=true,
         fsspec_args=None
     ))]
     pub fn __new__(
@@ -687,16 +693,34 @@ impl ArchiveIteratorPy {
         quirks_mode: bool,
         strict_mode: Option<bool>, // deprecated
         auto_decode: &str,
+        stream_detect: bool,
         fsspec_args: Option<Py<PyAny>>,
     ) -> PyResult<Self> {
-        let reader = wrap_reader_stream(
-            py,
-            stream,
-            fsspec_args,
-            |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
-            |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
-        )?;
-        let inner = ArchiveIteratorThreadSafe::new(reader)
+        // Check if fsspec is `False`
+        let use_fsspec = fsspec_args
+            .as_ref()
+            .and_then(|f| f.cast_bound::<PyBool>(py).ok())
+            .map(|b| b.is_true())
+            .unwrap_or(true);
+
+        let mut iterator;
+        if !use_fsspec && let Ok(path) = path_like_to_string(stream.bind(py)) {
+            let opts = ArchiveIteratorOptions {
+                stream_detect,
+                ..ArchiveIteratorOptions::default()
+            };
+            iterator = ArchiveIteratorThreadSafe::from_path_with_options(path, opts)?;
+        } else {
+            let reader = wrap_reader_stream(
+                py,
+                stream,
+                fsspec_args,
+                |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
+                |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
+            )?;
+            iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
+        }
+        iterator = iterator
             .with_quirks_mode(strict_mode.unwrap_or(quirks_mode))
             .with_parse_http(parse_http)
             .with_verify_digests(verify_digests)
@@ -709,7 +733,7 @@ impl ArchiveIteratorPy {
             });
 
         Ok(Self {
-            inner,
+            inner: iterator,
             record_types: record_types as u16,
             min_content_length: u64::try_from(min_content_length).ok(),
             max_content_length: u64::try_from(max_content_length).ok(),

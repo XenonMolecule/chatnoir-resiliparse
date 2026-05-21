@@ -15,6 +15,9 @@
 use super::stream_io::{
     BufReadSeek, LimitedBufReadSeek, LimitedBufReader, LimitedBufReaderOuterWrap, WarcRead, brotli, chunked, gzip, zstd,
 };
+use crate::stream_io::gzip::GzipReader;
+use crate::stream_io::lz4::Lz4Reader;
+use crate::stream_io::zstd::ZstdReader;
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -25,14 +28,13 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead, Read};
+use std::io::{self, BufRead, BufReader, Read};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use uuid::Uuid;
-
 // ===========================================================
 // WARC record type enum
 // ===========================================================
@@ -1705,8 +1707,10 @@ impl Iterator for WarcRecord {
 ///
 /// This is an internal generic interface for implementing the single-threaded and
 /// thread-safe iterator variants.
+#[derive(Debug)]
 pub struct ArchiveIteratorImpl<R> {
     cur: R,
+    stream_started: bool,
     options: ArchiveIteratorOptions,
 }
 
@@ -1719,18 +1723,22 @@ pub struct ArchiveIteratorImpl<R> {
 ///   Requires `parse_http=true`.to have an effect.
 /// * `verify_digests` - automatically verify record digest.
 /// * `quirks_mode` - enable strict record parsing (set to `false` for quirks mode --
-///   required for some ClueWebs)
+///   required for some ClueWebs).
+/// * `stream_detect` - automatically detect the stream compression type. If enabled, automatically
+///   detects the stream compression type based on the file extension or magic bytes.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ArchiveIteratorOptions {
-    parse_http: bool,
-    decode_http_payload: AutoDecode,
-    verify_digests: bool,
-    quirks_mode: bool,
+    pub stream_detect: bool,
+    pub parse_http: bool,
+    pub decode_http_payload: AutoDecode,
+    pub verify_digests: bool,
+    pub quirks_mode: bool,
 }
 
 impl Default for ArchiveIteratorOptions {
     fn default() -> Self {
         Self {
+            stream_detect: true,
             parse_http: true,
             decode_http_payload: AutoDecode::None,
             verify_digests: false,
@@ -1834,13 +1842,65 @@ where
         empty.attach_reader(reader);
         Self {
             cur: R::new(empty),
+            stream_started: false,
             options,
         }
+    }
+    /// Create an archive iterator from a WARC file path.
+    ///
+    /// If the file name ends in `.warc.gz`, `.warc.zst`, or `.warc.lz4`, the correct
+    /// decompressor will automatically be chosen. No further autodetection based on
+    /// magic bytes will be performed after that.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - path to WARC file.
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::from_path_with_options(path, Default::default())
+    }
+
+    /// Create an archive iterator from a WARC file path with the supplied options..
+    ///
+    /// If `options.stream_detect` is `true`, and the file name ends in `.gz`, `.zst`,
+    /// or `.lz4`, the correct decompressor will automatically be chosen.
+    /// No further autodetection based on magic bytes will be performed after that.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - path to WARC file.
+    /// * `options` - options for constructing the iterator.
+    pub fn from_path_with_options(
+        path: impl AsRef<std::path::Path>,
+        mut options: ArchiveIteratorOptions,
+    ) -> io::Result<Self> {
+        let reader = BufReader::new(std::fs::File::open(&path)?);
+        if options.stream_detect {
+            let reader: Box<dyn BufReadSeek> = match path.as_ref().extension().and_then(|e| e.to_str()) {
+                Some("gz") => Box::new(GzipReader::new(reader)),
+                Some("zst") => Box::new(ZstdReader::new(reader)),
+                Some("lz4") => Box::new(Lz4Reader::new(reader)),
+                _ => Box::new(reader),
+            };
+            options.stream_detect = false;
+            return Ok(Self::with_options(reader, options));
+        }
+        Ok(Self::with_options(Box::new(reader), options))
     }
 
     /// Change the iterator options.
     pub fn set_options(&mut self, options: ArchiveIteratorOptions) {
         self.options = options;
+    }
+
+    /// Enable or disable automatic stream compression detection.
+    pub fn set_stream_detect(&mut self, stream_detect: bool) {
+        self.options.stream_detect = stream_detect;
+    }
+
+    /// Consuming setter: Enable or disable automatic stream compression detection.
+    pub fn with_stream_detect(mut self, stream_detect: bool) -> Self {
+        self.set_stream_detect(stream_detect);
+        self
     }
 
     /// Enable or disable automatic HTTP parsing on iterated records.
@@ -1918,6 +1978,23 @@ where
     pub fn into_inner(self) -> Option<Box<dyn BufReadSeek>> {
         self.cur.with_mut(WarcRecord::detach_reader)
     }
+
+    fn detect_stream_compression_type(&mut self) -> io::Result<()> {
+        self.cur.with_mut(|r| -> io::Result<()> {
+            let magic_bytes = r.reader_mut().unwrap().fill_buf()?.get(..4).map(|b| b.to_vec());
+            let Some(ReaderType::Original(reader)) = r.reader.take() else {
+                return Err(io::Error::other("Inconsistent reader state."));
+            };
+            let reader = match magic_bytes.as_deref() {
+                Some(b) if &b[..3] == b"\x1F\x8B\x08" => LimitedBufReader::new(Box::new(GzipReader::new(reader)), None),
+                Some(b"\x28\xB5\x2F\xFD") => LimitedBufReader::new(Box::new(ZstdReader::new(reader)), None),
+                Some(b"\x04\x22\x4D\x18") => LimitedBufReader::new(Box::new(Lz4Reader::new(reader)), None),
+                _ => reader,
+            };
+            r.reader = Some(ReaderType::Original(reader));
+            Ok(())
+        })
+    }
 }
 
 impl<S> Iterator for ArchiveIteratorImpl<S>
@@ -1927,6 +2004,14 @@ where
     type Item = Result<S, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if !self.stream_started
+            && self.options.stream_detect
+            && let Err(e) = self.detect_stream_compression_type()
+        {
+            return Some(Err(e));
+        }
+        self.stream_started = true;
+
         loop {
             let next = self.cur.with_mut(WarcRecord::next)?;
             return match next {

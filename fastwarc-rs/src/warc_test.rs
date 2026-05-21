@@ -891,11 +891,13 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     assert_eq!(it.options, ArchiveIteratorOptions::default());
 
     let new_opts = ArchiveIteratorOptions {
+        stream_detect: false,
         parse_http: false,
         decode_http_payload: AutoDecode::All,
         verify_digests: true,
         quirks_mode: true,
     };
+    assert_ne!(ArchiveIteratorOptions::default().stream_detect, new_opts.stream_detect);
     assert_ne!(ArchiveIteratorOptions::default().parse_http, new_opts.parse_http);
     assert_ne!(ArchiveIteratorOptions::default().decode_http_payload, new_opts.decode_http_payload);
     assert_ne!(ArchiveIteratorOptions::default().verify_digests, new_opts.verify_digests);
@@ -907,6 +909,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
 
     // Test setters
     let mut it = ArchiveIterator::new(reader.clone());
+    it.set_stream_detect(new_opts.stream_detect);
     it.set_parse_http(new_opts.parse_http);
     it.set_decode_http_payload(new_opts.decode_http_payload);
     it.set_verify_digests(new_opts.verify_digests);
@@ -919,6 +922,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
 
     // Test consuming setters
     let it = ArchiveIterator::new(reader.clone())
+        .with_stream_detect(new_opts.stream_detect)
         .with_parse_http(new_opts.parse_http)
         .with_decode_http_payload(new_opts.decode_http_payload)
         .with_verify_digests(new_opts.verify_digests)
@@ -990,6 +994,65 @@ fn archive_iterator_into_inner() -> io::Result<()> {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
     assert_eq!(buf, record_data);
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_stream_compression_autodetection() -> io::Result<()> {
+    let plain_warc = get_fixture_path("warcfile.warc");
+    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(plain_warc)?)));
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    let gzip_warc = get_fixture_path("warcfile.warc.gz");
+    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(gzip_warc)?)));
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    let lz4_warc = get_fixture_path("warcfile.warc.lz4");
+    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(lz4_warc)?)));
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    // Gzip without autodetection
+    let gzip_warc = get_fixture_path("warcfile.warc.gz");
+    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(gzip_warc)?))).with_stream_detect(false);
+    assert_eq!(it.next().transpose().unwrap_err().kind(), io::ErrorKind::InvalidData);
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_from_path() -> io::Result<()> {
+    let plain_warc = get_fixture_path("warcfile.warc");
+    let mut it = ArchiveIterator::from_path(plain_warc)?;
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    // Invalid path
+    let plain_warc = get_fixture_path("warcfile.warc.doesnotexist");
+    assert_eq!(ArchiveIterator::from_path(plain_warc).unwrap_err().kind(), io::ErrorKind::NotFound);
+
+    // With autodetection
+    let plain_warc = get_fixture_path("warcfile.warc.gz");
+    let mut it = ArchiveIterator::from_path(plain_warc)?;
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    let plain_warc = get_fixture_path("warcfile.warc.lz4");
+    let mut it = ArchiveIterator::from_path(plain_warc)?;
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    // Without autodetection
+    let plain_warc = get_fixture_path("warcfile.warc.gz");
+    let opts = ArchiveIteratorOptions {
+        stream_detect: false,
+        ..ArchiveIteratorOptions::default()
+    };
+    let mut it = ArchiveIterator::from_path_with_options(plain_warc, opts)?;
+    assert_eq!(it.next().transpose().unwrap_err().kind(), io::ErrorKind::InvalidData);
 
     Ok(())
 }
