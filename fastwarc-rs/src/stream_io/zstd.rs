@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::{
-    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_stream_from_path, impl_to_any_funcs,
 };
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
@@ -224,7 +224,6 @@ impl<T: ReadSeek> ZstdReader<T> {
     }
 }
 
-impl_fastwarc_stream!(ZstdReader, WarcRead, ReadSeek);
 impl_stream_from_path!(ZstdReader, ZstdReaderOptions);
 
 impl<T: ReadSeek> io::Read for ZstdReader<T> {
@@ -260,7 +259,9 @@ impl<T: ReadSeek> Seek for ZstdReader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for ZstdReader<T> {
+impl<T: ReadSeek> WarcRead for ZstdReader<T> {
+    impl_to_any_funcs!();
+
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let new_pos = self.reset_decoder(Some(pos))?;
         self.stream_pos = 0;
@@ -270,7 +271,9 @@ impl<T: ReadSeek> DecompressingReader for ZstdReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
+}
 
+impl<T: ReadSeek> DecompressingReader for ZstdReader<T> {
     fn member_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
@@ -476,8 +479,11 @@ impl<T: Write + 'static> ZstdWriter<T> {
     }
 }
 
-impl_fastwarc_stream!(ZstdWriter, WarcWrite, Write + 'static);
 impl_stream_from_path!(ZstdWriter, ZstdWriterOptions);
+
+impl<T: Write + 'static> WarcWrite for ZstdWriter<T> {
+    impl_to_any_funcs!();
+}
 
 impl<T: Write + 'static> CompressingWriter for ZstdWriter<T> {
     fn finish(&mut self) -> io::Result<()> {

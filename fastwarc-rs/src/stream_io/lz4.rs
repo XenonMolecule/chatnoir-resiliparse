@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use crate::stream_io::{
-    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_stream_from_path, impl_to_any_funcs,
 };
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Lz4Reader
@@ -91,7 +91,6 @@ impl<T: ReadSeek> Lz4Reader<T> {
     }
 }
 
-impl_fastwarc_stream!(Lz4Reader, WarcRead, ReadSeek);
 impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 
 // noinspection DuplicatedCode
@@ -126,7 +125,9 @@ impl<T: ReadSeek> Seek for Lz4Reader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for Lz4Reader<T> {
+impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
+    impl_to_any_funcs!();
+
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut inner = self.inner.take().unwrap().into_inner();
         let new_pos = inner.seek(pos)?;
@@ -139,7 +140,9 @@ impl<T: ReadSeek> DecompressingReader for Lz4Reader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().stream_position()
     }
+}
 
+impl<T: ReadSeek> DecompressingReader for Lz4Reader<T> {
     fn member_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
@@ -241,8 +244,11 @@ impl<T: Write + 'static> Lz4Writer<T> {
     }
 }
 
-impl_fastwarc_stream!(Lz4Writer, WarcWrite, Write + 'static);
 impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
+
+impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
+    impl_to_any_funcs!();
+}
 
 impl<T: Write + 'static> CompressingWriter for Lz4Writer<T> {
     fn finish(&mut self) -> io::Result<()> {

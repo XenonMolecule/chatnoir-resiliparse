@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead, BufReader, Read, Seek};
+use std::io::{self, BufRead, BufReader, Read};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};

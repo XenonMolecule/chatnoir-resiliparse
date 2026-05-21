@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{impl_fastwarc_stream, impl_stream_from_path};
+use super::{impl_stream_from_path, impl_to_any_funcs};
 use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
@@ -163,7 +163,6 @@ impl<T: ReadSeek> GzipReader<T> {
     }
 }
 
-impl_fastwarc_stream!(GzipReader, WarcRead, ReadSeek);
 impl_stream_from_path!(GzipReader, GzipReaderOptions);
 
 impl<T: ReadSeek> io::Read for GzipReader<T> {
@@ -199,7 +198,9 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for GzipReader<T> {
+impl<T: ReadSeek> WarcRead for GzipReader<T> {
+    impl_to_any_funcs!();
+
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.deflate = Inflate::new(true, self.window_bits);
         self.buf_pos = 0;
@@ -213,7 +214,9 @@ impl<T: ReadSeek> DecompressingReader for GzipReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.stream_position()
     }
+}
 
+impl<T: ReadSeek> DecompressingReader for GzipReader<T> {
     fn member_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
@@ -473,8 +476,11 @@ impl<T: Write + 'static> GzipWriter<T> {
     }
 }
 
-impl_fastwarc_stream!(GzipWriter, WarcWrite, Write + 'static);
 impl_stream_from_path!(GzipWriter, GzipWriterOptions);
+
+impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
+    impl_to_any_funcs!();
+}
 
 impl<T: Write + 'static> CompressingWriter for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {

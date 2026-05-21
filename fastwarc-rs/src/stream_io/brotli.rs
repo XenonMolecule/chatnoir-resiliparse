@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::{
-    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_fastwarc_stream, impl_stream_from_path,
+    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_stream_from_path, impl_to_any_funcs,
 };
 use brotli::{CompressorWriter, Decompressor};
 use std::any::Any;
@@ -88,7 +88,6 @@ impl<T: ReadSeek> BrotliReader<T> {
     }
 }
 
-impl_fastwarc_stream!(BrotliReader, WarcRead, ReadSeek);
 impl_stream_from_path!(BrotliReader, BrotliReaderOptions);
 
 // noinspection DuplicatedCode
@@ -120,7 +119,9 @@ impl<T: ReadSeek> Seek for BrotliReader<T> {
     }
 }
 
-impl<T: ReadSeek + 'static> DecompressingReader for BrotliReader<T> {
+impl<T: ReadSeek> WarcRead for BrotliReader<T> {
+    impl_to_any_funcs!();
+
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let capacity = self.inner.as_ref().unwrap().capacity();
         let mut inner = self.inner.take().unwrap().into_inner().into_inner();
@@ -133,6 +134,8 @@ impl<T: ReadSeek + 'static> DecompressingReader for BrotliReader<T> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
 }
+
+impl<T: ReadSeek> DecompressingReader for BrotliReader<T> {}
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> BufRead for BrotliReader<T> {
@@ -179,7 +182,9 @@ impl Default for BrotliWriterOptions {
     }
 }
 
-impl_fastwarc_stream!(BrotliWriter, WarcWrite, Write + 'static);
+impl<T: Write + 'static> WarcWrite for BrotliWriter<T> {
+    impl_to_any_funcs!();
+}
 
 impl<T: Write + 'static> BrotliWriter<T> {
     /// Create a new [`BrotliWriter`].

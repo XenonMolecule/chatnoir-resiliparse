@@ -14,7 +14,7 @@
 
 use std::any::Any;
 use std::io;
-
+use std::io::SeekFrom;
 // ===========================================================
 // Submodules
 // ===========================================================
@@ -48,6 +48,24 @@ pub trait WarcRead: BufReadSeek + Any {
 
     /// Convert the [`DecompressingReader`] into [`Any`].
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
+
+    /// Seek to an offset, in bytes, in a wrapped inner stream.
+    /// If the stream isn't wrapped, or if the inner stream doesn't perform
+    /// decompression or buffering, then this is the same as [`io::Seek::seek()`].
+    ///
+    /// Seeking on the inner stream may reset the state of the decompressor.
+    /// It is up to the user to seek valid positions from which decompression
+    /// can be resumed.
+    fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64>;
+
+    /// Return the current seek position from the start of a wrapped inner stream.
+    /// If the stream isn't wrapped, or if the inner stream doesn't perform
+    /// decompression or buffering, then this is the same as [`io::Seek::stream_position()`].
+    ///
+    /// The returned position is the logical position on the compressed inner stream,
+    /// which does not consider input buffer sizes. The physical reader position may be
+    /// larger than this.
+    fn inner_stream_position(&mut self) -> io::Result<u64>;
 }
 
 pub trait WarcWrite: io::Write + Any + 'static {
@@ -61,25 +79,23 @@ pub trait WarcWrite: io::Write + Any + 'static {
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
-/// Internal helper for implementing boilerplate methods for casting to [`Any`].
-macro_rules! impl_fastwarc_stream {
-    ($StreamType: ident, $Trait: ident, $($TraitBounds: tt)+) => {
-        impl<T: $($TraitBounds)+> $Trait for $StreamType<T> {
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
+/// Internal helper for implementing to_any() boilerplate methods.
+macro_rules! impl_to_any_funcs {
+    () => {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
 
-            fn as_any_mut(&mut self) -> &mut dyn Any {
-                self
-            }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
 
-            fn into_any(self: Box<Self>) -> Box<dyn Any> {
-                self
-            }
+        fn into_any(self: Box<Self>) -> Box<dyn Any> {
+            self
         }
     };
 }
-pub(crate) use impl_fastwarc_stream;
+pub(crate) use impl_to_any_funcs;
 
 // ===========================================================
 // Compressors and decompressors
@@ -88,22 +104,6 @@ pub(crate) use impl_fastwarc_stream;
 /// Trait for [`io::Read`] stream implementations reading from
 /// compressed input streams.
 pub trait DecompressingReader: WarcRead {
-    /// Seek to an offset, in bytes, in the compressed inner stream.
-    /// The semantics are the same as [`io::Seek::seek()`].
-    ///
-    /// Seeking on the inner stream may reset the state of the decompressor.
-    /// It is up to the user to seek valid positions from which decompression
-    /// can be resumed.
-    fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64>;
-
-    /// Return the current seek position from the start of the compressed inner stream.
-    /// The semantics are the same as [`io::Seek::stream_position()`].
-    ///
-    /// The returned position is the logical position on the compressed inner stream,
-    /// which does not consider input buffer sizes. The physical reader position may be
-    /// larger than this.
-    fn inner_stream_position(&mut self) -> io::Result<u64>;
-
     /// Return the start position, in bytes, of the current member / frame
     /// in the compressed inner stream. If the compression format does not support
     /// multi-member streams, this is always the beginning of the stream.
@@ -334,6 +334,14 @@ where
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
+    }
+
+    fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.reader.seek(pos)
+    }
+
+    fn inner_stream_position(&mut self) -> io::Result<u64> {
+        self.reader.stream_position()
     }
 }
 

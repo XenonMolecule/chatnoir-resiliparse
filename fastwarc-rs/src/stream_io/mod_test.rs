@@ -169,7 +169,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>) -> S,
-        S: DecompressingReader + BufReadSeek,
+        S: WarcRead + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -210,7 +210,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
-        S: DecompressingReader + BufReadSeek,
+        S: WarcRead + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -237,7 +237,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
-        S: DecompressingReader + BufReadSeek,
+        S: WarcRead + BufReadSeek,
         I: Fn(S) -> Cursor<Vec<u8>>,
     {
         let plain = sample_data();
@@ -272,7 +272,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>, usize) -> S,
-        S: DecompressingReader + BufReadSeek,
+        S: WarcRead + BufReadSeek,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
@@ -305,7 +305,7 @@ pub(crate) mod helpers {
     where
         C: Fn(&[u8]) -> io::Result<Vec<u8>>,
         R: Fn(Cursor<Vec<u8>>) -> S,
-        S: DecompressingReader + BufRead,
+        S: WarcRead + BufRead,
     {
         let plain = sample_data();
         let compressed = compress_fn(&plain)?;
