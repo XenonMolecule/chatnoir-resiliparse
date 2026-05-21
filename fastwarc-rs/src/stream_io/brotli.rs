@@ -91,6 +91,7 @@ impl<T: ReadSeek> BrotliReader<T> {
 impl_fastwarc_stream!(BrotliReader, WarcRead, ReadSeek);
 impl_stream_from_path!(BrotliReader, BrotliReaderOptions);
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for BrotliReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let n = self.inner.as_mut().unwrap().read(buf)?;
@@ -133,6 +134,7 @@ impl<T: ReadSeek + 'static> DecompressingReader for BrotliReader<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> BufRead for BrotliReader<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.as_mut().unwrap().fill_buf()
@@ -253,8 +255,8 @@ impl<T: Write + 'static> Write for BrotliWriter<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> Drop for BrotliWriter<T> {
-    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.flush().ok();

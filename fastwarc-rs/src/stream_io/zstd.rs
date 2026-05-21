@@ -237,6 +237,7 @@ impl<T: ReadSeek> io::Read for ZstdReader<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> Seek for ZstdReader<T> {
     /// Seek to an offset, in bytes, in the decompressed output stream.
     ///
@@ -275,6 +276,7 @@ impl<T: ReadSeek> DecompressingReader for ZstdReader<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> BufRead for ZstdReader<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.ensure_frame_data()?;
@@ -505,8 +507,8 @@ impl<T: Write + 'static> Write for ZstdWriter<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> Drop for ZstdWriter<T> {
-    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

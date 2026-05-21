@@ -106,6 +106,7 @@ impl<T: ReadSeek> io::Read for ChunkedReader<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> Seek for ChunkedReader<T> {
     /// Seek to an offset, in bytes, in the output stream.
     ///
@@ -241,6 +242,7 @@ impl Default for ChunkedWriterOptions {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> ChunkedWriter<T> {
     /// Create a new [`ChunkedWriter`].
     ///
@@ -336,8 +338,8 @@ impl<T: Write + 'static> Write for ChunkedWriter<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> Drop for ChunkedWriter<T> {
-    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

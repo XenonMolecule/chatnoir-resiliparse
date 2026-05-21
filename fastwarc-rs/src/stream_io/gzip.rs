@@ -176,6 +176,7 @@ impl<T: ReadSeek> io::Read for GzipReader<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> Seek for GzipReader<T> {
     /// Seek to an offset, in bytes, in the decompressed output stream.
     ///
@@ -325,6 +326,7 @@ impl Default for GzipWriterOptions {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> GzipWriter<T> {
     /// Create a new [`GzipWriter`].
     ///
@@ -500,8 +502,8 @@ impl<T: Write + 'static> Write for GzipWriter<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> Drop for GzipWriter<T> {
-    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

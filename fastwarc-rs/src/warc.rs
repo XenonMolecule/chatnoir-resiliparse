@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read, Seek};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -1982,7 +1982,7 @@ where
     fn detect_stream_compression_type(&mut self) -> io::Result<()> {
         self.cur.with_mut(|r| -> io::Result<()> {
             let magic_bytes = r.reader_mut().unwrap().fill_buf()?.get(..4).map(|b| b.to_vec());
-            let Some(ReaderType::Original(reader)) = r.reader.take() else {
+            let Some(ReaderType::Original(mut reader)) = r.reader.take() else {
                 return Err(io::Error::other("Inconsistent reader state."));
             };
             let reader = match magic_bytes.as_deref() {

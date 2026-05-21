@@ -17,7 +17,7 @@ use crate::stream_io::{
 };
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Lz4Reader
@@ -94,24 +94,16 @@ impl<T: ReadSeek> Lz4Reader<T> {
 impl_fastwarc_stream!(Lz4Reader, WarcRead, ReadSeek);
 impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = match self.inner.as_mut().unwrap().read(buf) {
-            Ok(0) if !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() => {
-                // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
-                let old_pos = self.stream_pos;
-                self.inner_seek(SeekFrom::Current(0))?;
-                self.stream_pos = old_pos;
-                self.inner.as_mut().unwrap().read(buf)?
-            }
-            Ok(b) => b,
-            Err(e) => return Err(e),
-        };
+        let n = self.inner.as_mut().unwrap().read(buf)?;
         self.stream_pos += n as u64;
         Ok(n)
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> Seek for Lz4Reader<T> {
     /// Seek to an offset, in bytes, in the decompressed output stream.
     ///
@@ -155,6 +147,14 @@ impl<T: ReadSeek> DecompressingReader for Lz4Reader<T> {
 
 impl<T: ReadSeek> BufRead for Lz4Reader<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        let buf = self.inner.as_mut().unwrap().fill_buf()?;
+
+        // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
+        if buf.is_empty() && self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
+            let old_pos = self.stream_pos;
+            self.inner_seek(SeekFrom::Current(0))?;
+            self.stream_pos = old_pos;
+        }
         self.inner.as_mut().unwrap().fill_buf()
     }
 
@@ -270,8 +270,8 @@ impl<T: Write + 'static> Write for Lz4Writer<T> {
     }
 }
 
+// noinspection DuplicatedCode
 impl<T: Write + 'static> Drop for Lz4Writer<T> {
-    // noinspection ALL
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();
