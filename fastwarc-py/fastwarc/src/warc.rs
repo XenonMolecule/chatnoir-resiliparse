@@ -84,6 +84,41 @@ impl From<WarcRecordType> for WarcRecordTypePy {
     }
 }
 
+#[pymethods]
+impl WarcRecordTypePy {
+    fn __int__(&self) -> u16 {
+        *self as u16
+    }
+
+    fn __index__(&self) -> u16 {
+        *self as u16
+    }
+
+    fn __and__(&self, other: u16) -> u16 {
+        (*self as u16) & other
+    }
+
+    fn __rand__(&self, other: u16) -> u16 {
+        other & (*self as u16)
+    }
+
+    fn __or__(&self, other: u16) -> u16 {
+        (*self as u16) | other
+    }
+
+    fn __ror__(&self, other: u16) -> u16 {
+        other | (*self as u16)
+    }
+
+    fn __xor__(&self, other: u16) -> u16 {
+        (*self as u16) ^ other
+    }
+
+    fn __rxor__(&self, other: u16) -> u16 {
+        other ^ (*self as u16)
+    }
+}
+
 // ===========================================================
 // HeaderMap
 // ===========================================================
@@ -678,7 +713,7 @@ impl ArchiveIteratorPy {
     #[new]
     #[pyo3(signature = (
         stream,
-        record_types=WarcRecordTypePy::any_type,
+        record_types=WarcRecordTypePy::any_type as u16,
         parse_http=true,
         min_content_length=-1,
         max_content_length=-1,
@@ -692,7 +727,7 @@ impl ArchiveIteratorPy {
     pub fn __new__(
         py: Python<'_>,
         stream: Py<PyAny>,
-        record_types: WarcRecordTypePy,
+        record_types: u16,
         parse_http: bool,
         min_content_length: i64,
         max_content_length: i64,
@@ -702,7 +737,6 @@ impl ArchiveIteratorPy {
         auto_decode: &str,
         stream_detect: bool,
         fsspec_args: Option<Py<PyAny>>,
-        strict_mode: Option<bool>, // deprecated
     ) -> PyResult<Self> {
         // Check if fsspec is `False`
         let use_fsspec = fsspec_args
