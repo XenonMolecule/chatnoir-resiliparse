@@ -25,8 +25,13 @@ pub mod _fastwarc {
     #[pymodule_init]
     pub fn __init__(m: &Bound<'_, PyModule>) -> PyResult<()> {
         let stream_io = m.getattr("stream_io")?;
+        let warc = m.getattr("warc")?;
 
         // Top-level exports
+        m.add("ArchiveIterator", warc.getattr("ArchiveIterator")?)?;
+        m.add("WarcRecord", warc.getattr("WarcRecord")?)?;
+        m.add("WarcRecordType", warc.getattr("WarcRecordType")?)?;
+
         m.add("GzipReader", stream_io.getattr("GzipReader")?)?;
         m.add("GzipWriter", stream_io.getattr("GzipWriter")?)?;
         m.add("Lz4Reader", stream_io.getattr("Lz4Reader")?)?;
