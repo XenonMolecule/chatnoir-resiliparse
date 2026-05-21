@@ -40,19 +40,6 @@ def _warn_deprecated(msg):
     warnings.warn(msg, FutureWarning, 3)
 
 
-def _is_writer_stream(raw_stream):
-    mode = getattr(raw_stream, "mode", None)
-    if isinstance(mode, str):
-        if any(flag in mode for flag in ("w", "a", "x")):
-            return True
-        if "r" in mode:
-            return False
-
-    has_read = callable(getattr(raw_stream, "read", None))
-    has_write = callable(getattr(raw_stream, "write", None))
-    return has_write and not has_read
-
-
 def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
     _warn_deprecated("wrap_stream is deprecated and will be removed in a future version.")
     if isinstance(raw_stream, str):
@@ -62,118 +49,139 @@ def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
                 return fsspec.open(raw_stream, mode, **(fsspec_args or {})).open()
             except ModuleNotFoundError:
                 pass
-        return FileStream(raw_stream, mode)
+        return open(raw_stream, mode)
 
     return raw_stream
 
 
 class BufferedReader:
-    def __new__(cls, first, *args, **kwargs):
+    def __init__(self, stream, *args, **kwargs):
         _warn_deprecated("BufferedReader is deprecated and will be removed in a future version.")
-        return first
+        self._stream = stream
+
+    def close(self):
+        return self._stream.close()
+
+    def consume(self, size: int = -1):
+        return self._stream.consume(size)
+
+    def read(self, size: int = -1):
+        return self._stream.read(size)
+
+    def readline(self, crlf=True, max_line_len=8192):
+        return self._stream.readLine(max_line_len)
+
+    def tell(self):
+        return self._stream.tell()
 
 
 class IOStream:
-    def __init__(self, *_, **__):
+    def __init__(self, *_, _reader_factory=None, _writer_factory=None, **__):
         _warn_deprecated(
-            "IOStream is deprecated and will be removed in a future version. "
-            "Use Reader and Writer instead.")
+            f"{self.__class__.__name__} is deprecated and will be removed in a future version. "
+            "Use the new Reader and Writer classes from stream_io instead.")
 
+        self._reader_factory = _reader_factory
+        self._writer_factory = _writer_factory
+        self._reader = None
+        self._writer = None
 
-class PythonIOStreamAdapter(IOStream):
-    def __new__(cls, first, *args, **kwargs):
-        _warn_deprecated("IOStream is deprecated and will be removed in a future version.")
-        return first
+    def _get_stream(self):
+        if self._reader is not None:
+            return self._reader
+        return self._writer
+
+    def _get_reader(self):
+        if self._reader is None:
+            self._reader = self._reader_factory()
+        return self._reader
+
+    def _get_writer(self):
+        if self._writer is None:
+            self._writer = self._writer_factory()
+        return self._writer
+
+    def read(self, size: int) -> bytes:
+        return self._get_reader().read(size)
+
+    def write(self, data: bytes) -> int:
+        return self._get_writer().write(data)
+
+    def close(self):
+        self._get_stream().close()
+
+    def flush(self):
+        self._get_stream().flush()
+
+    def seek(self, offset: int):
+        self._get_stream().seek(offset)
+
+    def tell(self) -> int:
+        return self._get_stream().tell()
+
+    def __enter__(self):
+        s = self._get_stream()
+        if hasattr(s, '__enter__'):
+            return self._get_stream().__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        s = self._get_stream()
+        if hasattr(s, '__exit__'):
+            self._get_stream().__exit__(exc_type, exc, traceback)
+        s.close()
 
 
 class CompressingStream(IOStream):
-    def __init__(self, *_, **__):
-        super().__init__(*_, **__)
-        _warn_deprecated(
-            "CompressingStream is deprecated and will be removed in a future version. "
-            "Use fastwarc.stream_io.DecompressingReader instead.")
+    def begin_member(self):
+        pass
+
+    def end_member(self):
+        self._get_writer().finish()
 
 
-class FileStream(IOStream):
-    def __new__(cls, filename, mode='rb'):
-        _warn_deprecated(
-            "FileStream is deprecated and will be removed in a future version. "
-            "Use open() or raw file paths instead.")
+class PythonIOStreamAdapter:
+    def __new__(cls, py_stream):
+        return IOStream(_reader_factory=lambda: py_stream,
+                        _writer_factory=lambda: py_stream)
+
+
+class FileStream:
+    def __new__(cls, filename: str, mode: str = 'rb'):
         if 'b' not in mode:
             mode += 'b'
-        return open(filename, mode)
+        f = open(filename, mode)
+        return IOStream(_reader_factory=lambda: f, _writer_factory=lambda: f)
 
 
-class BytesIOStream(IOStream):
-    def __new__(cls, initial_data):
-        _warn_deprecated("BytesIOStream is deprecated and will be removed in a future version.")
+class BytesIOStream:
+    def __new__(cls, initial_data=None):
         import io
-        return io.BytesIO(initial_data)
+        bio = io.BytesIO(initial_data if initial_data is not None else b'')
+        return IOStream(_reader_factory=lambda: bio, _writer_factory=lambda: bio)
 
 
-class GZipStream(CompressingStream):
-    def __new__(cls, raw_stream, mode='r', compression_level=9, zlib=False, fsspec_args=None):
-        _warn_deprecated(
-            "GZipStream is deprecated and will be removed in a future version. "
-            "Use GzipReader and GzipWriter instead.")
-
+class GZipStream:
+    def __new__(cls, raw_stream, compression_level=9, zlib=False, fsspec_args=None):
         from fastwarc.stream_io import GzipReader, GzipWriter
-
-        is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
-        if isinstance(raw_stream, str):
-            if is_writer:
-                return GzipWriter(
-                    raw_stream,
-                    compression_level=compression_level,
-                    zlib=zlib,
-                    fsspec_args=fsspec_args,
-                )
-            return GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args)
-
-        if is_writer or _is_writer_stream(raw_stream):
-            return GzipWriter(
-                raw_stream,
-                compression_level=compression_level,
-                zlib=zlib,
-                fsspec_args=fsspec_args,
-            )
-        return GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args)
+        return CompressingStream(
+            _reader_factory=lambda: GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args),
+            _writer_factory=lambda: GzipWriter(raw_stream, compression_level=compression_level, zlib=zlib,
+                                               fsspec_args=fsspec_args))
 
 
-class LZ4Stream(CompressingStream):
-    def __new__(cls, raw_stream, mode='r', compression_level=12, favor_dec_speed=True, fsspec_args=None):
-        _warn_deprecated(
-            "LZ4Stream is deprecated and will be removed in a future version. "
-            "Use Lz4Reader and Lz4Writer instead.")
-
+class LZ4Stream:
+    def __new__(cls, raw_stream, mode='r', compression_level=12,
+                favor_dec_speed=True, fsspec_args=None):
         from fastwarc.stream_io import Lz4Reader, Lz4Writer
-
-        is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
-        if isinstance(raw_stream, str):
-            if is_writer:
-                return Lz4Writer(raw_stream, fsspec_args=fsspec_args)
-            return Lz4Reader(raw_stream, fsspec_args=fsspec_args)
-
-        if is_writer or _is_writer_stream(raw_stream):
-            return Lz4Writer(raw_stream, fsspec_args=fsspec_args)
-        return Lz4Reader(raw_stream, fsspec_args=fsspec_args)
+        return CompressingStream(
+            _reader_factory=lambda: Lz4Reader(raw_stream, fsspec_args=fsspec_args),
+            _writer_factory=lambda: Lz4Writer(raw_stream, fsspec_args=fsspec_args))
 
 
-class BrotliStream(CompressingStream):
-    def __new__(cls, raw_stream, mode='r', fsspec_args=None):
-        _warn_deprecated(
-            "BrotliStream is deprecated and will be removed in a future version. "
-            "Use BrotliReader and BrotliWriter instead.")
-
+class BrotliStream:
+    def __new__(cls, raw_stream, quality=11, lgwin=22, lgblock=0, fsspec_args=None):
         from fastwarc.stream_io import BrotliReader, BrotliWriter
-
-        is_writer = any(flag in mode for flag in ('w', 'a', 'x'))
-
-        if isinstance(raw_stream, str):
-            if is_writer:
-                return BrotliWriter(raw_stream, fsspec_args=fsspec_args)
-            return BrotliReader(raw_stream, fsspec_args=fsspec_args)
-
-        if is_writer or _is_writer_stream(raw_stream):
-            return BrotliWriter(raw_stream, fsspec_args=fsspec_args)
-        return BrotliReader(raw_stream, fsspec_args=fsspec_args)
+        return CompressingStream(
+            _reader_factory=lambda: BrotliReader(raw_stream, fsspec_args=fsspec_args),
+            _writer_factory=lambda: BrotliWriter(raw_stream, fsspec_args=fsspec_args))

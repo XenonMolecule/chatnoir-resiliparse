@@ -111,7 +111,7 @@ def test_python_io_stream_adapter():
 def validate_compressing_stream(raw_stream, comp_stream_cls, comp_val_func, decomp_val_func, raises=True):
     # Compression
     in_value = b'Hello World'
-    comp_stream = comp_stream_cls(raw_stream, 'w')
+    comp_stream = comp_stream_cls(raw_stream)
     comp_stream.write(in_value)
     comp_stream.flush()
     comp_stream.close()
@@ -123,7 +123,7 @@ def validate_compressing_stream(raw_stream, comp_stream_cls, comp_val_func, deco
     assert decomp_val_func(out_value) == in_value
 
     raw_stream.seek(0)
-    comp_stream = comp_stream_cls(raw_stream, 'r')
+    comp_stream = comp_stream_cls(raw_stream)
     out_value = comp_stream.read(1024)
     assert out_value == in_value
 
@@ -180,42 +180,42 @@ def test_brotli_stream():
                                 brotli.decompress,
                                 raises=False)
 
+
 # noinspection PyProtectedMember
-# def validate_buf_reader_on_warc(reader, uncompressed):
-#     # Lines and byte blocks
-#     # sio._buf_reader_py_test_detect_stream_type(reader)
-#     assert reader.tell() == 0
-#     assert reader.readline() == b'WARC/1.0\r\n'
-#     if uncompressed:
-#         assert reader.tell() == 10
-#     assert reader.read(9) == b'WARC-Type'
-#     if uncompressed:
-#         assert reader.tell() == 19
-#
-#     # Limited reader
-#     sio._buf_reader_py_test_set_limit(reader, 512)
-#     assert len(reader.read(1024)) == 512
-#     assert reader.read(1024) == b''
-#     pos = reader.tell()
-#     assert reader.read() == b''
-#     assert reader.tell() == pos
-#     sio._buf_reader_py_test_reset_limit(reader)
-#     assert len(reader.read(1024)) == 1024
-#
-#     Stream consumption
-#     pos = reader.tell()
-#     reader.consume(8)
-#     if uncompressed:
-#         assert reader.tell() == pos + 8
-#     assert len(reader.read(10)) == 10
-#     reader.consume()
-#     assert reader.read() == b''
-#     assert reader.read(1024) == b''
-#     assert reader.tell() > pos
-#
-#     reader.close()
-#
-#
+def validate_buf_reader_on_warc(reader, uncompressed):
+    # Lines and byte blocks
+    sio._buf_reader_py_test_detect_stream_type(reader)
+    assert reader.tell() == 0
+    assert reader.readline() == b'WARC/1.0\r\n'
+    if uncompressed:
+        assert reader.tell() == 10
+    assert reader.read(9) == b'WARC-Type'
+    if uncompressed:
+        assert reader.tell() == 19
+
+    # Limited reader
+    sio._buf_reader_py_test_set_limit(reader, 512)
+    assert len(reader.read(1024)) == 512
+    assert reader.read(1024) == b''
+    pos = reader.tell()
+    assert reader.read() == b''
+    assert reader.tell() == pos
+    sio._buf_reader_py_test_reset_limit(reader)
+    assert len(reader.read(1024)) == 1024
+
+    # Stream consumption
+    pos = reader.tell()
+    reader.consume(8)
+    if uncompressed:
+        assert reader.tell() == pos + 8
+    assert len(reader.read(10)) == 10
+    reader.consume()
+    assert reader.read() == b''
+    assert reader.read(1024) == b''
+    assert reader.tell() > pos
+
+    reader.close()
+
 # def test_buffered_reader():
 #     stream = sio.FileStream(os.path.join(DATA_DIR, 'warcfile.warc'), 'rb')
 #     validate_buf_reader_on_warc(sio.BufferedReader(stream), True)
