@@ -93,8 +93,8 @@ impl_stream_from_path!(BrotliReader, BrotliReaderOptions);
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for BrotliReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = self.inner.as_mut().unwrap().read(buf)?;
-        self.stream_pos += n as u64;
+        let n = self.fill_buf()?.read(buf)?;
+        self.consume(n);
         Ok(n)
     }
 }

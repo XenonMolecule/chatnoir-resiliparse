@@ -165,13 +165,12 @@ impl<T: ReadSeek> GzipReader<T> {
 
 impl_stream_from_path!(GzipReader, GzipReaderOptions);
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for GzipReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let in_buf = self.fill_buf()?;
-        let bytes_read = buf.len().min(in_buf.len());
-        buf[..bytes_read].copy_from_slice(&in_buf[..bytes_read]);
-        self.consume(bytes_read);
-        Ok(bytes_read)
+        let n = self.fill_buf()?.read(buf)?;
+        self.consume(n);
+        Ok(n)
     }
 }
 

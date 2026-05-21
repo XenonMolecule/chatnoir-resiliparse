@@ -95,6 +95,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
 
 impl_stream_from_path!(ChunkedReader, ChunkedReaderOptions);
 
+// noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for ChunkedReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let n = self.fill_buf()?.read(buf)?;
