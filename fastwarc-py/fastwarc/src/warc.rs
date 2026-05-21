@@ -577,11 +577,10 @@ impl WarcRecordPy {
         }
     }
 
-    #[pyo3(signature = (strict_mode=true, auto_decode="none"))]
-    pub fn parse_http(&mut self, strict_mode: bool, auto_decode: &str) -> PyResult<()> {
-        // TODO: Implement parameters
-        let _ = (strict_mode, auto_decode);
-        self.lock().parse_http()?;
+    #[pyo3(signature = (auto_decode="none"))]
+    pub fn parse_http(&mut self, auto_decode: &str) -> PyResult<()> {
+        self.lock()
+            .parse_http_with_decode_opts(auto_decode_str_to_enum(auto_decode)?)?;
         Ok(())
     }
 
@@ -663,6 +662,16 @@ pub struct ArchiveIteratorPy {
     func_filter: Option<Py<PyAny>>,
 }
 
+fn auto_decode_str_to_enum(value: &str) -> PyResult<AutoDecode> {
+    Ok(match value {
+        "none" => AutoDecode::None,
+        "transfer" => AutoDecode::TransferEncoding,
+        "content" => AutoDecode::ContentEncoding,
+        "all" => AutoDecode::All,
+        _ => return Err(PyValueError::new_err(format!("Invalid value for auto_decode: '{}'", value))),
+    })
+}
+
 #[pymethods]
 impl ArchiveIteratorPy {
     #[allow(clippy::too_many_arguments)]
@@ -676,10 +685,9 @@ impl ArchiveIteratorPy {
         func_filter=None,
         verify_digests=false,
         quirks_mode=false,
-        strict_mode=None,
         auto_decode="none",
         stream_detect=true,
-        fsspec_args=None
+        fsspec_args=None,
     ))]
     pub fn __new__(
         py: Python<'_>,
@@ -691,10 +699,10 @@ impl ArchiveIteratorPy {
         func_filter: Option<Py<PyAny>>,
         verify_digests: bool,
         quirks_mode: bool,
-        strict_mode: Option<bool>, // deprecated
         auto_decode: &str,
         stream_detect: bool,
         fsspec_args: Option<Py<PyAny>>,
+        strict_mode: Option<bool>, // deprecated
     ) -> PyResult<Self> {
         // Check if fsspec is `False`
         let use_fsspec = fsspec_args
@@ -721,16 +729,10 @@ impl ArchiveIteratorPy {
             iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
         }
         iterator = iterator
-            .with_quirks_mode(strict_mode.unwrap_or(quirks_mode))
+            .with_quirks_mode(quirks_mode)
             .with_parse_http(parse_http)
             .with_verify_digests(verify_digests)
-            .with_decode_http_payload(match auto_decode {
-                "none" => AutoDecode::None,
-                "transfer" => AutoDecode::TransferEncoding,
-                "content" => AutoDecode::ContentEncoding,
-                "all" => AutoDecode::All,
-                _ => return Err(PyValueError::new_err(format!("Invalid value for auto_decode: '{}'", auto_decode))),
-            });
+            .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?);
 
         Ok(Self {
             inner: iterator,
