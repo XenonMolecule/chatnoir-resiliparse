@@ -19,9 +19,6 @@ from typing import BinaryIO, Callable, Dict, Iterable, Iterator, Literal, Option
 
 from .stream_io import _GenericReader, _GenericWriter, Reader, Writer
 
-# Legacy shims
-from fastwarc.legacy.warc import *  # noqa: F401,F403
-
 
 class WarcRecordType(IntFlag):
     warcinfo = 2

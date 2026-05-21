@@ -26,10 +26,6 @@ warc = _native.warc
 sys.modules[__name__ + ".stream_io"] = stream_io
 sys.modules[__name__ + ".warc"] = warc
 
-ArchiveIterator = warc.ArchiveIterator
-WarcRecord = warc.WarcRecord
-WarcRecordType = warc.WarcRecordType
-
 # Patch legacy shims onto stream_io
 for name in _legacy_shims.__all__:
     setattr(stream_io, name, getattr(_legacy_shims, name))
@@ -48,7 +44,4 @@ __all__ = [
     "LZ4Stream",
     "FastWARCError",
     "StreamError",
-    "ArchiveIterator",
-    "WarcRecord",
-    "WarcRecordType"
 ]

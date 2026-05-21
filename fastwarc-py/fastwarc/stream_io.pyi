@@ -17,7 +17,7 @@ from types import TracebackType
 from typing import BinaryIO, ContextManager, Optional, Protocol, Type, Self, Union
 
 # Legacy shims
-from fastwarc.legacy.stream_io import *  # noqa: F401,F403
+from fastwarc.legacy.stream_io import *
 
 
 class _GenericReader(Protocol):
