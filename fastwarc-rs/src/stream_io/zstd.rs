@@ -230,7 +230,6 @@ impl<T: ReadSeek> io::Read for ZstdReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.ensure_frame_data()?;
         let n = self.inner.as_mut().unwrap().read(buf)?;
-
         self.stream_pos += n as u64;
         Ok(n)
     }

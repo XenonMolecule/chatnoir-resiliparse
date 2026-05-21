@@ -96,8 +96,8 @@ impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = self.inner.as_mut().unwrap().read(buf)?;
-        self.stream_pos += n as u64;
+        let n = self.fill_buf()?.read(buf)?;
+        self.consume(n);
         Ok(n)
     }
 }
@@ -153,7 +153,7 @@ impl<T: ReadSeek> BufRead for Lz4Reader<T> {
         let buf = self.inner.as_mut().unwrap().fill_buf()?;
 
         // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
-        if buf.is_empty() && self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
+        if buf.is_empty() && !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
             let old_pos = self.stream_pos;
             self.inner_seek(SeekFrom::Current(0))?;
             self.stream_pos = old_pos;
