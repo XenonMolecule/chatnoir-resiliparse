@@ -99,3 +99,17 @@ pub trait WarcWrite: io::Write + Any + 'static {
         Ok(())
     }
 }
+
+/// Conversion trait for arbitrary [`io::Read`] types into [`WarcRead`].
+pub trait IntoWarcReader {
+    type Reader: WarcRead;
+
+    fn into_warc_reader(self) -> Self::Reader;
+}
+
+/// Conversion trait for arbitrary [`io::Write`] types into [`WarcWrite`].
+pub trait IntoWarcWriter {
+    type Writer: WarcWrite;
+
+    fn into_warc_writer(self) -> Self::Writer;
+}

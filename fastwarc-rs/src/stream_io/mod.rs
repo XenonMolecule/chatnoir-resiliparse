@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{BufReadSeek, WarcRead};
+use crate::stream_io::traits::{BufReadSeek, IntoWarcReader, IntoWarcWriter, ReadSeek, WarcRead, WarcWrite};
 use std::any::Any;
 use std::io;
-use std::io::SeekFrom;
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Submodules
@@ -80,6 +80,128 @@ macro_rules! impl_to_any_funcs {
     };
 }
 pub(super) use impl_to_any_funcs;
+
+// ===========================================================
+// Wrappers types for raw reader and writer types
+// ===========================================================
+
+/// Wrapper type for arbitrary [`BufReadSeek`] readers that implements [`WarcRead`].
+pub struct RawReaderAdapter<T> {
+    inner: T,
+}
+
+impl<T> RawReaderAdapter<T> {
+    /// Unwrap this [`RawReaderAdapter`], returning the underlying reader.
+    ///
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> BufRead for RawReaderAdapter<T>
+where
+    T: BufReadSeek,
+{
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    fn consume(&mut self, amount: usize) {
+        self.inner.consume(amount);
+    }
+}
+
+impl<T> Read for RawReaderAdapter<T>
+where
+    T: BufReadSeek,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl<T> Seek for RawReaderAdapter<T>
+where
+    T: BufReadSeek,
+{
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.inner.seek(pos)
+    }
+}
+
+impl<T> WarcRead for RawReaderAdapter<T>
+where
+    T: BufReadSeek,
+{
+    impl_to_any_funcs!();
+
+    fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.inner.seek(pos)
+    }
+
+    fn inner_stream_position(&mut self) -> io::Result<u64> {
+        self.inner.stream_position()
+    }
+}
+
+impl<T: ReadSeek> IntoWarcReader for T {
+    type Reader = RawReaderAdapter<BufReader<T>>;
+
+    fn into_warc_reader(self) -> Self::Reader {
+        RawReaderAdapter {
+            inner: BufReader::new(self),
+        }
+    }
+}
+
+/// Wrapper type for arbitrary [`Write`] readers that implements [`WarcWrite`].
+pub struct RawWriterAdapter<T> {
+    inner: T,
+}
+
+impl<T> RawWriterAdapter<T>
+where
+    T: Write + 'static,
+{
+    /// Unwrap this [`RawWriterAdapter`], returning the underlying reader.
+    ///
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> Write for RawWriterAdapter<T>
+where
+    T: Write + 'static,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<T> WarcWrite for RawWriterAdapter<T>
+where
+    T: Write + 'static,
+{
+    impl_to_any_funcs!();
+}
+
+impl<T> IntoWarcWriter for T
+where
+    T: Write + 'static,
+{
+    type Writer = RawWriterAdapter<T>;
+
+    fn into_warc_writer(self) -> Self::Writer {
+        RawWriterAdapter { inner: self }
+    }
+}
 
 // ===========================================================
 // Limited buffered reader

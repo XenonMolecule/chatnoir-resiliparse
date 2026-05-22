@@ -82,7 +82,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
         }
     }
 
-    /// Unwraps this [`Lz4Reader`], returning the underlying reader.
+    /// Unwrap this [`Lz4Reader`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
@@ -230,7 +230,7 @@ impl<T: Write + 'static> Lz4Writer<T> {
         }
     }
 
-    /// Unwraps this [`Lz4Writer`], returning the underlying writer.
+    /// Unwrap this [`Lz4Writer`], returning the underlying writer.
     ///
     /// Writes out buffer contents before returning the inner reader.
     pub fn into_inner(mut self) -> io::Result<T> {

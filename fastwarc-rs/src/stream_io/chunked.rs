@@ -86,7 +86,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
         }
     }
 
-    /// Unwraps this [`ChunkedReader`], returning the underlying reader.
+    /// Unwrap this [`ChunkedReader`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
@@ -286,7 +286,7 @@ impl<T: Write + 'static> ChunkedWriter<T> {
         }
     }
 
-    /// Unwraps this [`ChunkedWriter`], returning the underlying writer.
+    /// Unwrap this [`ChunkedWriter`], returning the underlying writer.
     ///
     /// Writes out buffer contents before returning the inner reader.
     pub fn into_inner(mut self) -> io::Result<T> {
