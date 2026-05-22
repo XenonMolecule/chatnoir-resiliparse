@@ -35,6 +35,11 @@ fn lz4_compress_decompress_roundtrip_validation() -> io::Result<()> {
     test_compress_decompress_roundtrip_validation(compress_frame, decompress_frame)
 }
 
+#[test]
+fn lz4_frame_start_position_in_sync() -> io::Result<()> {
+    test_frame_start_position_in_sync(compress_frame, Lz4Reader::new)
+}
+
 // ===========================================================
 // Specific tests.
 // ===========================================================

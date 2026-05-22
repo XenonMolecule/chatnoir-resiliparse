@@ -23,14 +23,20 @@ fn decompress(data: &[u8], _expected_len: usize) -> io::Result<Vec<u8>> {
     ::zstd::stream::decode_all(data)
 }
 
+// ===========================================================
+// Generic tests.
+// ===========================================================
+
 #[test]
 fn zstd_compress_decompress_roundtrip_validation() -> io::Result<()> {
     test_compress_decompress_roundtrip_validation(compress, decompress)
 }
 
-// ===========================================================
-// Generic tests.
-// ===========================================================
+// TODO: Fix
+// #[test]
+// fn zstd_frame_start_position_in_sync() -> io::Result<()> {
+//     test_frame_start_position_in_sync(compress, ZstdReader::new)
+// }
 
 #[test]
 fn zstd_reader_new_read_seek_and_stream_position() -> io::Result<()> {

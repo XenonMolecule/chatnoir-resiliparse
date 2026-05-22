@@ -52,6 +52,12 @@ fn gzip_compress_decompress_roundtrip_validation() -> io::Result<()> {
 // Generic tests.
 // ===========================================================
 
+// TODO: Fix
+// #[test]
+// fn gzip_frame_start_position_in_sync() -> io::Result<()> {
+//     test_frame_start_position_in_sync(compress_member, GzipReader::new)
+// }
+
 #[test]
 fn gzip_reader_new_read_seek_and_stream_position() -> io::Result<()> {
     test_reader_new_read_seek_and_stream_position(compress_member, GzipReader::new)

@@ -161,6 +161,43 @@ where
     Ok(())
 }
 
+pub fn test_frame_start_position_in_sync<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
+where
+    C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+    R: Fn(Cursor<Vec<u8>>) -> S,
+    S: WarcRead + BufReadSeek,
+{
+    let mut buf = Vec::with_capacity(300);
+    let data = b"abcdefgh".repeat(50);
+    for _ in 0..20 {
+        let compressed = compress_fn(&data)?;
+        buf.extend_from_slice(&compressed);
+    }
+    assert!(!buf.is_empty());
+
+    let mut reader = reader_new_fn(io::Cursor::new(buf));
+    let mut count = 0;
+    let mut last_frame_pos = 0;
+    loop {
+        let mut buf = [0u8];
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            count += 1;
+            break;
+        }
+        let pos = reader.inner_stream_position()?;
+        let fpos = reader.frame_start_position()?;
+        assert!(pos >= fpos);
+        if fpos != last_frame_pos {
+            assert_eq!(pos, fpos);
+            last_frame_pos = fpos;
+            count += 1;
+        }
+    }
+    assert_eq!(count, 20);
+    Ok(())
+}
+
 pub fn test_reader_new_read_seek_and_stream_position<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
 where
     C: Fn(&[u8]) -> io::Result<Vec<u8>>,
