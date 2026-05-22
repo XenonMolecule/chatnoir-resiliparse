@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{CompressingWriter, ReadSeek, WarcRead, WarcWrite, impl_stream_from_path, impl_to_any_funcs};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
@@ -295,8 +296,6 @@ impl<T: Write + 'static> ChunkedWriter<T> {
     }
 }
 
-impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions);
-
 impl<T: Write + 'static> ChunkedWriter<T> {
     fn write_chunk_buffer(&mut self) -> io::Result<usize> {
         let inner = self.inner.as_mut().unwrap();
@@ -310,11 +309,11 @@ impl<T: Write + 'static> ChunkedWriter<T> {
     }
 }
 
+impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions);
+
 impl<T: Write + 'static> WarcWrite for ChunkedWriter<T> {
     impl_to_any_funcs!();
-}
 
-impl<T: Write + 'static> CompressingWriter for ChunkedWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         if self.chunk_buffer.is_empty() && !self.stream_started {
             return Ok(());

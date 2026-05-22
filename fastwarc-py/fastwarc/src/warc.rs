@@ -15,12 +15,11 @@
 use crate::stream_io::{
     PyReaderAdapter, PyWriterAdapter, ReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
 };
-use fastwarc::stream_io::{BufReadSeek, LimitedBufReadSeek};
-use fastwarc::warc::DigestError::StreamError;
-use fastwarc::warc::{
-    ArchiveIteratorOptions, ArchiveIteratorThreadSafe, AutoDecode, HeaderEncoding, HeaderMap, WarcRecord,
-    WarcRecordType,
-};
+use fastwarc::stream_io::LimitedBufReadSeek;
+use fastwarc::stream_io::traits::BufReadSeek;
+use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe};
+use fastwarc::warc::record::DigestError::StreamError;
+use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyIterator, PyString, PyTuple};

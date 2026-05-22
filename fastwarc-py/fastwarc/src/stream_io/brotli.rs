@@ -14,8 +14,8 @@
 
 use super::impl_macros::*;
 use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
-use fastwarc::stream_io::brotli::BrotliWriterOptions;
-use fastwarc::stream_io::{CompressingWriter, DecompressingReader, brotli};
+use fastwarc::stream_io::brotli::{self, BrotliWriterOptions};
+use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 #[pyclass(name = "BrotliReader", extends = DecompressingReaderPy, subclass)]
 pub struct BrotliReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -43,7 +43,7 @@ impl BrotliReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
                 Ok(Box::new(brotli::BrotliReader::with_options(reader, options)))
             },
             |path| Ok(Box::new(brotli::BrotliReader::from_path_with_options(path, options)?)),
@@ -78,7 +78,7 @@ impl BrotliReaderPy {
 
     #[allow(clippy::needless_question_mark)]
     pub fn member_start_position(&mut self) -> io::Result<u64> {
-        forward_fn_call!(self, member_start_position)
+        forward_fn_call!(self, frame_start_position)
     }
 
     pub fn close(&self) -> PyResult<()> {
@@ -88,7 +88,7 @@ impl BrotliReaderPy {
 
 #[pyclass(name = "BrotliWriter", extends = CompressingWriterPy, subclass)]
 pub struct BrotliWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -110,7 +110,7 @@ impl BrotliWriterPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn CompressingWriter + Send>> {
+            |reader| -> io::Result<Box<dyn CompressingWrite + Send>> {
                 Ok(Box::new(brotli::BrotliWriter::with_options(reader, options)))
             },
             |path| Ok(Box::new(brotli::BrotliWriter::from_path_with_options(path, options)?)),

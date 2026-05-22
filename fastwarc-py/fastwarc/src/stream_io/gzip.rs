@@ -14,8 +14,8 @@
 
 use super::impl_macros::*;
 use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
-use fastwarc::stream_io::gzip::MAX_WBITS;
-use fastwarc::stream_io::{CompressingWriter, DecompressingReader, gzip};
+use fastwarc::stream_io::gzip::{self, MAX_WBITS};
+use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 #[pyclass(name = "GzipReader", extends = DecompressingReaderPy, subclass)]
 pub struct GzipReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -48,7 +48,7 @@ impl GzipReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
                 Ok(Box::new(gzip::GzipReader::with_options(reader, options)))
             },
             |path| Ok(Box::new(gzip::GzipReader::from_path_with_options(path, options)?)),
@@ -83,7 +83,7 @@ impl GzipReaderPy {
 
     #[allow(clippy::needless_question_mark)]
     pub fn member_start_position(&mut self) -> io::Result<u64> {
-        forward_fn_call!(self, member_start_position)
+        forward_fn_call!(self, frame_start_position)
     }
 
     pub fn close(&self) -> PyResult<()> {
@@ -93,7 +93,7 @@ impl GzipReaderPy {
 
 #[pyclass(name = "GzipWriter", extends = CompressingWriterPy, subclass)]
 pub struct GzipWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -119,7 +119,7 @@ impl GzipWriterPy {
             py,
             inner,
             fsspec_args,
-            |writer| -> io::Result<Box<dyn CompressingWriter + Send>> {
+            |writer| -> io::Result<Box<dyn CompressingWrite + Send>> {
                 Ok(Box::new(gzip::GzipWriter::with_options(writer, options)))
             },
             |path| Ok(Box::new(gzip::GzipWriter::from_path_with_options(path, options)?)),

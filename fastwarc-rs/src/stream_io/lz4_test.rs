@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::mod_test::helpers::*;
+use crate::stream_io::mod_test::*;
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io::Read;
 

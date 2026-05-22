@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::mod_test::helpers::*;
+use crate::stream_io::mod_test::*;
 use brotli::enc::BrotliEncoderParams;
 
 fn compress(mut data: &[u8]) -> io::Result<Vec<u8>> {

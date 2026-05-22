@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{impl_stream_from_path, impl_to_any_funcs};
-use crate::stream_io::{CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{CompressingWrite, DecompressingRead, ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
@@ -215,8 +215,8 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for GzipReader<T> {
-    fn member_start_position(&mut self) -> io::Result<u64> {
+impl<T: ReadSeek> DecompressingRead for GzipReader<T> {
+    fn frame_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
 }
@@ -479,9 +479,7 @@ impl_stream_from_path!(GzipWriter, GzipWriterOptions);
 
 impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
     impl_to_any_funcs!();
-}
 
-impl<T: Write + 'static> CompressingWriter for GzipWriter<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.member_started {
             return Ok(());
@@ -491,6 +489,8 @@ impl<T: Write + 'static> CompressingWriter for GzipWriter<T> {
         Ok(())
     }
 }
+
+impl<T: Write + 'static> CompressingWrite for GzipWriter<T> {}
 
 impl<T: Write + 'static> Write for GzipWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

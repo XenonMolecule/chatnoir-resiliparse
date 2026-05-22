@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::mod_test::helpers::*;
+use crate::stream_io::mod_test::*;
 use std::io::{Cursor, Read};
 
 // Fixed chunk size for testing.

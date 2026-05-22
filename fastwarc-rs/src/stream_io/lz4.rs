@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::{
-    CompressingWriter, DecompressingReader, ReadSeek, WarcRead, WarcWrite, impl_stream_from_path, impl_to_any_funcs,
-};
+use crate::stream_io::traits::{CompressingWrite, DecompressingRead, ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
@@ -142,8 +141,8 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
     }
 }
 
-impl<T: ReadSeek> DecompressingReader for Lz4Reader<T> {
-    fn member_start_position(&mut self) -> io::Result<u64> {
+impl<T: ReadSeek> DecompressingRead for Lz4Reader<T> {
+    fn frame_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
 }
@@ -248,9 +247,7 @@ impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
 
 impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
     impl_to_any_funcs!();
-}
 
-impl<T: Write + 'static> CompressingWriter for Lz4Writer<T> {
     fn finish(&mut self) -> io::Result<()> {
         if !self.frame_started {
             return Ok(());
@@ -261,6 +258,8 @@ impl<T: Write + 'static> CompressingWriter for Lz4Writer<T> {
         Ok(())
     }
 }
+
+impl<T: Write + 'static> CompressingWrite for Lz4Writer<T> {}
 
 impl<T: Write + 'static> Write for Lz4Writer<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

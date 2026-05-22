@@ -14,7 +14,8 @@
 
 use super::impl_macros::*;
 use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
-use fastwarc::stream_io::{CompressingWriter, DecompressingReader, zstd};
+use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
+use fastwarc::stream_io::zstd;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -23,7 +24,7 @@ use std::sync::Mutex;
 
 #[pyclass(name = "ZstdReader", extends = DecompressingReaderPy, subclass)]
 pub struct ZstdReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -43,7 +44,7 @@ impl ZstdReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
                 match dictionary {
                     Some(d) => Ok(Box::new(zstd::ZstdReader::with_dictionary(reader, d, Some(options)))),
                     _ => Ok(Box::new(zstd::ZstdReader::with_options(reader, options))),
@@ -81,7 +82,7 @@ impl ZstdReaderPy {
 
     #[allow(clippy::needless_question_mark)]
     pub fn member_start_position(&mut self) -> io::Result<u64> {
-        forward_fn_call!(self, member_start_position)
+        forward_fn_call!(self, frame_start_position)
     }
 
     pub fn close(&self) -> PyResult<()> {
@@ -91,7 +92,7 @@ impl ZstdReaderPy {
 
 #[pyclass(name = "ZstdWriter", extends = CompressingWriterPy, subclass)]
 pub struct ZstdWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -116,7 +117,7 @@ impl ZstdWriterPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn CompressingWriter + Send>> {
+            |reader| -> io::Result<Box<dyn CompressingWrite + Send>> {
                 match dictionary {
                     Some(d) => Ok(Box::new(zstd::ZstdWriter::with_dictionary(reader, d, Some(options)))),
                     _ => Ok(Box::new(zstd::ZstdWriter::with_options(reader, options))),

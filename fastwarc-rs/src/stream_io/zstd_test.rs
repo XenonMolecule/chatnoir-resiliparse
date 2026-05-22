@@ -13,15 +13,14 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::mod_test::helpers::*;
-use zstd::stream::{decode_all, encode_all};
+use crate::stream_io::mod_test::*;
 
 fn compress(data: &[u8]) -> io::Result<Vec<u8>> {
-    encode_all(data, 3)
+    ::zstd::stream::encode_all(data, 3)
 }
 
 fn decompress(data: &[u8], _expected_len: usize) -> io::Result<Vec<u8>> {
-    decode_all(data)
+    ::zstd::stream::decode_all(data)
 }
 
 #[test]

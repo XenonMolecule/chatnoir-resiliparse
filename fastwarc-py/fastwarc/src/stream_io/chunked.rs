@@ -13,17 +13,18 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
-use fastwarc::stream_io::{CompressingWriter, DecompressingReader, chunked};
+use crate::stream_io::{CompressingWriterPy, ReaderPy, wrap_reader_stream, wrap_writer_stream};
+use fastwarc::stream_io::chunked;
+use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "ChunkedReader", extends = DecompressingReaderPy, subclass)]
+#[pyclass(name = "ChunkedReader", extends = ReaderPy, subclass)]
 pub struct ChunkedReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingReader + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -42,12 +43,12 @@ impl ChunkedReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingReader + Send>> {
+            |reader| -> io::Result<Box<dyn WarcRead + Send>> {
                 Ok(Box::new(chunked::ChunkedReader::with_options(reader, options)))
             },
             |path| Ok(Box::new(chunked::ChunkedReader::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(ReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }
@@ -75,11 +76,6 @@ impl ChunkedReaderPy {
         forward_fn_call!(self, inner_stream_position)
     }
 
-    #[allow(clippy::needless_question_mark)]
-    pub fn member_start_position(&mut self) -> io::Result<u64> {
-        forward_fn_call!(self, member_start_position)
-    }
-
     pub fn close(&self) -> PyResult<()> {
         impl_reader_close!(self)
     }
@@ -87,7 +83,7 @@ impl ChunkedReaderPy {
 
 #[pyclass(name = "ChunkedWriter", extends = CompressingWriterPy, subclass)]
 pub struct ChunkedWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWriter + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -106,7 +102,7 @@ impl ChunkedWriterPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn CompressingWriter + Send>> {
+            |reader| -> io::Result<Box<dyn WarcWrite + Send>> {
                 Ok(Box::new(chunked::ChunkedWriter::with_options(reader, options)))
             },
             |path| Ok(Box::new(chunked::ChunkedWriter::from_path_with_options(path, options)?)),

@@ -258,6 +258,7 @@ version = "0.16.0"
 dependencies = [
  "brotli",
  "data-encoding",
+ "digest",
  "encoding",
  "lz4_flex",
  "md-5",

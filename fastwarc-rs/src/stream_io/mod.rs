@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stream_io::traits::{BufReadSeek, WarcRead};
 use std::any::Any;
 use std::io;
 use std::io::SeekFrom;
+
 // ===========================================================
 // Submodules
 // ===========================================================
@@ -23,118 +25,8 @@ pub mod brotli;
 pub mod chunked;
 pub mod gzip;
 pub mod lz4;
+pub mod traits;
 pub mod zstd;
-
-// ===========================================================
-// Global trait definitions
-// ===========================================================
-
-pub trait ReadSeek: io::Read + io::Seek + Send + 'static {}
-impl<T: io::Read + io::Seek + Send + ?Sized + 'static> ReadSeek for T {}
-
-pub trait BufReadSeek: io::BufRead + io::Seek + Send + 'static {}
-impl<T: io::BufRead + io::Seek + Send + ?Sized + 'static> BufReadSeek for T {}
-
-// ===========================================================
-// General Reader / Writer trait
-// ===========================================================
-
-pub trait WarcRead: BufReadSeek + Any {
-    /// Get an [`Any`] reference to this [`DecompressingReader`].
-    fn as_any(&self) -> &dyn Any;
-
-    /// Get a mutable [`Any`] reference to this [`DecompressingReader`].
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-
-    /// Convert the [`DecompressingReader`] into [`Any`].
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-
-    /// Seek to an offset, in bytes, in a wrapped inner stream.
-    /// If the stream isn't wrapped, or if the inner stream doesn't perform
-    /// decompression or buffering, then this is the same as [`io::Seek::seek()`].
-    ///
-    /// Seeking on the inner stream may reset the state of the decompressor.
-    /// It is up to the user to seek valid positions from which decompression
-    /// can be resumed.
-    fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64>;
-
-    /// Return the current seek position from the start of a wrapped inner stream.
-    /// If the stream isn't wrapped, or if the inner stream doesn't perform
-    /// decompression or buffering, then this is the same as [`io::Seek::stream_position()`].
-    ///
-    /// The returned position is the logical position on the compressed inner stream,
-    /// which does not consider input buffer sizes. The physical reader position may be
-    /// larger than this.
-    fn inner_stream_position(&mut self) -> io::Result<u64>;
-}
-
-pub trait WarcWrite: io::Write + Any + 'static {
-    /// Get an [`Any`] reference to this [`DecompressingReader`].
-    fn as_any(&self) -> &dyn Any;
-
-    /// Get a mutable [`Any`] reference to this [`DecompressingReader`].
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-
-    /// Convert the [`DecompressingReader`] into [`Any`].
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-}
-
-/// Internal helper for implementing to_any() boilerplate methods.
-macro_rules! impl_to_any_funcs {
-    () => {
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-
-        fn into_any(self: Box<Self>) -> Box<dyn Any> {
-            self
-        }
-    };
-}
-pub(crate) use impl_to_any_funcs;
-
-// ===========================================================
-// Compressors and decompressors
-// ===========================================================
-
-/// Trait for [`io::Read`] stream implementations reading from
-/// compressed input streams.
-pub trait DecompressingReader: WarcRead {
-    /// Return the start position, in bytes, of the current member / frame
-    /// in the compressed inner stream. If the compression format does not support
-    /// multi-member streams, this is always the beginning of the stream.
-    ///
-    /// # Returns
-    ///
-    /// Position, in bytes, of the current member
-    fn member_start_position(&mut self) -> io::Result<u64> {
-        Ok(0)
-    }
-}
-
-/// Trait for [`io::Write`] stream implementations that write compressed data
-/// onto an output stream.
-pub trait CompressingWriter: WarcWrite {
-    /// Finish a compression member / frame and reset the compressor state.
-    ///
-    /// If the compressor supports multi-member streams, the writer can be
-    /// used again after this to start a new member / frame. Otherwise, writing
-    /// further bytes may yield an error. Calling this method without an open
-    /// member / frame is a no-op.
-    ///
-    /// Does not necessarily flush buffer contents to the inner stream.
-    /// Users should call [`io::Write::flush()`] afterward to ensure that
-    /// all pending data is safely written.
-    ///
-    /// The behavior is implementation-specific and may do nothing.
-    fn finish(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
 
 // ===========================================================
 // Helper macros
@@ -169,7 +61,25 @@ macro_rules! impl_stream_from_path {
         }
     };
 }
-pub(crate) use impl_stream_from_path;
+pub(super) use impl_stream_from_path;
+
+/// Internal helper for implementing to_any() boilerplate methods.
+macro_rules! impl_to_any_funcs {
+    () => {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn into_any(self: Box<Self>) -> Box<dyn Any> {
+            self
+        }
+    };
+}
+pub(super) use impl_to_any_funcs;
 
 // ===========================================================
 // Limited buffered reader
@@ -265,7 +175,7 @@ impl LimitedBufReadSeek for LimitedBufReader {
 /// Internal type for wrapped payload readers.
 /// This is only there to fulfil the type contracts on `WarcRecord.reader` and it implements an
 /// `into_inner()` method that doesn't erase the [`WarcRead`] trait (important for unwrapping via [`Any`]).
-pub(crate) type LimitedBufReaderOuterWrap = LimitedBufReaderImpl<Box<dyn WarcRead>>;
+pub(super) type LimitedBufReaderOuterWrap = LimitedBufReaderImpl<Box<dyn WarcRead>>;
 
 impl LimitedBufReadSeek for LimitedBufReaderOuterWrap {
     fn set_limit(&mut self, limit: u64) {
@@ -287,7 +197,7 @@ impl LimitedBufReadSeek for LimitedBufReaderOuterWrap {
 }
 
 impl LimitedBufReaderOuterWrap {
-    pub(crate) fn into_inner_warc(self) -> Box<dyn WarcRead> {
+    pub fn into_inner_warc(self) -> Box<dyn WarcRead> {
         self.reader
     }
 }

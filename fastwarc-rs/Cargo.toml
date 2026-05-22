@@ -26,6 +26,7 @@ sha2 = "0.11"
 time = { version = "0.3", features = ["formatting"] }
 zlib-rs = "0.6"
 zstd = { version = "0.13", features = ["zstdmt"] }
+digest = "0.11"
 
 [dev-dependencies]
 pretty_assertions.workspace = true
