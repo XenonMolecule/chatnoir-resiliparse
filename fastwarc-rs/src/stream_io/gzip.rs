@@ -28,6 +28,7 @@ pub struct GzipReader<T: ReadSeek> {
     deflate: Inflate,
     stream_pos: u64,
     member_pos: u64,
+    next_member_pos: u64,
     buf: Vec<u8>,
     buf_pos: usize,
     buf_len: usize,
@@ -121,6 +122,7 @@ impl<T: ReadSeek> GzipReader<T> {
             deflate: Inflate::new(options.expect_header, window_bits),
             stream_pos: 0,
             member_pos,
+            next_member_pos: member_pos,
             buf: vec![0; options.capacity * decomp_ratio as usize],
             buf_pos: 0,
             buf_len: 0,
@@ -205,7 +207,7 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
         self.buf_pos = 0;
         self.buf_len = 0;
         let new_pos = self.inner.seek(pos)?;
-        self.member_pos = new_pos;
+        self.next_member_pos = new_pos;
         self.stream_pos = 0;
         Ok(new_pos)
     }
@@ -214,12 +216,12 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
         self.inner.stream_position()
     }
 
-    fn is_stream_decoder(&self) -> bool {
-        true
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+        Ok(Some(self.member_pos))
     }
 
-    fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(self.member_pos)
+    fn is_stream_decoder(&self) -> bool {
+        true
     }
 }
 
@@ -236,13 +238,12 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             let total_out = self.deflate.total_out();
             let total_in = self.deflate.total_in();
 
-            let inner_pos = self.inner.stream_position()?;
             let in_buf = self.inner.fill_buf()?;
             let in_buf_len = in_buf.len();
 
-            // New member and not EOF
-            if total_in == 0 && in_buf_len > 0 {
-                self.member_pos = inner_pos;
+            // New member started and not EOF
+            if self.next_member_pos != self.member_pos && in_buf_len > 0 {
+                self.member_pos = self.next_member_pos;
             }
 
             let status = self
@@ -257,8 +258,10 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             self.inner.consume(in_delta as usize);
             self.buf_len += out_delta as usize;
 
+            // Member end or EOF
             if matches!(status, zlib_rs::Status::StreamEnd) {
                 self.deflate = Inflate::new(true, self.window_bits);
+                self.next_member_pos = self.inner.stream_position()?;
                 break;
             }
 

@@ -32,12 +32,6 @@ fn zstd_compress_decompress_roundtrip_validation() -> io::Result<()> {
     test_compress_decompress_roundtrip_validation(compress, decompress)
 }
 
-// TODO: Fix
-// #[test]
-// fn zstd_frame_start_position_in_sync() -> io::Result<()> {
-//     test_frame_start_position_in_sync(compress, ZstdReader::new)
-// }
-
 #[test]
 fn zstd_reader_new_read_seek_and_stream_position() -> io::Result<()> {
     test_reader_new_read_seek_and_stream_position(compress, ZstdReader::new)
@@ -65,7 +59,12 @@ fn zstd_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 
 #[test]
 fn zstd_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, ZstdReader::new, true)
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, ZstdReader::new)
+}
+
+#[test]
+fn zstd_frame_start_position_in_sync() -> io::Result<()> {
+    test_frame_start_position_in_sync(compress, ZstdReader::new, 0)
 }
 
 #[test]

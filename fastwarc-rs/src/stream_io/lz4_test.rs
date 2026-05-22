@@ -35,11 +35,6 @@ fn lz4_compress_decompress_roundtrip_validation() -> io::Result<()> {
     test_compress_decompress_roundtrip_validation(compress_frame, decompress_frame)
 }
 
-#[test]
-fn lz4_frame_start_position_in_sync() -> io::Result<()> {
-    test_frame_start_position_in_sync(compress_frame, Lz4Reader::new)
-}
-
 // ===========================================================
 // Specific tests.
 // ===========================================================
@@ -84,7 +79,12 @@ fn lz4_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 
 #[test]
 fn lz4_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_frame, Lz4Reader::new, true)
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_frame, Lz4Reader::new)
+}
+
+#[test]
+fn lz4_frame_start_position_in_sync() -> io::Result<()> {
+    test_frame_start_position_in_sync(compress_frame, Lz4Reader::new, 4)
 }
 
 #[test]

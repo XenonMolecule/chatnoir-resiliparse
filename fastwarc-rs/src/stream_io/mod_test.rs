@@ -161,43 +161,6 @@ where
     Ok(())
 }
 
-pub fn test_frame_start_position_in_sync<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
-where
-    C: Fn(&[u8]) -> io::Result<Vec<u8>>,
-    R: Fn(Cursor<Vec<u8>>) -> S,
-    S: WarcRead + BufReadSeek,
-{
-    let mut buf = Vec::with_capacity(300);
-    let data = b"abcdefgh".repeat(50);
-    for _ in 0..20 {
-        let compressed = compress_fn(&data)?;
-        buf.extend_from_slice(&compressed);
-    }
-    assert!(!buf.is_empty());
-
-    let mut reader = reader_new_fn(io::Cursor::new(buf));
-    let mut count = 0;
-    let mut last_frame_pos = 0;
-    loop {
-        let mut buf = [0u8];
-        let n = reader.read(&mut buf)?;
-        if n == 0 {
-            count += 1;
-            break;
-        }
-        let pos = reader.inner_stream_position()?;
-        let fpos = reader.frame_start_position()?;
-        assert!(pos >= fpos);
-        if fpos != last_frame_pos {
-            assert_eq!(pos, fpos);
-            last_frame_pos = fpos;
-            count += 1;
-        }
-    }
-    assert_eq!(count, 20);
-    Ok(())
-}
-
 pub fn test_reader_new_read_seek_and_stream_position<C, R, S>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
 where
     C: Fn(&[u8]) -> io::Result<Vec<u8>>,
@@ -350,7 +313,6 @@ where
 pub fn test_reader_inner_seek_inner_stream_position_and_member_tracking<C, R, S>(
     compress_fn: C,
     reader_new_fn: R,
-    supported_members: bool,
 ) -> io::Result<()>
 where
     C: Fn(&[u8]) -> io::Result<Vec<u8>>,
@@ -363,8 +325,10 @@ where
     let first_member = compress_fn(&first_plain)?;
     let second_member = compress_fn(&second_plain)?;
 
+    let frames_supported = reader_new_fn(Cursor::new(Vec::new())).frame_start_position()?.is_some();
+
     let mut combined;
-    if supported_members {
+    if frames_supported {
         combined = first_member.clone();
         combined.extend_from_slice(&second_member);
     } else {
@@ -377,8 +341,8 @@ where
     let mut first_out = vec![0; first_plain.len() - 1];
     reader.read_exact(&mut first_out)?;
     assert_eq!(first_out, first_plain[..first_plain.len() - 1]);
-    if supported_members {
-        assert_eq!(reader.frame_start_position()?, 0);
+    if frames_supported {
+        assert_eq!(reader.frame_start_position()?.unwrap(), 0);
     }
     assert_eq!(reader.stream_position()?, first_out.len() as u64);
     let inner_pos_first = reader.inner_stream_position()?;
@@ -388,13 +352,13 @@ where
     let mut one_more_byte = [0; 1];
     reader.read_exact(&mut one_more_byte)?;
     assert_eq!(one_more_byte, first_plain[first_plain.len() - 1..]);
-    if supported_members {
-        assert_eq!(reader.frame_start_position()?, 0);
+    if frames_supported {
+        assert_eq!(reader.frame_start_position()?.unwrap(), 0);
     }
     assert_eq!(reader.stream_position()?, (first_out.len() + 1) as u64);
     assert!(reader.inner_stream_position()? >= inner_pos_first);
 
-    if !supported_members {
+    if !frames_supported {
         return Ok(());
     }
 
@@ -403,19 +367,19 @@ where
     let mut first_byte_second_member = [0; 1];
     reader.read_exact(&mut first_byte_second_member)?;
     assert_eq!(first_byte_second_member[0], second_plain[0]);
-    assert_eq!(reader.frame_start_position()?, first_member.len() as u64);
+    assert_eq!(reader.frame_start_position()?.unwrap(), first_member.len() as u64);
     assert_eq!(reader.stream_position()?, (first_out.len() + 2) as u64);
     assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
     // Reset the inner stream to the beginning of the second member and decompress again.
     // This should decompress without errors and reset stream_position() to 0.
     assert_eq!(reader.inner_seek(SeekFrom::Start(first_member.len() as u64))?, first_member.len() as u64);
-    assert_eq!(reader.frame_start_position()?, first_member.len() as u64);
+    assert_eq!(reader.frame_start_position()?.unwrap(), first_member.len() as u64);
     assert_eq!(reader.stream_position()?, 0);
     let mut first_two_bytes_second_member = [0; 2];
     reader.read_exact(&mut first_two_bytes_second_member)?;
     assert_eq!(first_two_bytes_second_member, second_plain[..2]);
-    assert_eq!(reader.frame_start_position()?, first_member.len() as u64);
+    assert_eq!(reader.frame_start_position()?.unwrap(), first_member.len() as u64);
     assert_eq!(reader.stream_position()?, 2);
     assert!(reader.inner_stream_position()? >= first_member.len() as u64);
 
@@ -423,10 +387,71 @@ where
     let mut rest = Vec::with_capacity(second_plain.len() - 2);
     reader.read_to_end(&mut rest)?;
     assert_eq!(rest, second_plain[2..]);
-    assert_eq!(reader.frame_start_position()?, first_member.len() as u64);
+    assert_eq!(reader.frame_start_position()?.unwrap(), first_member.len() as u64);
     assert_eq!(reader.stream_position()?, second_plain.len() as u64);
     assert_eq!(reader.inner_stream_position()?, combined_len as u64);
 
+    Ok(())
+}
+
+pub fn test_frame_start_position_in_sync<C, R, S>(
+    compress_fn: C,
+    reader_new_fn: R,
+    frame_end_offset: usize,
+) -> io::Result<()>
+where
+    C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+    R: Fn(Cursor<Vec<u8>>) -> S,
+    S: WarcRead + BufReadSeek,
+{
+    const COUNT: usize = 20;
+    let data = b"abcdefgh".repeat(200);
+    // let mut w = GzipWriter::new(io::Cursor::new(data.clone()));
+    // w.write_all(&data)?;
+    // let compressed = w.into_inner()?.into_inner();
+    let compressed = compress_fn(&data)?;
+    let mut expected_offsets = Vec::with_capacity(COUNT);
+    let mut buf = Vec::with_capacity(300);
+    for _ in 0..COUNT {
+        expected_offsets.push(buf.len() as u64);
+        buf.extend_from_slice(&compressed);
+    }
+    assert_eq!(buf.len(), compressed.len() * COUNT);
+
+    let mut reader = reader_new_fn(io::Cursor::new(buf));
+    let mut count = 0;
+    let mut last_frame_pos = 0;
+    let mut n_read = 0;
+    loop {
+        let mut out_buf = [0u8; 200];
+        let pos = reader.inner_stream_position()?;
+        let fpos = reader.frame_start_position()?.unwrap();
+        assert!(pos >= fpos);
+
+        let n = reader.read(&mut out_buf)?;
+        if n == 0 {
+            break;
+        }
+        n_read += n;
+        if n_read == data.len() {
+            // frame_start_position() should always be start of frame.
+            if count != 0 {
+                assert_eq!(fpos, last_frame_pos + compressed.len() as u64);
+            } else {
+                assert_eq!(fpos, 0);
+            }
+            assert_eq!(fpos, expected_offsets[count]);
+
+            // stream_position() should be end of frame (minus frame terminator padding)
+            assert_eq!(pos as usize, fpos as usize + compressed.len() - frame_end_offset);
+
+            count += 1;
+            n_read = 0;
+            println!("{}: {} -> {} -> {}", count, fpos, pos, last_frame_pos);
+            last_frame_pos = fpos;
+        }
+    }
+    assert_eq!(count, COUNT);
     Ok(())
 }
 

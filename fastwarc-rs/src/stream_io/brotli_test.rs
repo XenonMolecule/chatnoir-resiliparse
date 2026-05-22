@@ -64,7 +64,7 @@ fn brotli_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 
 #[test]
 fn gzip_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, BrotliReader::new, false)
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, BrotliReader::new)
 }
 
 #[test]

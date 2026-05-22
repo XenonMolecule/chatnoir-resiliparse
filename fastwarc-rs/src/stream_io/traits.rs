@@ -59,6 +59,17 @@ pub trait WarcRead: BufReadSeek + Any {
     /// larger than this.
     fn inner_stream_position(&mut self) -> io::Result<u64>;
 
+    /// If the stream uses a frame format, return the start position, in bytes, of the
+    /// current frame in the wrapped inner stream. If the stream format does not support
+    /// frames, the return value is `Ok(None)`.
+    ///
+    /// # Returns
+    ///
+    /// Position, in bytes, of the current member
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+        Ok(None)
+    }
+
     /// Return whether this reader decodes or merely reads it.
     ///
     /// If autodetection of the stream compression type or encoding is to be performed,
@@ -67,17 +78,6 @@ pub trait WarcRead: BufReadSeek + Any {
     /// may advance the wrapped coded stream, which can result in incorrect inner stream positions.
     fn is_stream_decoder(&self) -> bool {
         false
-    }
-
-    /// If the stream uses a frame format, return the start position, in bytes, of the
-    /// current frame in the wrapped inner stream. If the stream format does not support
-    /// frames, this is always the beginning of the stream (`Ok(0)`).
-    ///
-    /// # Returns
-    ///
-    /// Position, in bytes, of the current member
-    fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(0)
     }
 }
 

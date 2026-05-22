@@ -264,6 +264,7 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let new_pos = self.reset_decoder(Some(pos))?;
         self.stream_pos = 0;
+        self.frame_start_pos = new_pos;
         Ok(new_pos)
     }
 
@@ -271,12 +272,12 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
 
-    fn is_stream_decoder(&self) -> bool {
-        true
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+        Ok(Some(self.frame_start_pos))
     }
 
-    fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(self.frame_start_pos)
+    fn is_stream_decoder(&self) -> bool {
+        true
     }
 }
 

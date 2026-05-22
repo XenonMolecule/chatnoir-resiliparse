@@ -98,7 +98,7 @@ fn chunked_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 
 #[test]
 fn brotli_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-    test_reader_inner_seek_inner_stream_position_and_member_tracking(chunk, ChunkedReader::new, false)
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(chunk, ChunkedReader::new)
 }
 
 #[test]

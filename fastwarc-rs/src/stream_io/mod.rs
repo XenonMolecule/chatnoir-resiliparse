@@ -213,7 +213,7 @@ where
         (**self).is_stream_decoder()
     }
 
-    fn frame_start_position(&mut self) -> io::Result<u64> {
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
         (**self).frame_start_position()
     }
 }
@@ -428,6 +428,10 @@ impl WarcRead for LimitedBufReader {
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.inner_stream_position()
+    }
+
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+        self.inner.frame_start_position()
     }
 
     fn is_stream_decoder(&self) -> bool {

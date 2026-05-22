@@ -52,12 +52,6 @@ fn gzip_compress_decompress_roundtrip_validation() -> io::Result<()> {
 // Generic tests.
 // ===========================================================
 
-// TODO: Fix
-// #[test]
-// fn gzip_frame_start_position_in_sync() -> io::Result<()> {
-//     test_frame_start_position_in_sync(compress_member, GzipReader::new)
-// }
-
 #[test]
 fn gzip_reader_new_read_seek_and_stream_position() -> io::Result<()> {
     test_reader_new_read_seek_and_stream_position(compress_member, GzipReader::new)
@@ -85,7 +79,12 @@ fn gzip_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 
 #[test]
 fn gzip_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
-    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_member, GzipReader::new, true)
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_member, GzipReader::new)
+}
+
+#[test]
+fn gzip_frame_start_position_in_sync() -> io::Result<()> {
+    test_frame_start_position_in_sync(compress_member, GzipReader::new, 0)
 }
 
 #[test]

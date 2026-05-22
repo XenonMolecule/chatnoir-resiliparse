@@ -1182,6 +1182,11 @@ impl WarcRecord {
                 || (trimmed.starts_with(b"WARC/0.") && trimmed.len() <= 9)
             {
                 self.headers.status_line = Some(trimmed.to_owned());
+                if let Some(p) = reader.frame_start_position()? {
+                    // If supported, use the (potentially more accurate) member start position,
+                    // instead of the starting inner stream position.
+                    self.stream_pos = p;
+                }
                 break;
             } else if !quirks_mode {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid WARC header"));

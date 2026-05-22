@@ -98,17 +98,18 @@ impl<T: ReadSeek> Lz4Reader<T> {
             return Ok(());
         }
 
-        // More data available in the decoder buffer.
-        if !self.inner.as_mut().unwrap().fill_buf()?.is_empty() {
+        let buf_empty = self.inner.as_mut().unwrap().fill_buf()?.is_empty();
+        if !buf_empty {
             return Ok(());
         }
 
         // Frame end, but more data available in the underlying stream.
         // Reset the decoder and advance member_pos.
-        if !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
+        if buf_empty && !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
             let old_pos = self.stream_pos;
-            self.frame_start_pos = self.inner_seek(SeekFrom::Current(0))?;
+            let new_pos = self.inner_seek(SeekFrom::Current(0))?;
             self.stream_pos = old_pos;
+            self.frame_start_pos = new_pos;
         }
 
         Ok(())
@@ -166,12 +167,12 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
         self.inner.as_mut().unwrap().get_mut().stream_position()
     }
 
-    fn is_stream_decoder(&self) -> bool {
-        true
+    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+        Ok(Some(self.frame_start_pos))
     }
 
-    fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(self.frame_start_pos)
+    fn is_stream_decoder(&self) -> bool {
+        true
     }
 }
 

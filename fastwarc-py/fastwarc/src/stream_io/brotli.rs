@@ -77,7 +77,7 @@ impl BrotliReaderPy {
     }
 
     #[allow(clippy::needless_question_mark)]
-    pub fn member_start_position(&mut self) -> io::Result<u64> {
+    pub fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
         forward_fn_call!(self, frame_start_position)
     }
 

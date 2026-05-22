@@ -90,7 +90,7 @@ impl WarcReaderPy {
         Ok(py.NotImplemented())
     }
 
-    pub fn member_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    pub fn frame_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
 }
