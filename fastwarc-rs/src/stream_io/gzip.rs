@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
-use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
@@ -198,7 +198,7 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
 }
 
 impl<T: ReadSeek> WarcRead for GzipReader<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.deflate = Inflate::new(true, self.window_bits);
@@ -476,7 +476,7 @@ impl<T: Write + 'static> GzipWriter<T> {
 impl_stream_from_path!(GzipWriter, GzipWriterOptions);
 
 impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
         if !self.member_started {

@@ -26,7 +26,7 @@ use std::io::{self, BufRead, Read, Seek, Write};
 
 #[test]
 fn limited_buf_read_seek_limit_seek() -> io::Result<()> {
-    let mut limited = LimitedBufReader::new(Box::new(io::Cursor::new(b"abcdef".to_vec())), Some(4));
+    let mut limited = LimitedBufReader::new(io::Cursor::new(b"abcdef".to_vec()), Some(4));
 
     assert_eq!(limited.fill_buf()?, b"abcd");
     limited.consume(2);
@@ -376,7 +376,7 @@ fn parse_warc_headers() -> io::Result<()> {
     let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
     let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
 
-    let reader = Box::new(io::Cursor::new(warc_data));
+    let reader = io::Cursor::new(warc_data);
     let mut record1 = WarcRecord::new();
 
     assert_eq!(record1.content_length(), 0);
@@ -434,7 +434,7 @@ fn parse_http_headers() -> io::Result<()> {
     let payload = "Hello World";
     let warc_data = http_response_warc_data("<urn:uuid:record-id>", payload);
 
-    let reader = Box::new(io::Cursor::new(warc_data));
+    let reader = io::Cursor::new(warc_data);
     let mut record = WarcRecord::new();
     record.attach_reader(reader);
     record.parse_warc_headers()?;
@@ -474,12 +474,12 @@ fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
         .to_vec();
 
     let mut strict = WarcRecord::new();
-    strict.attach_reader(Box::new(io::Cursor::new(warc_data.clone())));
+    strict.attach_reader(io::Cursor::new(warc_data.clone()));
     let err = strict.parse_warc_headers().unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::InvalidData);
 
     let mut record = WarcRecord::new();
-    record.attach_reader(Box::new(io::Cursor::new(warc_data)));
+    record.attach_reader(io::Cursor::new(warc_data));
     let bytes_read = record.parse_warc_headers_quirks(true)?;
     assert!(bytes_read > 0);
     assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
@@ -752,7 +752,7 @@ fn verify_record_digests() -> io::Result<()> {
     let bytes_written = writable.write_with_block_size_checksum(&mut serialized, 2, true)?;
     assert_eq!(bytes_written, serialized.len());
 
-    let mut reparsed = WarcRecord::from_reader(Box::new(io::Cursor::new(serialized)))?;
+    let mut reparsed = WarcRecord::from_reader(io::Cursor::new(serialized))?;
     assert!(reparsed.headers().contains_key("WARC-Block-Digest"));
     assert!(reparsed.verify_block_digest(false).unwrap());
 
@@ -797,9 +797,8 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
     let record_data1 = warc_record_data("resource", "<urn:uuid:consume-freeze-1>", None, b"ABCDEF");
     let record_data2 = warc_record_data("metadata", "<urn:uuid:consume-freeze-2>", None, b"XYZ");
 
-    let mut consumed = WarcRecord::from_reader(Box::new(io::Cursor::new(
-        [record_data1.as_slice(), record_data2.as_slice()].concat(),
-    )))?;
+    let mut consumed =
+        WarcRecord::from_reader(io::Cursor::new([record_data1.as_slice(), record_data2.as_slice()].concat()))?;
     assert_eq!(consumed.consume_n(2)?, 2);
     assert_eq!(consumed.reader_mut().unwrap().stream_position()?, 2);
     assert_eq!(consumed.consume()?, 4);
@@ -808,7 +807,7 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
     let next = consumed.next().unwrap()?;
     assert_eq!(next.record_id().as_deref(), Some("<urn:uuid:consume-freeze-2>"));
 
-    let mut frozen = WarcRecord::from_reader(Box::new(io::Cursor::new(record_data1)))?;
+    let mut frozen = WarcRecord::from_reader(io::Cursor::new(record_data1))?;
     let mut prefix = [0u8; 2];
     frozen.reader_mut().unwrap().read_exact(&mut prefix)?;
     assert_eq!(&prefix, b"AB");
@@ -830,7 +829,7 @@ fn record_encoded_http_payload() -> io::Result<()> {
 
     let read_record = |payload_encoded: &[u8], tenc, cenc, dec_opts| -> io::Result<Vec<u8>> {
         let data = http_response_warc_data_encoded("<urn:uuid:abc>", payload_encoded, tenc, cenc);
-        let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(data)))?;
+        let mut rec = WarcRecord::from_reader(io::Cursor::new(data))?;
         rec.parse_http_with_decode_opts(dec_opts)?;
         let mut buf = Vec::with_capacity(payload_raw.len());
         rec.reader_mut().unwrap().read_to_end(&mut buf)?;
@@ -921,7 +920,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
 
     // Create HTTP WARC record with encoded payload.
     let record_data = http_response_warc_data_encoded("<urn:uuid:abc>", &payload_encoded, Some("gzip"), None);
-    let mut rec = WarcRecord::from_reader(Box::new(io::Cursor::new(record_data.clone())))?;
+    let mut rec = WarcRecord::from_reader(io::Cursor::new(record_data.clone()))?;
 
     // Freeze record
     rec.freeze()?;
@@ -955,7 +954,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     // Test freezing and eager decoding don't mess with record boundaries.
     let record_data = [record_data.clone(), record_data].concat();
     let mut count = 0;
-    for r in ArchiveIterator::new(Box::new(io::Cursor::new(record_data))).with_parse_http(false) {
+    for r in ArchiveIterator::new(io::Cursor::new(record_data)).with_parse_http(false) {
         r?.with_mut(|r| -> io::Result<()> {
             r.freeze()?;
             r.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;

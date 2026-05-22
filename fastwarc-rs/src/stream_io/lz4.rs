@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
-use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
@@ -125,7 +125,7 @@ impl<T: ReadSeek> Seek for Lz4Reader<T> {
 }
 
 impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut inner = self.inner.take().unwrap().into_inner();
@@ -244,7 +244,7 @@ impl<T: Write + 'static> Lz4Writer<T> {
 impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
 
 impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
         if !self.frame_started {

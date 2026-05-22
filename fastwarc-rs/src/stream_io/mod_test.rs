@@ -105,40 +105,40 @@ fn limited_buf_read_seek_read_line() -> std::io::Result<()> {
     let mut inner: Vec<u8> = b"abcd\nefghij\r\n\n".to_vec();
     inner.extend_from_slice(b"a".repeat(128).as_slice());
     let reader_limit = 130;
-    let mut reader = LimitedBufReader::new(Box::new(io::Cursor::new(inner)), Some(reader_limit));
+    let mut reader = LimitedBufReader::new(io::Cursor::new(inner), Some(reader_limit));
 
     let mut line = Vec::new();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 5);
+    assert_eq!(reader.read_line(&mut line, 64)?, 5);
     assert_eq!(line, b"abcd\n");
     assert_eq!(reader.stream_position()?, 5);
 
     // Line with CRLF
     line.clear();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 8);
+    assert_eq!(reader.read_line(&mut line, 64)?, 8);
     assert_eq!(line, b"efghij\r\n");
     assert_eq!(reader.stream_position()?, 13);
 
     // Empty line
     line.clear();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 1);
+    assert_eq!(reader.read_line(&mut line, 64)?, 1);
     assert_eq!(line, b"\n");
     assert_eq!(reader.stream_position()?, 14);
 
     // Last line too long
     line.clear();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 64);
+    assert_eq!(reader.read_line(&mut line, 64)?, 64);
     assert_eq!(line, b"a".repeat(64).as_slice());
     assert_eq!(reader.stream_position()?, 78);
 
     // Read rest (truncated by reader limit)
     line.clear();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 52);
+    assert_eq!(reader.read_line(&mut line, 64)?, 52);
     assert_eq!(line, b"a".repeat(52).as_slice());
     assert_eq!(reader.stream_position()?, 130);
 
     // EOF
     line.clear();
-    assert_eq!(LimitedBufReadSeek::read_line(&mut reader, &mut line, 64)?, 0);
+    assert_eq!(reader.read_line(&mut line, 64)?, 0);
     assert!(line.is_empty());
     assert_eq!(reader.stream_position()?, 130);
 

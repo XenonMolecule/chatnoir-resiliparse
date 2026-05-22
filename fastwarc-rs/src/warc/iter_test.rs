@@ -29,12 +29,12 @@ use digest::Digest;
 use sha1::Sha1;
 use std::fs::File;
 use std::io;
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn archive_iterator_option_setters() -> io::Result<()> {
-    let reader = Box::new(io::Cursor::new(Vec::new()));
+    let reader = io::Cursor::new(Vec::new());
     let it = ArchiveIterator::new(reader.clone());
     assert_eq!(it.options, ArchiveIteratorOptions::default());
 
@@ -86,7 +86,7 @@ fn archive_iterator() -> io::Result<()> {
     let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
     let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
 
-    let reader = Box::new(io::Cursor::new(warc_data));
+    let reader = io::Cursor::new(warc_data);
 
     // Manual iteration
     let mut record1 = WarcRecord::from_reader(reader.clone())?;
@@ -135,7 +135,7 @@ fn archive_iterator() -> io::Result<()> {
 #[test]
 fn archive_iterator_into_inner() -> io::Result<()> {
     let record_data = warc_record_data("resource", "<urn:uuid:into-inner>", None, b"ABC");
-    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone())))
+    let mut reader = ArchiveIterator::new(io::Cursor::new(record_data.clone()))
         .into_inner()
         .unwrap();
 
@@ -149,23 +149,23 @@ fn archive_iterator_into_inner() -> io::Result<()> {
 #[test]
 fn archive_iterator_stream_compression_autodetection() -> io::Result<()> {
     let plain_warc = get_fixture_path("warcfile.warc");
-    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(plain_warc)?)));
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(plain_warc)?));
     it.next().transpose()?;
     it.next().transpose()?;
 
     let gzip_warc = get_fixture_path("warcfile.warc.gz");
-    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(gzip_warc)?)));
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(gzip_warc)?));
     it.next().transpose()?;
     it.next().transpose()?;
 
     let lz4_warc = get_fixture_path("warcfile.warc.lz4");
-    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(lz4_warc)?)));
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(lz4_warc)?));
     it.next().transpose()?;
     it.next().transpose()?;
 
     // Gzip without autodetection
     let gzip_warc = get_fixture_path("warcfile.warc.gz");
-    let mut it = ArchiveIterator::new(Box::new(io::BufReader::new(File::open(gzip_warc)?))).with_stream_detect(false);
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(gzip_warc)?)).with_stream_detect(false);
     assert_eq!(it.next().transpose().unwrap_err().kind(), io::ErrorKind::InvalidData);
 
     Ok(())
@@ -209,7 +209,7 @@ fn archive_iterator_from_path() -> io::Result<()> {
 fn archive_iterator_thread_safe() -> io::Result<()> {
     let record_data1 = warc_record_data("resource", "<urn:uuid:threadsafe-1>", None, b"ABC");
     let record_data2 = warc_record_data("metadata", "<urn:uuid:threadsafe-2>", None, b"XYZ");
-    let reader = Box::new(io::Cursor::new([record_data1.as_slice(), record_data2.as_slice()].concat()));
+    let reader = io::Cursor::new([record_data1.as_slice(), record_data2.as_slice()].concat());
 
     let mut it = ArchiveIteratorThreadSafe::new(reader);
     let record1 = it.next().unwrap()?;
@@ -233,11 +233,11 @@ fn archive_iterator_quirks_mode() -> io::Result<()> {
     record_data.extend_from_slice(b"bar\r\n\r\n");
     record_data.extend_from_slice(&warc_record_data("resource", "<urn:uuid:d>", None, b"ABC"));
 
-    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data.clone())));
+    let mut reader = ArchiveIterator::new(io::Cursor::new(record_data.clone()));
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
     assert!(reader.next().unwrap().is_err());
 
-    let mut reader = ArchiveIterator::new(Box::new(io::Cursor::new(record_data))).with_quirks_mode(true);
+    let mut reader = ArchiveIterator::new(io::Cursor::new(record_data)).with_quirks_mode(true);
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:a>");
     // b skipped due to corrupted WARC/1.1 header start
     assert_eq!(reader.next().unwrap()?.borrow().record_id().unwrap(), "<urn:uuid:c>");
@@ -274,7 +274,7 @@ fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
     data.push(http_response_warc_data_encoded("<urn:uuid:abc>", &payload_raw[2], None, None));
 
     let mut count = 0;
-    for (i, rec) in ArchiveIterator::new(Box::new(io::Cursor::new(data.concat())))
+    for (i, rec) in ArchiveIterator::new(io::Cursor::new(data.concat()))
         .with_decode_http_payload(AutoDecode::All)
         .enumerate()
     {
@@ -293,7 +293,7 @@ fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
 #[test]
 fn filtered_archive_iterator() -> io::Result<()> {
     let mut filtered: FilteredArchiveIterator<_> = ArchiveIterator::with_filter(
-        Box::new(io::Cursor::new(filter_test_warc_data())),
+        io::Cursor::new(filter_test_warc_data()),
         filter::has_record_type(WarcRecordType::Resource),
     );
     filtered.set_parse_http(false);
@@ -361,7 +361,7 @@ fn filter_test_warc_data() -> Vec<u8> {
 /// Helper for running iterator checks on both [`ArchiveIterator`] and [`ArchiveIteratorThreadSafe`].
 fn run_archive_iterator_variants<R, M, F>(mut make_reader: M, mut check: F) -> io::Result<()>
 where
-    R: BufReadSeek + Send + 'static,
+    R: IntoWarcReader,
     M: FnMut() -> io::Result<R>,
     F: FnMut(&mut WarcRecord) -> io::Result<()>,
 {
@@ -369,11 +369,11 @@ where
         parse_http: false,
         ..Default::default()
     };
-    for r in ArchiveIterator::with_options(Box::new(make_reader()?), opts) {
+    for r in ArchiveIterator::with_options(make_reader()?, opts) {
         r?.with_mut(|rm| check(rm))?;
     }
 
-    for r in ArchiveIteratorThreadSafe::with_options(Box::new(make_reader()?), opts) {
+    for r in ArchiveIteratorThreadSafe::with_options(make_reader()?, opts) {
         r?.with_mut(|rm| check(rm))?;
     }
 
@@ -491,7 +491,7 @@ fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
 /// and whether we can restart a new iterator from those record / compression member boundaries.
 fn iterate_archive_members_with_offsets<R, M>(mut make_reader: M) -> io::Result<()>
 where
-    R: BufReadSeek + Send + 'static,
+    R: IntoWarcReader,
     M: FnMut() -> io::Result<R>,
 {
     let mut iterator_variant_runs = Vec::new();
@@ -538,7 +538,7 @@ where
         let mut first_record = true;
 
         let make_reader = || {
-            let mut reader = make_reader()?;
+            let mut reader = make_reader()?.into_warc_reader();
             reader.seek(SeekFrom::Start(offset))?;
             Ok(reader)
         };

@@ -15,15 +15,15 @@
 use crate::stream_io::{
     PyReaderAdapter, PyWriterAdapter, WarcReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
 };
-use fastwarc::stream_io::LimitedBufReadSeek;
-use fastwarc::stream_io::traits::BufReadSeek;
+use fastwarc::stream_io::LimitedBufReader;
+use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
 use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe};
 use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyIterator, PyString, PyTuple};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // ===========================================================
@@ -386,7 +386,7 @@ struct WarcRecordPayloadReaderPy {
 impl WarcRecordPayloadReaderPy {
     fn with_payload_reader<F, T>(&self, closure: F) -> PyResult<T>
     where
-        F: FnOnce(&mut dyn LimitedBufReadSeek) -> PyResult<T>,
+        F: FnOnce(&mut LimitedBufReader) -> PyResult<T>,
     {
         let mut record = self.record.lock().unwrap();
         let reader = record
@@ -418,7 +418,7 @@ impl WarcRecordPayloadReaderPy {
     pub fn readline<'py>(&self, py: Python<'py>, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
         self.with_payload_reader(|reader| {
             let mut buf = Vec::with_capacity(max_line_len.min(128));
-            LimitedBufReadSeek::read_line(reader, &mut buf, max_line_len)?;
+            reader.read_line(&mut buf, max_line_len)?;
             Ok(PyBytes::new(py, &buf))
         })
     }
@@ -756,8 +756,8 @@ impl ArchiveIteratorPy {
                 py,
                 stream,
                 fsspec_args,
-                |reader| -> io::Result<Box<dyn BufReadSeek + Send>> { Ok(Box::new(reader)) },
-                |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?))),
+                |reader| -> io::Result<Box<dyn WarcRead + Send>> { Ok(Box::new(reader)) },
+                |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader())),
             )?;
             iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
         }
@@ -769,7 +769,7 @@ impl ArchiveIteratorPy {
 
         Ok(Self {
             inner: iterator,
-            record_types: record_types as u16,
+            record_types,
             min_content_length: u64::try_from(min_content_length).ok(),
             max_content_length: u64::try_from(max_content_length).ok(),
             func_filter,

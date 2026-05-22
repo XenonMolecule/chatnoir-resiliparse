@@ -14,11 +14,12 @@
 
 use self::gzip::{GzipReaderPy, GzipWriterPy};
 use self::lz4::{Lz4ReaderPy, Lz4WriterPy};
+use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyString};
+use std::any::Any;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
-
 // ===========================================================
 // Submodules
 // ===========================================================
@@ -167,6 +168,28 @@ pub(crate) struct PyReaderAdapter {
 impl PyStreamAdapter for PyReaderAdapter {
     fn new(inner: Py<PyAny>) -> Self {
         PyReaderAdapter::new(inner)
+    }
+}
+
+impl WarcRead for PyReaderAdapter {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.seek(pos)
+    }
+
+    fn inner_stream_position(&mut self) -> io::Result<u64> {
+        self.stream_position()
     }
 }
 
@@ -349,6 +372,20 @@ impl PyWriterAdapter {
             }
         });
         Self { inner }
+    }
+}
+
+impl WarcWrite for PyWriterAdapter {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 }
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
-use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
@@ -129,7 +129,7 @@ impl<T: ReadSeek> Seek for ChunkedReader<T> {
 }
 
 impl<T: ReadSeek> WarcRead for ChunkedReader<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let new_pos = self.inner.as_mut().unwrap().seek(pos)?;
@@ -312,7 +312,7 @@ impl<T: Write + 'static> ChunkedWriter<T> {
 impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions);
 
 impl<T: Write + 'static> WarcWrite for ChunkedWriter<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
         if self.chunk_buffer.is_empty() && !self.stream_started {

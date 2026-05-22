@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
-use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
+use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use brotli::{CompressorWriter, Decompressor};
 use std::any::Any;
 use std::io::{self, BufRead, Seek, SeekFrom, Write};
@@ -119,7 +119,7 @@ impl<T: ReadSeek> Seek for BrotliReader<T> {
 }
 
 impl<T: ReadSeek> WarcRead for BrotliReader<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let capacity = self.inner.as_ref().unwrap().capacity();
@@ -180,7 +180,7 @@ impl Default for BrotliWriterOptions {
 }
 
 impl<T: Write + 'static> WarcWrite for BrotliWriter<T> {
-    impl_to_any_funcs!();
+    impl_to_any_methods!();
 }
 
 impl<T: Write + 'static> BrotliWriter<T> {

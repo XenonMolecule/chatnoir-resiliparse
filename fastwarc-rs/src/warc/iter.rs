@@ -15,10 +15,11 @@
 use crate::stream_io::LimitedBufReader;
 use crate::stream_io::gzip::GzipReader;
 use crate::stream_io::lz4::Lz4Reader;
-use crate::stream_io::traits::BufReadSeek;
+use crate::stream_io::traits::{IntoWarcReader, WarcRead};
 use crate::stream_io::zstd::ZstdReader;
 use crate::warc::record::{AutoDecode, ReaderType, WarcRecord};
 use std::cell::RefCell;
+use std::io::BufRead;
 use std::io::{self, BufReader};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -146,7 +147,7 @@ where
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance to attach to records.
-    pub fn new(reader: Box<dyn BufReadSeek>) -> Self {
+    pub fn new(reader: impl IntoWarcReader) -> Self {
         Self::with_options(reader, ArchiveIteratorOptions::default())
     }
 
@@ -156,7 +157,7 @@ where
     ///
     /// * `reader` - buffered reader instance to attach to records.
     /// * `options` - custom iterator options.
-    pub fn with_options(reader: Box<dyn BufReadSeek>, options: ArchiveIteratorOptions) -> Self {
+    pub fn with_options(reader: impl IntoWarcReader, options: ArchiveIteratorOptions) -> Self {
         let mut empty = WarcRecord::new();
         if options.quirks_mode {
             empty.quirks_mode = true;
@@ -197,16 +198,16 @@ where
     ) -> io::Result<Self> {
         let reader = BufReader::new(std::fs::File::open(&path)?);
         if options.stream_detect {
-            let reader: Box<dyn BufReadSeek> = match path.as_ref().extension().and_then(|e| e.to_str()) {
+            let reader: Box<dyn WarcRead> = match path.as_ref().extension().and_then(|e| e.to_str()) {
                 Some("gz") => Box::new(GzipReader::new(reader)),
                 Some("zst") => Box::new(ZstdReader::new(reader)),
                 Some("lz4") => Box::new(Lz4Reader::new(reader)),
-                _ => Box::new(reader),
+                _ => Box::new(reader.into_warc_reader()),
             };
             options.stream_detect = false;
             return Ok(Self::with_options(reader, options));
         }
-        Ok(Self::with_options(Box::new(reader), options))
+        Ok(Self::with_options(reader, options))
     }
 
     /// Change the iterator options.
@@ -282,7 +283,7 @@ where
     ///
     /// * `reader` - buffered reader instance to attach to records
     /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
-    pub fn with_filter<F>(reader: Box<dyn BufReadSeek>, filter: F) -> FilteredArchiveIteratorImpl<R, F>
+    pub fn with_filter<F>(reader: impl IntoWarcReader, filter: F) -> FilteredArchiveIteratorImpl<R, F>
     where
         F: Fn(&mut WarcRecord) -> bool,
     {
@@ -297,7 +298,7 @@ where
     /// # Returns
     ///
     /// Reader instances originally attached to this iterator.
-    pub fn into_inner(self) -> Option<Box<dyn BufReadSeek>> {
+    pub fn into_inner(self) -> Option<Box<dyn WarcRead>> {
         self.cur.with_mut(WarcRecord::detach_reader)
     }
 
