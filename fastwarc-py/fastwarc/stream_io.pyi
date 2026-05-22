@@ -38,7 +38,7 @@ class _GenericWriter(Protocol):
     def close(self) -> None: ...
 
 
-class Reader(ContextManager[Reader]):
+class WarcReader(ContextManager[WarcReader]):
     def read(self, size: int = -1) -> bytes: ...
 
     def seek(self, offset: int, whence: int = 0) -> int: ...
@@ -56,8 +56,6 @@ class Reader(ContextManager[Reader]):
             traceback: Optional[TracebackType]
     ) -> None: ...
 
-
-class DecompressingReader(Reader):
     def inner_seek(self, offset: int, whence: int = 0) -> int: ...
 
     def inner_tell(self) -> int: ...
@@ -65,7 +63,7 @@ class DecompressingReader(Reader):
     def member_start_position(self) -> int: ...
 
 
-class Writer(ContextManager[Writer]):
+class WarcWriter(ContextManager[WarcWriter]):
     def write(self, data: bytes) -> int: ...
 
     def flush(self) -> None: ...
@@ -81,56 +79,54 @@ class Writer(ContextManager[Writer]):
             traceback: Optional[TracebackType]
     ) -> None: ...
 
-
-class CompressingWriter(Writer):
     def finish(self) -> None: ...
 
 
-class GzipReader(DecompressingReader):
-    def __new__(cls, inner: Union[Reader, BinaryIO, _GenericReader, PathLike, str],
+class GzipReader(WarcReader):
+    def __new__(cls, inner: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
                 buffer_size=4096, zlib=False, fsspec_args=None) -> Self: ...
 
 
-class GzipWriter(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+class GzipWriter(WarcWriter):
+    def __new__(cls, inner: Union[WarcWriter, BinaryIO, _GenericWriter, PathLike, str],
                 compression_level=9, buffer_size=8192, zlib=False, fsspec_args=None) -> Self: ...
 
 
-class ZstdReader(DecompressingReader):
-    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+class ZstdReader(WarcReader):
+    def __new__(cls, inner: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
                 buffer_size=4096, fsspec_args=None, dictionary=None) -> Self: ...
 
 
-class ZstdWriter(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+class ZstdWriter(WarcWriter):
+    def __new__(cls, inner: Union[WarcWriter, BinaryIO, _GenericWriter, PathLike, str],
                 buffer_size=8192, fsspec_args=None, dictionary=None, compress_dictionary_frame=False) -> Self: ...
 
 
-class Lz4Reader(DecompressingReader):
-    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+class Lz4Reader(WarcReader):
+    def __new__(cls, inner: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
                 buffer_size=4096, fsspec_args=None) -> Self: ...
 
 
-class Lz4Writer(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+class Lz4Writer(WarcWriter):
+    def __new__(cls, inner: Union[WarcWriter, BinaryIO, _GenericWriter, PathLike, str],
                 buffer_size=8192, fsspec_args=None) -> Self: ...
 
 
-class BrotliReader(DecompressingReader):
-    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+class BrotliReader(WarcReader):
+    def __new__(cls, inner: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
                 buffer_size=4096, fsspec_args=None) -> Self: ...
 
 
-class BrotliWriter(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+class BrotliWriter(WarcWriter):
+    def __new__(cls, inner: Union[WarcWriter, BinaryIO, _GenericWriter, PathLike, str],
                 buffer_size=8192, fsspec_args=None) -> Self: ...
 
 
-class ChunkedReader(DecompressingReader):
-    def __new__(cls, inner: Union[Writer, Reader, BinaryIO, _GenericReader, PathLike, str],
+class ChunkedReader(WarcReader):
+    def __new__(cls, inner: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
                 buffer_size=1024, fsspec_args=None) -> Self: ...
 
 
-class ChunkedWriter(CompressingWriter):
-    def __new__(cls, inner: Union[Writer, BinaryIO, _GenericWriter, PathLike, str],
+class ChunkedWriter(WarcWriter):
+    def __new__(cls, inner: Union[WarcWriter, BinaryIO, _GenericWriter, PathLike, str],
                 min_chunk_size=512, fsspec_args=None) -> Self: ...

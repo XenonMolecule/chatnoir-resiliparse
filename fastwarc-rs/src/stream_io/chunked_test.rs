@@ -97,6 +97,11 @@ fn chunked_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 }
 
 #[test]
+fn brotli_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
+    test_reader_inner_seek_inner_stream_position_and_member_tracking(chunk, ChunkedReader::new, false)
+}
+
+#[test]
 fn chunked_writer_new_write_and_into_inner_roundtrip() -> io::Result<()> {
     test_writer_new_write_and_into_inner_roundtrip(dechunk, ChunkedWriter::new, ChunkedWriter::into_inner)
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{CompressingWrite, DecompressingRead, ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
@@ -213,9 +213,7 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.stream_position()
     }
-}
 
-impl<T: ReadSeek> DecompressingRead for GzipReader<T> {
     fn frame_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
@@ -489,8 +487,6 @@ impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
         Ok(())
     }
 }
-
-impl<T: Write + 'static> CompressingWrite for GzipWriter<T> {}
 
 impl<T: Write + 'static> Write for GzipWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

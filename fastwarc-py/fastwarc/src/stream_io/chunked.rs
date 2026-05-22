@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingWriterPy, ReaderPy, wrap_reader_stream, wrap_writer_stream};
+use crate::stream_io::{WarcReaderPy, WarcWriterPy, wrap_reader_stream, wrap_writer_stream};
 use fastwarc::stream_io::chunked;
 use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::PyValueError;
@@ -22,7 +22,7 @@ use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "ChunkedReader", extends = ReaderPy, subclass)]
+#[pyclass(name = "ChunkedReader", extends = WarcReaderPy, subclass)]
 pub struct ChunkedReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
@@ -48,7 +48,7 @@ impl ChunkedReaderPy {
             },
             |path| Ok(Box::new(chunked::ChunkedReader::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(ReaderPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }
@@ -81,7 +81,7 @@ impl ChunkedReaderPy {
     }
 }
 
-#[pyclass(name = "ChunkedWriter", extends = CompressingWriterPy, subclass)]
+#[pyclass(name = "ChunkedWriter", extends = WarcWriterPy, subclass)]
 pub struct ChunkedWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }
@@ -107,7 +107,7 @@ impl ChunkedWriterPy {
             },
             |path| Ok(Box::new(chunked::ChunkedWriter::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }

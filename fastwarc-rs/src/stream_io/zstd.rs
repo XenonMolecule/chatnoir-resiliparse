@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{CompressingWrite, DecompressingRead, ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_funcs};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
@@ -30,10 +30,10 @@ pub struct ZstdReader<T: ReadSeek> {
     member_pos: u64,
 }
 
-pub use zstd::dict::from_continuous as train_dictionary_from_continuous;
-pub use zstd::dict::from_files as train_dictionary_from_files;
-pub use zstd::dict::from_sample_iterator as train_dictionary_sample_iterator;
-pub use zstd::dict::from_samples as train_dictionary_from_samples;
+pub use ::zstd::dict::from_continuous as train_dictionary_from_continuous;
+pub use ::zstd::dict::from_files as train_dictionary_from_files;
+pub use ::zstd::dict::from_sample_iterator as train_dictionary_sample_iterator;
+pub use ::zstd::dict::from_samples as train_dictionary_from_samples;
 
 /// Options for constructing a new [`ZstdReader`].
 ///
@@ -270,9 +270,7 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
-}
 
-impl<T: ReadSeek> DecompressingRead for ZstdReader<T> {
     fn frame_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }
@@ -493,8 +491,6 @@ impl<T: Write + 'static> WarcWrite for ZstdWriter<T> {
         Ok(())
     }
 }
-
-impl<T: Write + 'static> CompressingWrite for ZstdWriter<T> {}
 
 impl<T: Write + 'static> Write for ZstdWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

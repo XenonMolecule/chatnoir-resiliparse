@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
-use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
+use crate::stream_io::{WarcReaderPy, WarcWriterPy, wrap_reader_stream, wrap_writer_stream};
+use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use fastwarc::stream_io::zstd;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -22,9 +22,9 @@ use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "ZstdReader", extends = DecompressingReaderPy, subclass)]
+#[pyclass(name = "ZstdReader", extends = WarcReaderPy, subclass)]
 pub struct ZstdReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -44,7 +44,7 @@ impl ZstdReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
+            |reader| -> io::Result<Box<dyn WarcRead + Send>> {
                 match dictionary {
                     Some(d) => Ok(Box::new(zstd::ZstdReader::with_dictionary(reader, d, Some(options)))),
                     _ => Ok(Box::new(zstd::ZstdReader::with_options(reader, options))),
@@ -52,7 +52,7 @@ impl ZstdReaderPy {
             },
             |path| Ok(Box::new(zstd::ZstdReader::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }
@@ -90,9 +90,9 @@ impl ZstdReaderPy {
     }
 }
 
-#[pyclass(name = "ZstdWriter", extends = CompressingWriterPy, subclass)]
+#[pyclass(name = "ZstdWriter", extends = WarcWriterPy, subclass)]
 pub struct ZstdWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -117,7 +117,7 @@ impl ZstdWriterPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn CompressingWrite + Send>> {
+            |reader| -> io::Result<Box<dyn WarcWrite + Send>> {
                 match dictionary {
                     Some(d) => Ok(Box::new(zstd::ZstdWriter::with_dictionary(reader, d, Some(options)))),
                     _ => Ok(Box::new(zstd::ZstdWriter::with_options(reader, options))),
@@ -125,7 +125,7 @@ impl ZstdWriterPy {
             },
             |path| Ok(Box::new(zstd::ZstdWriter::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }

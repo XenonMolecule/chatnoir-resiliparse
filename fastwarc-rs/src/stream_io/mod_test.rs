@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::traits::{DecompressingRead, WarcWrite};
+use crate::stream_io::traits::WarcWrite;
 use std::cell::RefCell;
 use std::io;
 use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};
@@ -318,7 +318,7 @@ pub fn test_reader_inner_seek_inner_stream_position_and_member_tracking<C, R, S>
 where
     C: Fn(&[u8]) -> io::Result<Vec<u8>>,
     R: Fn(Cursor<Vec<u8>>) -> S,
-    S: DecompressingRead + BufRead,
+    S: WarcRead + BufRead,
 {
     let first_plain = b"first member data\n".repeat(32);
     let second_plain = b"second member payload\n".repeat(24);

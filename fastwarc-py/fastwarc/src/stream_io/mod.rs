@@ -33,11 +33,11 @@ pub mod zstd;
 // Exported stream parent classes
 // ===========================================================
 
-#[pyclass(name = "Reader", subclass)]
-pub struct ReaderPy {}
+#[pyclass(name = "WarcReader", subclass)]
+pub struct WarcReaderPy {}
 
 #[pymethods]
-impl ReaderPy {
+impl WarcReaderPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
@@ -78,17 +78,6 @@ impl ReaderPy {
         self.close(py)?;
         Ok(())
     }
-}
-
-#[pyclass(name = "DecompressingReader", extends = ReaderPy, subclass)]
-pub struct DecompressingReaderPy {}
-
-#[pymethods]
-impl DecompressingReaderPy {
-    #[new]
-    pub fn __new__() -> (Self, ReaderPy) {
-        (Self {}, ReaderPy::__new__())
-    }
 
     #[pyo3(signature = (offset, whence=0))]
     pub fn inner_seek(&self, py: Python<'_>, offset: i128, whence: u8) -> PyResult<Py<PyAny>> {
@@ -105,11 +94,11 @@ impl DecompressingReaderPy {
     }
 }
 
-#[pyclass(name = "Writer", subclass)]
-pub struct WriterPy {}
+#[pyclass(name = "WarcWriter", subclass)]
+pub struct WarcWriterPy {}
 
 #[pymethods]
-impl WriterPy {
+impl WarcWriterPy {
     #[new]
     pub fn __new__() -> Self {
         Self {}
@@ -142,17 +131,6 @@ impl WriterPy {
     ) -> PyResult<()> {
         self.close(py)?;
         Ok(())
-    }
-}
-
-#[pyclass(name = "CompressingWriter", extends = WriterPy, subclass)]
-pub struct CompressingWriterPy {}
-
-#[pymethods]
-impl CompressingWriterPy {
-    #[new]
-    pub fn __new__() -> (Self, WriterPy) {
-        (Self {}, WriterPy::__new__())
     }
 
     pub fn finish(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::stream_io::{
-    PyReaderAdapter, PyWriterAdapter, ReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
+    PyReaderAdapter, PyWriterAdapter, WarcReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
 };
 use fastwarc::stream_io::LimitedBufReadSeek;
 use fastwarc::stream_io::traits::BufReadSeek;
@@ -378,7 +378,7 @@ impl HeaderMapPy {
 // WarcRecord
 // ===========================================================
 
-#[pyclass(name = "WarcRecordPayloadReader", extends = ReaderPy)]
+#[pyclass(name = "WarcRecordPayloadReader", extends = WarcReaderPy)]
 struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,
 }
@@ -558,7 +558,7 @@ impl WarcRecordPy {
         }
         let reader = Py::new(
             py,
-            PyClassInitializer::from(ReaderPy::__new__()).add_subclass(WarcRecordPayloadReaderPy {
+            PyClassInitializer::from(WarcReaderPy::__new__()).add_subclass(WarcRecordPayloadReaderPy {
                 record: self.inner.clone(),
             }),
         )?;

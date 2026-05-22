@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
+use crate::stream_io::{WarcReaderPy, WarcWriterPy, wrap_reader_stream, wrap_writer_stream};
 use fastwarc::stream_io::brotli::{self, BrotliWriterOptions};
-use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
+use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "BrotliReader", extends = DecompressingReaderPy, subclass)]
+#[pyclass(name = "BrotliReader", extends = WarcReaderPy, subclass)]
 pub struct BrotliReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -43,12 +43,12 @@ impl BrotliReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
+            |reader| -> io::Result<Box<dyn WarcRead + Send>> {
                 Ok(Box::new(brotli::BrotliReader::with_options(reader, options)))
             },
             |path| Ok(Box::new(brotli::BrotliReader::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }
@@ -86,9 +86,9 @@ impl BrotliReaderPy {
     }
 }
 
-#[pyclass(name = "BrotliWriter", extends = CompressingWriterPy, subclass)]
+#[pyclass(name = "BrotliWriter", extends = WarcWriterPy, subclass)]
 pub struct BrotliWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -110,12 +110,12 @@ impl BrotliWriterPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn CompressingWrite + Send>> {
+            |reader| -> io::Result<Box<dyn WarcWrite + Send>> {
                 Ok(Box::new(brotli::BrotliWriter::with_options(reader, options)))
             },
             |path| Ok(Box::new(brotli::BrotliWriter::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }

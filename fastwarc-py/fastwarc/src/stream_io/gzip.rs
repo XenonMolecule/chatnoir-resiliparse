@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use super::impl_macros::*;
-use crate::stream_io::{CompressingWriterPy, DecompressingReaderPy, wrap_reader_stream, wrap_writer_stream};
+use crate::stream_io::{WarcReaderPy, WarcWriterPy, wrap_reader_stream, wrap_writer_stream};
 use fastwarc::stream_io::gzip::{self, MAX_WBITS};
-use fastwarc::stream_io::traits::{CompressingWrite, DecompressingRead};
+use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "GzipReader", extends = DecompressingReaderPy, subclass)]
+#[pyclass(name = "GzipReader", extends = WarcReaderPy, subclass)]
 pub struct GzipReaderPy {
-    pub(crate) inner: Mutex<Option<Box<dyn DecompressingRead + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -48,12 +48,12 @@ impl GzipReaderPy {
             py,
             inner,
             fsspec_args,
-            |reader| -> io::Result<Box<dyn DecompressingRead + Send>> {
+            |reader| -> io::Result<Box<dyn WarcRead + Send>> {
                 Ok(Box::new(gzip::GzipReader::with_options(reader, options)))
             },
             |path| Ok(Box::new(gzip::GzipReader::from_path_with_options(path, options)?)),
         )?;
-        Ok(PyClassInitializer::from(DecompressingReaderPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcReaderPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }
@@ -91,9 +91,9 @@ impl GzipReaderPy {
     }
 }
 
-#[pyclass(name = "GzipWriter", extends = CompressingWriterPy, subclass)]
+#[pyclass(name = "GzipWriter", extends = WarcWriterPy, subclass)]
 pub struct GzipWriterPy {
-    pub(crate) inner: Mutex<Option<Box<dyn CompressingWrite + Send>>>,
+    pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }
 
 // noinspection DuplicatedCode
@@ -119,13 +119,13 @@ impl GzipWriterPy {
             py,
             inner,
             fsspec_args,
-            |writer| -> io::Result<Box<dyn CompressingWrite + Send>> {
+            |writer| -> io::Result<Box<dyn WarcWrite + Send>> {
                 Ok(Box::new(gzip::GzipWriter::with_options(writer, options)))
             },
             |path| Ok(Box::new(gzip::GzipWriter::from_path_with_options(path, options)?)),
         )?;
 
-        Ok(PyClassInitializer::from(CompressingWriterPy::__new__()).add_subclass(Self {
+        Ok(PyClassInitializer::from(WarcWriterPy::__new__()).add_subclass(Self {
             inner: Mutex::new(Some(inner)),
         }))
     }

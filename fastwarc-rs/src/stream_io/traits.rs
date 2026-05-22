@@ -29,6 +29,8 @@ impl<T: io::BufRead + io::Seek + Send + ?Sized + 'static> BufReadSeek for T {}
 // General Reader / Writer trait
 // ===========================================================
 
+/// Trait for [`io::Read`] stream implementations that read (potentially coded)
+/// data from a WARC stream. A [`WarcRead`] stream may wrap another inner stream.
 pub trait WarcRead: BufReadSeek + Any {
     /// Get an [`Any`] reference to this [`DecompressingRead`].
     fn as_any(&self) -> &dyn Any;
@@ -56,8 +58,21 @@ pub trait WarcRead: BufReadSeek + Any {
     /// which does not consider input buffer sizes. The physical reader position may be
     /// larger than this.
     fn inner_stream_position(&mut self) -> io::Result<u64>;
+
+    /// If the stream uses a frame format, return the start position, in bytes, of the
+    /// current frame in the wrapped inner stream. If the stream format does not support
+    /// frames, this is always the beginning of the stream (`Ok(0)`).
+    ///
+    /// # Returns
+    ///
+    /// Position, in bytes, of the current member
+    fn frame_start_position(&mut self) -> io::Result<u64> {
+        Ok(0)
+    }
 }
 
+/// Trait for [`io::Write`] stream implementations that writes (potentially coded)
+/// data to a WARC stream. A [`WarcWrite`] stream may wrap another inner stream.
 pub trait WarcWrite: io::Write + Any + 'static {
     /// Get an [`Any`] reference to this [`DecompressingRead`].
     fn as_any(&self) -> &dyn Any;
@@ -84,26 +99,3 @@ pub trait WarcWrite: io::Write + Any + 'static {
         Ok(())
     }
 }
-
-// ===========================================================
-// Compressors and decompressors
-// ===========================================================
-
-/// Trait for [`io::Read`] stream implementations reading from
-/// compressed input streams.
-pub trait DecompressingRead: WarcRead {
-    /// Return the start position, in bytes, of the current member / frame
-    /// in the compressed inner stream. If the compression format does not support
-    /// multi-member streams, this is always the beginning of the stream.
-    ///
-    /// # Returns
-    ///
-    /// Position, in bytes, of the current member
-    fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(0)
-    }
-}
-
-/// Trait for [`io::Write`] stream implementations that write compressed data
-/// onto an output stream.
-pub trait CompressingWrite: WarcWrite {}
