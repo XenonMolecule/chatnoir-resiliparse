@@ -2,10 +2,9 @@ import io
 import os
 import pytest
 
-from fastwarc.warc import *
-from fastwarc.stream_io import *
+from fastwarc.legacy.warc import *
+from fastwarc.legacy.stream_io import *
 from resiliparse.itertools import *
-
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
 
