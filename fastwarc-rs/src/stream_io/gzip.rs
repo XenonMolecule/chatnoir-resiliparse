@@ -214,6 +214,10 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
         self.inner.stream_position()
     }
 
+    fn is_stream_decoder(&self) -> bool {
+        true
+    }
+
     fn frame_start_position(&mut self) -> io::Result<u64> {
         Ok(self.member_pos)
     }

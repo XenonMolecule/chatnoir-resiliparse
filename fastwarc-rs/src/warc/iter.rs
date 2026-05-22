@@ -304,6 +304,10 @@ where
 
     fn detect_stream_compression_type(&mut self) -> io::Result<()> {
         self.cur.with_mut(|r| -> io::Result<()> {
+            if r.reader_mut().unwrap().is_stream_decoder() {
+                // Already a decoding reader
+                return Ok(());
+            }
             let magic_bytes = r.reader_mut().unwrap().fill_buf()?.get(..4).map(|b| b.to_vec());
             let Some(ReaderType::Original(reader)) = r.reader.take() else {
                 return Err(io::Error::other("Inconsistent reader state."));

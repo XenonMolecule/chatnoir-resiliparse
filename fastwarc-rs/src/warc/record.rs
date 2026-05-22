@@ -1161,7 +1161,7 @@ impl WarcRecord {
             line.clear();
 
             // Try to find first WARC/* header
-            self.stream_pos = reader.real_stream_position()?;
+            self.stream_pos = reader.inner_stream_position()?;
             let n = reader.take(256).read_until(b'\n', &mut line)?;
             if n == 0 {
                 // EOF

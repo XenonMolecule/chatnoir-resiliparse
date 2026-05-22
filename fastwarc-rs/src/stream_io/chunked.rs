@@ -142,6 +142,10 @@ impl<T: ReadSeek> WarcRead for ChunkedReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().stream_position()
     }
+
+    fn is_stream_decoder(&self) -> bool {
+        true
+    }
 }
 
 impl<T: ReadSeek> ChunkedReader<T> {

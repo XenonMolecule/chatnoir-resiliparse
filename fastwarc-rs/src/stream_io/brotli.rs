@@ -132,6 +132,10 @@ impl<T: ReadSeek> WarcRead for BrotliReader<T> {
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
+
+    fn is_stream_decoder(&self) -> bool {
+        true
+    }
 }
 
 // noinspection DuplicatedCode

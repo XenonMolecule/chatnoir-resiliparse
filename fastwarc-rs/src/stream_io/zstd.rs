@@ -27,7 +27,7 @@ pub struct ZstdReader<T: ReadSeek> {
     inner: Option<BufReader<Decoder<'static, BufReader<T>>>>,
     dict: Option<Vec<u8>>,
     stream_pos: u64,
-    member_pos: u64,
+    frame_start_pos: u64,
 }
 
 pub use ::zstd::dict::from_continuous as train_dictionary_from_continuous;
@@ -91,7 +91,7 @@ impl<T: ReadSeek> ZstdReader<T> {
             inner: Some(decoder),
             dict: None,
             stream_pos: 0,
-            member_pos,
+            frame_start_pos: member_pos,
         }
     }
 
@@ -183,7 +183,7 @@ impl<T: ReadSeek> ZstdReader<T> {
         }
         .single_frame();
         self.inner = Some(BufReader::with_capacity(capacity, decoder));
-        self.member_pos = mpos;
+        self.frame_start_pos = mpos;
         Ok(mpos)
     }
 
@@ -191,7 +191,7 @@ impl<T: ReadSeek> ZstdReader<T> {
     /// no explicit dictionary was supplied by the user.
     fn maybe_load_dict_frame(&mut self) -> io::Result<()> {
         if self.stream_pos == 0
-            && self.member_pos == 0
+            && self.frame_start_pos == 0
             && self.dict.is_none()
             && let Some(dict) = self.read_dict_frame()?
         {
@@ -271,8 +271,12 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
 
+    fn is_stream_decoder(&self) -> bool {
+        true
+    }
+
     fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(self.member_pos)
+        Ok(self.frame_start_pos)
     }
 }
 

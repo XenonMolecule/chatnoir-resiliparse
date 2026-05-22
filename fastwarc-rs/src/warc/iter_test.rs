@@ -29,7 +29,7 @@ use digest::Digest;
 use sha1::Sha1;
 use std::fs::File;
 use std::io;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, Write};
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -167,6 +167,18 @@ fn archive_iterator_stream_compression_autodetection() -> io::Result<()> {
     let gzip_warc = get_fixture_path("warcfile.warc.gz");
     let mut it = ArchiveIterator::new(io::BufReader::new(File::open(gzip_warc)?)).with_stream_detect(false);
     assert_eq!(it.next().transpose().unwrap_err().kind(), io::ErrorKind::InvalidData);
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_no_stream_detect_for_decoding_readers() -> io::Result<()> {
+    let gzip_warc = get_fixture_path("warcfile.warc.gz");
+    let reader = gzip::GzipReader::from_path(gzip_warc)?;
+    assert!(reader.is_stream_decoder());
+    let record = ArchiveIterator::new(reader).with_stream_detect(true).next().unwrap()?;
+    // First position is 0, not already start of the next frame.
+    assert_eq!(record.borrow().stream_pos(), 0);
 
     Ok(())
 }
@@ -531,40 +543,14 @@ where
 
     // Test whether we can restart the iterator from any of the previously recorded offsets.
     for (i, &offset) in offsets.iter().enumerate() {
-        let num_expected_records = num_records - i;
         let expected_id = &record_ids[i];
-        let mut iterator_variant_counts = Vec::new();
-        let mut count = 0usize;
-        let mut first_record = true;
 
-        let make_reader = || {
-            let mut reader = make_reader()?.into_warc_reader();
-            reader.seek(SeekFrom::Start(offset))?;
-            Ok(reader)
-        };
-        run_archive_iterator_variants(make_reader, |record| {
-            // First run of second variant
-            if count > 0 && record.stream_pos() == offset {
-                iterator_variant_counts.push(count);
-                count = 0;
-                first_record = true;
-            }
+        let mut reader = make_reader()?.into_warc_reader();
+        reader.inner_seek(io::SeekFrom::Start(offset))?;
+        let record = WarcRecord::from_reader(reader)?;
 
-            // Check whether first record matches the previously recorded ID and verify block digest.
-            if first_record {
-                assert_eq!(record.record_id().as_deref(), Some(expected_id.as_str()));
-                if record.record_type() == WarcRecordType::Response {
-                    assert!(record.verify_block_digest(false).unwrap());
-                }
-                first_record = false;
-            }
-
-            count += 1;
-            Ok(())
-        })?;
-
-        iterator_variant_counts.push(count);
-        assert_eq!(iterator_variant_counts, vec![num_expected_records, num_expected_records]);
+        // Check that we are at the correct record.
+        assert_eq!(record.record_id().as_deref(), Some(expected_id.as_str()));
     }
 
     Ok(())

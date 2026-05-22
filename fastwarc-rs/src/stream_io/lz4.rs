@@ -26,7 +26,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 pub struct Lz4Reader<T: ReadSeek> {
     inner: Option<FrameDecoder<BufReader<T>>>,
     stream_pos: u64,
-    member_pos: u64,
+    frame_start_pos: u64,
 }
 
 /// Options for constructing a new [`Lz4Reader`].
@@ -78,7 +78,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
         Self {
             inner: Some(FrameDecoder::new(BufReader::with_capacity(options.capacity, inner))),
             stream_pos: 0,
-            member_pos,
+            frame_start_pos: member_pos,
         }
     }
 
@@ -87,6 +87,31 @@ impl<T: ReadSeek> Lz4Reader<T> {
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
         self.inner.unwrap().into_inner().into_inner()
+    }
+
+    /// Internal: Helper for syncing decoder state with LZ4 frame boundaries.
+    /// This needs to be called in `fill_buf()` to not terminate early and in
+    /// `stream_position()` to not get incorrect values (usually off by the four
+    /// bytes at the end of a frame).
+    fn sync_next_frame(&mut self) -> io::Result<()> {
+        if self.stream_pos == 0 {
+            return Ok(());
+        }
+
+        // More data available in the decoder buffer.
+        if !self.inner.as_mut().unwrap().fill_buf()?.is_empty() {
+            return Ok(());
+        }
+
+        // Frame end, but more data available in the underlying stream.
+        // Reset the decoder and advance member_pos.
+        if !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
+            let old_pos = self.stream_pos;
+            self.frame_start_pos = self.inner_seek(SeekFrom::Current(0))?;
+            self.stream_pos = old_pos;
+        }
+
+        Ok(())
     }
 }
 
@@ -131,30 +156,28 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
         let mut inner = self.inner.take().unwrap().into_inner();
         let new_pos = inner.seek(pos)?;
         self.inner = Some(FrameDecoder::new(inner));
-        self.member_pos = new_pos;
+        self.frame_start_pos = new_pos;
         self.stream_pos = 0;
         Ok(new_pos)
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
+        self.sync_next_frame()?;
         self.inner.as_mut().unwrap().get_mut().stream_position()
     }
 
+    fn is_stream_decoder(&self) -> bool {
+        true
+    }
+
     fn frame_start_position(&mut self) -> io::Result<u64> {
-        Ok(self.member_pos)
+        Ok(self.frame_start_pos)
     }
 }
 
 impl<T: ReadSeek> BufRead for Lz4Reader<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        let buf = self.inner.as_mut().unwrap().fill_buf()?;
-
-        // Frame end: Reset FrameDecoder and read again (keep self.stream_pos counting up).
-        if buf.is_empty() && !self.inner.as_mut().unwrap().get_mut().fill_buf()?.is_empty() {
-            let old_pos = self.stream_pos;
-            self.inner_seek(SeekFrom::Current(0))?;
-            self.stream_pos = old_pos;
-        }
+        self.sync_next_frame()?;
         self.inner.as_mut().unwrap().fill_buf()
     }
 
