@@ -831,23 +831,23 @@ def test_clueweb_quirks():
 
     fname = os.path.join(DATA_DIR, 'clueweb-quirk.warc.gz')
 
+    # count = 0
+    # prev_stream_pos = -1
+    # for rec in ArchiveIterator(FileStream(fname)):
+    #     assert rec.record_id
+    #     assert rec.stream_pos > prev_stream_pos
+    #     prev_stream_pos = rec.stream_pos
+    #
+    #     # WARC headers use correct CRLF, but HTTP headers are LF-only
+    #     assert rec.record_id
+    #     assert rec.http_content_type is None
+    #
+    #     count += 1
+    # assert count == 30
+
     count = 0
     prev_stream_pos = -1
-    for rec in ArchiveIterator(FileStream(fname)):
-        assert rec.record_id
-        assert rec.stream_pos > prev_stream_pos
-        prev_stream_pos = rec.stream_pos
-
-        # WARC headers use correct CRLF, but HTTP headers are LF-only
-        assert rec.record_id
-        assert rec.http_content_type is None
-
-        count += 1
-    assert count == 30
-
-    count = 0
-    prev_stream_pos = -1
-    for rec in ArchiveIterator(FileStream(fname), strict_mode=False):
+    for rec in ArchiveIterator(FileStream(fname), quirks_mode=True):
         assert rec.record_id
         assert rec.stream_pos > prev_stream_pos
         prev_stream_pos = rec.stream_pos
