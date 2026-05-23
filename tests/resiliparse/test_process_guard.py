@@ -1,3 +1,5 @@
+import gc
+
 import os
 import platform
 import signal
@@ -14,7 +16,6 @@ if platform.system() == 'Windows':
 if platform.system() == 'Darwin' and 'CIBUILDWHEEL' in os.environ:
     pytest.skip('macOS CI detected: Skipping unreliable process guard tests due to CI slowness.',
                 allow_module_level=True)
-
 
 from resiliparse.process_guard import InterruptType, ExecutionTimeout, MemoryLimitExceeded, \
     mem_guard, time_guard, progress
@@ -148,7 +149,8 @@ def test_time_guard():
 
     # Progress loop
     start = monotonic()
-    with time_guard(timeout_ms=160, grace_period=50, check_interval=80, interrupt_type=InterruptType.exception) as guard:
+    with time_guard(timeout_ms=160, grace_period=50, check_interval=80,
+                    interrupt_type=InterruptType.exception) as guard:
         for _ in progress_loop(infinite_gen(), ctx=guard):
             sleep(0.001)
             if monotonic() - start > .3:
@@ -205,18 +207,33 @@ def test_mem_guard():
     with pytest.raises(MemoryLimitExceeded):
         fill_mem()
 
+    time.sleep(.5)
+    gc.collect()
+
     with pytest.raises(SigIntSent):
         fill_mem_exc_signal()
+
+    time.sleep(.5)
+    gc.collect()
 
     with pytest.raises(SigIntSent):
         fill_mem_signal()
 
+    time.sleep(.5)
+    gc.collect()
+
     with pytest.raises(SigTermSent):
         fill_mem_signal_term()
+
+    time.sleep(.5)
+    gc.collect()
 
     # Test if same guard can be used twice
     with pytest.raises(MemoryLimitExceeded):
         fill_mem()
+
+    time.sleep(.5)
+    gc.collect()
 
     # Test context manager interface
     with pytest.raises(MemoryLimitExceeded):
