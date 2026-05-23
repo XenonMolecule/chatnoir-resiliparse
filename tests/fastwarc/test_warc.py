@@ -621,9 +621,7 @@ def test_clipped_warc_gz():
 def test_warc_headers():
     new_record = WarcRecord()
     headers = new_record.headers
-    with pytest.raises(KeyError):
-        # noinspection PyStatementEffect
-        new_record.record_id
+    assert new_record.record_id is None
 
     # Set various headers
     headers['WARC-Record-ID'] = 'abc'
