@@ -827,14 +827,35 @@ impl WarcRecordPy {
                 .set_bytes(b"WARC-Payload-Digest", &digest_header);
         }
 
-        let mut writer = PyWriterAdapter::new(stream.unbind())?;
-        if checksum_data {
-            Ok(self
-                .lock()
-                .write_with_block_size_checksum(&mut writer, chunk_size, true)?)
+        // Record correct before stream position for legacy shims.
+        // TODO: Remove when shims are removed.
+        let raw_stream = stream.getattr("_raw_stream").ok();
+        let pos_before = match &raw_stream {
+            Some(raw_stream) => raw_stream.call_method0("tell").and_then(|r| r.extract::<usize>()).ok(),
+            None => None,
+        };
+
+        let mut writer = PyWriterAdapter::new(stream.clone().unbind())?;
+        let bytes_written = if checksum_data {
+            self.lock()
+                .write_with_block_size_checksum(&mut writer, chunk_size, true)?
         } else {
-            Ok(self.lock().write_with_block_size(&mut writer, chunk_size)?)
+            self.lock().write_with_block_size(&mut writer, chunk_size)?
+        };
+
+        // Call legacy shim end_member and calculate bytes written.
+        // TODO: Remove when shims are removed.
+        if stream.hasattr("end_member")? {
+            stream.call_method0("end_member")?;
         }
+        Ok(match (pos_before, raw_stream) {
+            (Some(pos_before), Some(raw_stream)) => raw_stream
+                .call_method0("tell")
+                .and_then(|r| r.extract::<usize>())
+                .map(|pos_after| pos_after - pos_before)
+                .unwrap_or(bytes_written),
+            _ => bytes_written,
+        })
     }
 }
 

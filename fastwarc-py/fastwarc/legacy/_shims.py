@@ -146,6 +146,7 @@ class CompressingStream(IOStream):
 
     def end_member(self):
         self._get_writer().finish()
+        self._writer = None
 
 
 class PythonIOStreamAdapter:
@@ -172,24 +173,30 @@ class BytesIOStream:
 class GZipStream:
     def __new__(cls, raw_stream, compression_level=9, zlib=False, fsspec_args=None):
         from fastwarc.stream_io import GzipReader, GzipWriter
-        return CompressingStream(
+        stream = CompressingStream(
             _reader_factory=lambda: GzipReader(raw_stream, zlib=zlib, fsspec_args=fsspec_args),
             _writer_factory=lambda: GzipWriter(raw_stream, compression_level=compression_level, zlib=zlib,
                                                fsspec_args=fsspec_args))
+        stream._raw_stream = raw_stream
+        return stream
 
 
 class LZ4Stream:
     def __new__(cls, raw_stream, mode='r', compression_level=12,
                 favor_dec_speed=True, fsspec_args=None):
         from fastwarc.stream_io import Lz4Reader, Lz4Writer
-        return CompressingStream(
+        stream = CompressingStream(
             _reader_factory=lambda: Lz4Reader(raw_stream, fsspec_args=fsspec_args),
             _writer_factory=lambda: Lz4Writer(raw_stream, fsspec_args=fsspec_args))
+        stream._raw_stream = raw_stream
+        return stream
 
 
 class BrotliStream:
     def __new__(cls, raw_stream, quality=11, lgwin=22, lgblock=0, fsspec_args=None):
         from fastwarc.stream_io import BrotliReader, BrotliWriter
-        return CompressingStream(
+        stream = CompressingStream(
             _reader_factory=lambda: BrotliReader(raw_stream, fsspec_args=fsspec_args),
             _writer_factory=lambda: BrotliWriter(raw_stream, fsspec_args=fsspec_args))
+        stream._raw_stream = raw_stream
+        return stream
