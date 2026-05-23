@@ -17,7 +17,7 @@ use crate::stream_io::{
 };
 use fastwarc::stream_io::LimitedBufReader;
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
-use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe};
+use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, filter};
 use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
@@ -827,4 +827,53 @@ impl ArchiveIteratorPy {
             return Ok(Some(record_obj));
         }
     }
+}
+
+// ===========================================================
+// ArchiveIterator filter predicates
+// ===========================================================
+
+fn apply_filter(record: &WarcRecordPy, predicate: impl FnOnce(&mut WarcRecord) -> bool) -> bool {
+    let mut record = record.lock();
+    predicate(&mut record)
+}
+
+#[pyfunction(name = "is_warc_10")]
+pub fn is_warc_10_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::is_warc_10)
+}
+
+#[pyfunction(name = "is_warc_11")]
+pub fn is_warc_11_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::is_warc_11)
+}
+
+#[pyfunction(name = "has_block_digest")]
+pub fn has_block_digest_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::has_block_digest)
+}
+
+#[pyfunction(name = "has_valid_block_digest")]
+pub fn has_valid_block_digest_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::has_valid_block_digest)
+}
+
+#[pyfunction(name = "has_payload_digest")]
+pub fn has_payload_digest_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::has_payload_digest)
+}
+
+#[pyfunction(name = "has_valid_payload_digest")]
+pub fn has_valid_payload_digest_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::has_valid_payload_digest)
+}
+
+#[pyfunction(name = "is_http")]
+pub fn is_http_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::is_http)
+}
+
+#[pyfunction(name = "is_concurrent")]
+pub fn is_concurrent_py(record: &WarcRecordPy) -> bool {
+    apply_filter(record, filter::is_concurrent)
 }
