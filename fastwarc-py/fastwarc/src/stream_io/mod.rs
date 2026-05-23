@@ -145,7 +145,7 @@ impl WarcWriterPy {
 
 /// Python object stream adapter trait.
 pub(crate) trait PyStreamAdapter: Sized {
-    fn new(inner: Py<PyAny>) -> Self;
+    fn new(inner: Py<PyAny>) -> PyResult<Self>;
 }
 
 enum PyReaderType {
@@ -159,16 +159,23 @@ enum PyReaderType {
 /// `BytesIO` types will use dynamic Python `read()` / `seek()` calls.
 pub(crate) struct PyReaderAdapter {
     inner: PyReaderType,
-    pos: u64,
+    pos: Option<u64>,
     buf: Vec<u8>,
     buf_pos: usize,
     buf_len: usize,
 }
 
 impl PyStreamAdapter for PyReaderAdapter {
-    fn new(inner: Py<PyAny>) -> Self {
+    fn new(inner: Py<PyAny>) -> PyResult<Self> {
         PyReaderAdapter::new(inner)
     }
+}
+
+macro_rules! native_inner_call_path {
+    ($inner:ident, $py:ident, $ReaderType:ident, $($call:tt)+) => {{
+        let inner = &$inner.bind($py).cast::<$ReaderType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().$($call)+?)
+    }};
 }
 
 impl WarcRead for PyReaderAdapter {
@@ -189,17 +196,29 @@ impl WarcRead for PyReaderAdapter {
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        self.stream_position()
+        Ok(Python::attach(|py| -> PyResult<u64> {
+            match &self.inner {
+                PyReaderType::GzipReader(inner) => {
+                    native_inner_call_path!(inner, py, GzipReaderPy, inner_stream_position())
+                }
+                PyReaderType::Lz4Reader(inner) => {
+                    native_inner_call_path!(inner, py, Lz4ReaderPy, inner_stream_position())
+                }
+                PyReaderType::Other(_) => {
+                    // Calling inner.tell() would report wrong offsets due to our buffering
+                    Ok(self.stream_position()?)
+                }
+            }
+        })?)
     }
 }
 
-#[allow(unused)]
 impl PyReaderAdapter {
-    pub fn new(inner: Py<PyAny>) -> Self {
+    pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
         Self::with_capacity(inner, 8192)
     }
 
-    pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> Self {
+    pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> PyResult<Self> {
         let inner = Python::attach(|py| {
             let bound = inner.bind(py);
             if bound.is_exact_instance_of::<GzipReaderPy>() {
@@ -210,13 +229,18 @@ impl PyReaderAdapter {
                 PyReaderType::Other(inner)
             }
         });
-        Self {
+        let adapter = Self {
             inner,
-            pos: 0,
+            pos: None,
             buf: vec![0; capacity],
             buf_pos: 0,
             buf_len: 0,
-        }
+        };
+        Ok(adapter)
+    }
+
+    fn ensure_pos_initialized(&mut self) -> io::Result<u64> {
+        self.stream_position()
     }
 }
 
@@ -245,25 +269,34 @@ macro_rules! native_seek_call {
     }};
 }
 
+macro_rules! native_stream_position_call {
+    ($inner: ident, $py: ident, $WriterType: ident) => {{
+        let inner = &$inner.bind($py).cast::<$WriterType>().unwrap().borrow().inner;
+        Ok(inner.lock().unwrap().as_mut().unwrap().stream_position()?)
+    }};
+}
+
 impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let self_pos = self.ensure_pos_initialized()?;
         if pos == SeekFrom::Current(0) {
-            return Ok(self.pos);
+            return Ok(self_pos);
         }
         let new_pos = match pos {
             SeekFrom::Start(p) => SeekFrom::Start(p),
             SeekFrom::Current(p) => SeekFrom::Start(
-                u64::try_from(p as i128 + self.pos as i128)
+                u64::try_from(p as i128 + self_pos as i128)
                     .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Seek out of range"))?,
             ),
             SeekFrom::End(p) => SeekFrom::End(p),
         };
-        if let SeekFrom::Start(p) = new_pos {
-            if p >= self.pos - self.buf_pos as u64 && p < self.pos + self.buf_len as u64 {
-                self.buf_pos += (p - self.pos) as usize;
-                self.pos = p;
-                return Ok(p);
-            }
+        if let SeekFrom::Start(p) = new_pos
+            && p >= self_pos - self.buf_pos as u64
+            && p < self_pos + self.buf_len as u64
+        {
+            self.buf_pos += (p - self_pos) as usize;
+            self.pos = Some(p);
+            return Ok(p);
         }
 
         let buffered = (self.buf_len - self.buf_pos) as i64;
@@ -282,14 +315,27 @@ impl Seek for PyReaderAdapter {
                 }
             }
         })?;
-        self.pos = new_pos;
+        self.pos = Some(new_pos);
         self.buf_pos = 0;
         self.buf_len = 0;
         Ok(new_pos)
     }
 
     fn stream_position(&mut self) -> io::Result<u64> {
-        Ok(self.pos)
+        if self.pos.is_none() {
+            self.pos = Some(Python::attach(|py| -> PyResult<u64> {
+                match &self.inner {
+                    PyReaderType::GzipReader(inner) => native_stream_position_call!(inner, py, GzipReaderPy),
+                    PyReaderType::Lz4Reader(inner) => native_stream_position_call!(inner, py, Lz4ReaderPy),
+                    PyReaderType::Other(inner) => {
+                        let stream = inner.bind(py);
+                        let result = stream.call_method0("tell")?;
+                        Ok(result.extract::<u64>()?)
+                    }
+                }
+            })?);
+        }
+        Ok(self.pos.unwrap())
     }
 }
 
@@ -305,6 +351,8 @@ impl BufRead for PyReaderAdapter {
         if self.buf_pos < self.buf_len {
             return Ok(&self.buf[self.buf_pos..self.buf_len]);
         }
+
+        self.ensure_pos_initialized()?;
 
         let n = Python::attach(|py| -> io::Result<usize> {
             match &self.inner {
@@ -335,7 +383,7 @@ impl BufRead for PyReaderAdapter {
     }
 
     fn consume(&mut self, amount: usize) {
-        self.pos += amount as u64;
+        self.pos = Some(self.pos.unwrap() + amount as u64);
         self.buf_pos += amount;
     }
 }
@@ -354,13 +402,13 @@ pub(crate) struct PyWriterAdapter {
 }
 
 impl PyStreamAdapter for PyWriterAdapter {
-    fn new(inner: Py<PyAny>) -> Self {
+    fn new(inner: Py<PyAny>) -> PyResult<Self> {
         PyWriterAdapter::new(inner)
     }
 }
 
 impl PyWriterAdapter {
-    pub fn new(inner: Py<PyAny>) -> Self {
+    pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
         let inner = Python::attach(|py| {
             let bound = inner.bind(py);
             if bound.is_exact_instance_of::<GzipReaderPy>() {
@@ -371,7 +419,7 @@ impl PyWriterAdapter {
                 PyWriterType::Other(inner)
             }
         });
-        Self { inner }
+        Ok(Self { inner })
     }
 }
 
@@ -405,7 +453,7 @@ macro_rules! native_flush_call {
 
 impl Write for PyWriterAdapter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        Ok(Python::attach(|py| -> io::Result<usize> {
+        Python::attach(|py| -> io::Result<usize> {
             match &self.inner {
                 PyWriterType::GzipWriter(inner) => native_write_call!(inner, py, GzipWriterPy, buf),
                 PyWriterType::Lz4Writer(inner) => native_write_call!(inner, py, Lz4WriterPy, buf),
@@ -414,17 +462,17 @@ impl Write for PyWriterAdapter {
                     .call_method1("write", (buf,))
                     .and_then(|result| result.extract::<usize>())?),
             }
-        })?)
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(Python::attach(|py| -> io::Result<()> {
+        Python::attach(|py| -> io::Result<()> {
             match &self.inner {
                 PyWriterType::GzipWriter(inner) => native_flush_call!(inner, py, GzipWriterPy),
                 PyWriterType::Lz4Writer(inner) => native_flush_call!(inner, py, Lz4WriterPy),
                 PyWriterType::Other(inner) => Ok(inner.bind(py).call_method0("flush").map(|_| ())?),
             }
-        })?)
+        })
     }
 }
 
@@ -477,7 +525,7 @@ where
 {
     // Check whether `raw_stream` is a string or path-like object or wrap in adapter.
     let Ok(path) = path_like_to_string(raw_stream.bind(py)) else {
-        return Ok(wrap_stream_fn(A::new(raw_stream))?);
+        return Ok(wrap_stream_fn(A::new(raw_stream)?)?);
     };
 
     let use_fsspec = path.split_once("://").is_some()
@@ -495,7 +543,7 @@ where
                     fsspec.getattr("open")?.call1((path.as_str(), fsspec_open_mode))?
                 }
                 .call_method0("open")?;
-                return Ok(wrap_stream_fn(A::new(handle.unbind()))?);
+                return Ok(wrap_stream_fn(A::new(handle.unbind())?)?);
             }
             Err(err) => {
                 if err.matches(py, py.get_type::<PyModuleNotFoundError>())? {

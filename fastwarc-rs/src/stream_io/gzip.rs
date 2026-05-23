@@ -116,13 +116,13 @@ impl<T: ReadSeek> GzipReader<T> {
     pub fn with_options(mut inner: T, options: GzipReaderOptions) -> Self {
         let window_bits = options.window_bits;
         let decomp_ratio = 2.0;
-        let member_pos = inner.stream_position().unwrap_or(0);
+        let inner_pos = inner.stream_position().unwrap_or(0);
         Self {
             inner: BufReader::with_capacity(options.capacity, inner),
             deflate: Inflate::new(options.expect_header, window_bits),
             stream_pos: 0,
-            member_pos,
-            next_member_pos: member_pos,
+            member_pos: inner_pos,
+            next_member_pos: inner_pos,
             buf: vec![0; options.capacity * decomp_ratio as usize],
             buf_pos: 0,
             buf_len: 0,

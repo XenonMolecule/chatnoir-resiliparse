@@ -862,7 +862,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// WARC record parsed from the stream.
-    pub fn from_reader(reader: impl IntoWarcReader) -> Result<Self, io::Error> {
+    pub fn from_reader(reader: impl IntoWarcReader) -> io::Result<Self> {
         Self::from_reader_quirks(reader, false)
     }
 
@@ -879,7 +879,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// WARC record parsed from the stream.
-    pub fn from_reader_quirks(reader: impl IntoWarcReader, quirks_mode: bool) -> Result<Self, io::Error> {
+    pub fn from_reader_quirks(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Self> {
         match Self::_from_reader_internal(reader, quirks_mode)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
@@ -899,7 +899,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn _from_reader_internal(reader: impl IntoWarcReader, quirks_mode: bool) -> Result<Option<Self>, io::Error> {
+    fn _from_reader_internal(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Option<Self>> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
         record.quirks_mode = quirks_mode;
@@ -938,7 +938,12 @@ impl WarcRecord {
     where
         T: IntoWarcReader,
     {
-        let reader = Box::new(reader.into_warc_reader());
+        let mut reader = Box::new(reader.into_warc_reader());
+
+        // Initialize stream position from inner stream
+        if self.stream_pos == 0 {
+            self.stream_pos = reader.inner_stream_position().unwrap();
+        }
         self.reader = Some(ReaderType::Original(LimitedBufReader::new(reader, None)));
     }
 

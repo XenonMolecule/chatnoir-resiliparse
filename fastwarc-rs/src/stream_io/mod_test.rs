@@ -447,7 +447,6 @@ where
 
             count += 1;
             n_read = 0;
-            println!("{}: {} -> {} -> {}", count, fpos, pos, last_frame_pos);
             last_frame_pos = fpos;
         }
     }

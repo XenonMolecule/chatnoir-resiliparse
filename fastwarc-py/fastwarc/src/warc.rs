@@ -158,12 +158,12 @@ impl HeaderMapPy {
 
     #[pyo3(signature = (reader, has_status_line=true))]
     pub fn parse(&mut self, reader: Py<PyAny>, has_status_line: bool) -> PyResult<usize> {
-        let mut reader = PyReaderAdapter::new(reader);
+        let mut reader = PyReaderAdapter::new(reader)?;
         Ok(self.inner.parse(&mut reader, has_status_line)?)
     }
 
     pub fn write(&self, writer: Py<PyAny>) -> PyResult<usize> {
-        let mut writer = PyWriterAdapter::new(writer);
+        let mut writer = PyWriterAdapter::new(writer)?;
         Ok(self.inner.write(&mut writer)?)
     }
 
@@ -658,7 +658,7 @@ impl WarcRecordPy {
                 .set_bytes(b"WARC-Payload-Digest", &digest_header);
         }
 
-        let mut writer = PyWriterAdapter::new(stream.unbind());
+        let mut writer = PyWriterAdapter::new(stream.unbind())?;
         if checksum_data {
             Ok(self
                 .lock()

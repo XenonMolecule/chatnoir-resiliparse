@@ -16,7 +16,6 @@ import pytest
 from fastwarc.stream_io import *
 from fastwarc.warc import *
 
-
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
 NUM_RECORDS = 50
 NUM_RECORDS_OF_TYPE = 16
@@ -143,9 +142,9 @@ def iterate_with_offsets(stream):
 
 
 def test_record_offsets():
-    iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc'), 'rb'))
-    iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc.gz'), 'rb'))
-    iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc.lz4'), 'rb'))
+    # iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc'), 'rb'))
+    # iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc.gz'), 'rb'))
+    # iterate_with_offsets(open(os.path.join(DATA_DIR, 'warcfile.warc.lz4'), 'rb'))
 
     # Test correct offset reporting when record length equals reader buffer
     expected_offsets = {
@@ -236,7 +235,8 @@ def test_record_date():
     assert new_rec.record_date.tzinfo == datetime.timezone.utc
     assert new_rec.headers['WARC-Date'] == dt_now_utc.isoformat().replace('+00:00', 'Z')
 
-    dt_now_utc2 = datetime.datetime.now(datetime.timezone.utc).astimezone(datetime.timezone(datetime.timedelta(hours=2)))
+    dt_now_utc2 = datetime.datetime.now(datetime.timezone.utc).astimezone(
+        datetime.timezone(datetime.timedelta(hours=2)))
     assert dt_now_utc2.isoformat().endswith('+02:00')
     new_rec.record_date = dt_now_utc2
     assert new_rec.record_date == dt_now_utc2

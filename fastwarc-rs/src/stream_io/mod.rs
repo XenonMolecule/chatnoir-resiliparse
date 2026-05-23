@@ -346,10 +346,12 @@ impl LimitedBufReader {
     /// * `reader` - inner reader to put the limit on
     /// * `limit` - limit in bytes at which EOF is returned
     pub fn new(reader: impl IntoWarcReader, limit: Option<u64>) -> Self {
+        let mut reader = reader.into_warc_reader();
+        let pos = reader.stream_position().unwrap_or(0);
         Self {
-            inner: Box::new(reader.into_warc_reader()),
+            inner: Box::new(reader),
             limit: limit.unwrap_or(u64::MAX),
-            pos: 0,
+            pos,
         }
     }
 
@@ -365,12 +367,20 @@ impl LimitedBufReader {
         self.pos = 0;
     }
 
+    /// Reset the reader to being unlimited.
+    pub fn reset_limit(&mut self) {
+        self.limit = u64::MAX;
+        self.pos = self.inner.stream_position().unwrap_or(0);
+    }
+
     /// Get the current limit.
     pub fn limit(&mut self) -> u64 {
         self.limit
     }
 
-    /// Get the real (not the logical) stream position.
+    /// Get the real (not the logical) stream position in the inner stream.
+    /// This method is non-recursive. Use [`Self::inner_stream_position()`] if you need
+    /// to reach through a decoding inner reader stack.
     pub fn real_stream_position(&mut self) -> io::Result<u64> {
         self.inner.stream_position()
     }
