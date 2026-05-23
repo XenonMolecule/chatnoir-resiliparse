@@ -1710,6 +1710,15 @@ impl WarcRecord {
         }
 
         let reader = get_reader_mut!(self).ok_or_else(|| DigestError::StreamError("No reader set".into()))?;
+        let restore_pos = if consume {
+            None
+        } else {
+            Some(
+                reader
+                    .stream_position()
+                    .map_err(|e| DigestError::StreamError(format!("Failed to get stream position: {}", e)))?,
+            )
+        };
 
         let mut digest = _get_digest(&algorithm)?;
         let mut buf = [0u8; 4096];
@@ -1722,9 +1731,9 @@ impl WarcRecord {
             }
             digest.update(&buf[..n]);
         }
-        if !consume {
+        if let Some(restore_pos) = restore_pos {
             reader
-                .seek(io::SeekFrom::Start(self.stream_pos))
+                .seek(io::SeekFrom::Start(restore_pos))
                 .map_err(|e| DigestError::StreamError(format!("Failed to seek stream: {}", e)))?;
         }
 
