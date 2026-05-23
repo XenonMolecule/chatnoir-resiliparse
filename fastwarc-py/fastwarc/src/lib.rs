@@ -82,6 +82,9 @@ pub mod _fastwarc {
             m.add("no_type", WarcRecordTypePy::no_type)?;
             m.add("any_type", WarcRecordTypePy::any_type)?;
 
+            // Legacy name
+            m.add("WarcHeaderMap", m.getattr("HeaderMap")?)?;
+
             Ok(())
         }
 

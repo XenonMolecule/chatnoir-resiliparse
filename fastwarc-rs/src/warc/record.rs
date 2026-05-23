@@ -1183,7 +1183,7 @@ impl WarcRecord {
             {
                 self.headers.status_line = Some(trimmed.to_owned());
                 if let Some(p) = reader.frame_start_position()? {
-                    // If supported, use the (potentially more accurate) member start position,
+                    // If supported, use the (potentially more accurate) member start position
                     // instead of the starting inner stream position.
                     self.stream_pos = p;
                 }

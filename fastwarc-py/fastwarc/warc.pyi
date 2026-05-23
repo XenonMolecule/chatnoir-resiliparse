@@ -122,6 +122,10 @@ class HeaderMap:
     def __contains__(self, item: str) -> bool: ...
 
 
+# Legacy name
+WarcHeaderMap = HeaderMap
+
+
 class WarcRecordPayloadReaderPy(WarcReader):
     def readline(self, max_line_len: int = 8192) -> bytes: ...
 
