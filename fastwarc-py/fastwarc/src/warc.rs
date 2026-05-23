@@ -470,6 +470,11 @@ impl WarcRecordPy {
         self.lock().record_id().map(|s| PyString::new(py, s.as_ref()))
     }
 
+    #[setter]
+    pub fn set_record_id<'py>(&self, record_id: &str) {
+        self.lock().set_record_id(record_id);
+    }
+
     #[getter]
     pub fn record_type(&self) -> WarcRecordTypePy {
         self.lock().record_type().into()

@@ -1228,6 +1228,11 @@ impl WarcRecord {
         self.headers.get("WARC-Record-ID")
     }
 
+    /// Set WARC record ID
+    pub fn set_record_id(&mut self, record_id: impl AsRef<str>) {
+        self.headers.set("WARC-Record-ID", record_id)
+    }
+
     /// WARC record headers.
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
