@@ -20,6 +20,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyString};
 use std::any::Any;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
+
 // ===========================================================
 // Submodules
 // ===========================================================
@@ -229,18 +230,13 @@ impl PyReaderAdapter {
                 PyReaderType::Other(inner)
             }
         });
-        let adapter = Self {
+        Ok(Self {
             inner,
             pos: None,
             buf: vec![0; capacity],
             buf_pos: 0,
             buf_len: 0,
-        };
-        Ok(adapter)
-    }
-
-    fn ensure_pos_initialized(&mut self) -> io::Result<u64> {
-        self.stream_position()
+        })
     }
 }
 
@@ -278,7 +274,12 @@ macro_rules! native_stream_position_call {
 
 impl Seek for PyReaderAdapter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        let self_pos = self.ensure_pos_initialized()?;
+        if self.pos.is_none() {
+            // Initialize stream position.
+            self.stream_position()?;
+        }
+
+        let self_pos = self.pos.unwrap();
         if pos == SeekFrom::Current(0) {
             return Ok(self_pos);
         }
@@ -351,8 +352,10 @@ impl BufRead for PyReaderAdapter {
         if self.buf_pos < self.buf_len {
             return Ok(&self.buf[self.buf_pos..self.buf_len]);
         }
-
-        self.ensure_pos_initialized()?;
+        if self.pos.is_none() {
+            // Initialize stream position.
+            self.stream_position()?;
+        }
 
         let n = Python::attach(|py| -> io::Result<usize> {
             match &self.inner {
@@ -383,7 +386,7 @@ impl BufRead for PyReaderAdapter {
     }
 
     fn consume(&mut self, amount: usize) {
-        self.pos = Some(self.pos.unwrap() + amount as u64);
+        self.pos = Some(self.pos.expect("consume() called without fill_buf()") + amount as u64);
         self.buf_pos += amount;
     }
 }

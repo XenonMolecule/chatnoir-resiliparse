@@ -89,7 +89,12 @@ class IOStream:
     def _get_stream(self):
         if self._reader is not None:
             return self._reader
-        return self._writer
+        if self._writer is not None:
+            return self._writer
+        stream = self._get_reader()
+        if stream is None:
+            stream = self._get_writer()
+        return stream
 
     def _get_reader(self):
         if self._reader is None:
