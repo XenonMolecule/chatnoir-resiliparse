@@ -22,7 +22,7 @@ use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "GzipReader", extends = WarcReaderPy, subclass)]
+#[pyclass(name = "GzipReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct GzipReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
@@ -91,7 +91,7 @@ impl GzipReaderPy {
     }
 }
 
-#[pyclass(name = "GzipWriter", extends = WarcWriterPy, subclass)]
+#[pyclass(name = "GzipWriter", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct GzipWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }

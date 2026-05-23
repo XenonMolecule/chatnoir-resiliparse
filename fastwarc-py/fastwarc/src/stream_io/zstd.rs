@@ -22,7 +22,7 @@ use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
-#[pyclass(name = "ZstdReader", extends = WarcReaderPy, subclass)]
+#[pyclass(name = "ZstdReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct ZstdReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
@@ -90,7 +90,7 @@ impl ZstdReaderPy {
     }
 }
 
-#[pyclass(name = "ZstdWriter", extends = WarcWriterPy, subclass)]
+#[pyclass(name = "ZstdWriter", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct ZstdWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
 }

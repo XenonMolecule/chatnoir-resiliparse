@@ -220,7 +220,7 @@ pub enum HeaderEncoding {
 /// WARC headers should be created with [`HeaderEncoding::Unicode`].
 /// HTTP headers should use [`HeaderEncoding::Latin1`]. However, in either case,
 /// you should still avoid non-ASCII characters).
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct HeaderMap {
     encoding: HeaderEncoding,
     status_line: Option<Vec<u8>>,

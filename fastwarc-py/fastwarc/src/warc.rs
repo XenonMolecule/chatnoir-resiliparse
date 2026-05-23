@@ -31,8 +31,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 // ===========================================================
 
 #[allow(non_camel_case_types)]
-#[pyclass(name = "WarcRecordType", eq, eq_int, from_py_object)]
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[pyclass(name = "WarcRecordType", module = "fastwarc.warc", eq, eq_int, from_py_object)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum WarcRecordTypePy {
     warcinfo = 2,
     response = 4,
@@ -44,6 +44,7 @@ pub enum WarcRecordTypePy {
     continuation = 256,
     unknown = 512,
     any_type = 65535,
+    #[default]
     no_type = 0,
 }
 
@@ -122,7 +123,7 @@ impl WarcRecordTypePy {
 // HeaderMap
 // ===========================================================
 
-#[pyclass(name = "HeaderMap")]
+#[pyclass(name = "HeaderMap", module = "fastwarc.warc")]
 pub struct HeaderMapPy {
     inner: HeaderMapBacking,
 }
@@ -202,6 +203,30 @@ impl HeaderMapPy {
         Ok(Self {
             inner: HeaderMapBacking::Owned(HeaderMap::new(enc)),
         })
+    }
+
+    fn __getnewargs__(&self) -> (&'static str,) {
+        (self.encoding(),)
+    }
+
+    fn __getstate__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyBytes>, bool)> {
+        self.with_headers(|headers| {
+            let mut buf = Vec::with_capacity(headers.len() * 20);
+            headers.write(&mut buf)?;
+            Ok((PyBytes::new(py, buf.as_ref()), self.status_line(py).is_some()))
+        })
+    }
+
+    fn __setstate__<'py>(&mut self, state: (Bound<'py, PyBytes>, bool)) -> PyResult<()> {
+        let (header_bytes, has_status_line) = state;
+        let mut headers = HeaderMap::new(match self.encoding() {
+            "utf-8" => HeaderEncoding::Unicode,
+            "latin1" => HeaderEncoding::Latin1,
+            e => return Err(PyValueError::new_err(format!("Unsupported encoding: {}", e))),
+        });
+        headers.parse(&mut io::Cursor::new(header_bytes.as_bytes().to_vec()), has_status_line)?;
+        self.inner = HeaderMapBacking::Owned(headers);
+        Ok(())
     }
 
     pub fn encoding(&self) -> &'static str {
@@ -423,13 +448,21 @@ impl HeaderMapPy {
     pub fn __contains__(&self, item: &str) -> bool {
         self.with_headers(|h| h.contains_key(item))
     }
+
+    fn __eq__(&self, other: &HeaderMapPy) -> bool {
+        self.with_headers(|left| other.with_headers(|right| left == right))
+    }
+
+    fn __ne__(&self, other: &HeaderMapPy) -> bool {
+        !self.__eq__(other)
+    }
 }
 
 // ===========================================================
 // WarcRecord
 // ===========================================================
 
-#[pyclass(name = "WarcRecordPayloadReader", extends = WarcReaderPy)]
+#[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy)]
 struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,
 }
@@ -496,7 +529,7 @@ impl WarcRecordPayloadReaderPy {
     pub fn close(&self) {}
 }
 
-#[pyclass(name = "WarcRecord")]
+#[pyclass(name = "WarcRecord", module = "fastwarc.warc")]
 pub struct WarcRecordPy {
     inner: Arc<Mutex<WarcRecord>>,
 }
@@ -505,15 +538,41 @@ impl WarcRecordPy {
     fn lock(&self) -> MutexGuard<'_, WarcRecord> {
         self.inner.lock().unwrap()
     }
+
+    fn from_record(record: WarcRecord) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(record)),
+        }
+    }
 }
 
 #[pymethods]
 impl WarcRecordPy {
     #[new]
     pub fn __new__() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(WarcRecord::new())),
+        Self::from_record(WarcRecord::new())
+    }
+
+    fn __getnewargs__<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+        PyTuple::empty(py)
+    }
+
+    fn __getstate__(&mut self) -> PyResult<(Vec<u8>, bool)> {
+        let mut record = self.lock();
+        let http_parsed = record.is_http_parsed();
+        let mut serialized = Vec::with_capacity(record.content_length() as usize + 400);
+        record.write_with_block_size(&mut serialized, 16384)?;
+        Ok((serialized, http_parsed))
+    }
+
+    fn __setstate__(&mut self, state: (Vec<u8>, bool)) -> PyResult<()> {
+        let (serialized, http_parsed) = state;
+        let mut record = WarcRecord::from_bytes(serialized)?;
+        if http_parsed {
+            record.parse_http()?;
         }
+        self.inner = Arc::new(Mutex::new(record));
+        Ok(())
     }
 
     #[getter]
@@ -761,7 +820,7 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 // ArchiveIterator
 // ===========================================================
 
-#[pyclass(name = "ArchiveIterator")]
+#[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
 pub struct ArchiveIteratorPy {
     inner: ArchiveIteratorThreadSafe,
     record_types: u16,

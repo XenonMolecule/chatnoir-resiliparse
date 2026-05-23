@@ -36,7 +36,7 @@ pub mod zstd;
 // Exported stream parent classes
 // ===========================================================
 
-#[pyclass(name = "WarcReader", subclass)]
+#[pyclass(name = "WarcReader", module = "fastwarc.stream_io", subclass)]
 pub struct WarcReaderPy {}
 
 #[pymethods]
@@ -97,7 +97,7 @@ impl WarcReaderPy {
     }
 }
 
-#[pyclass(name = "WarcWriter", subclass)]
+#[pyclass(name = "WarcWriter", module = "fastwarc.stream_io", subclass)]
 pub struct WarcWriterPy {}
 
 #[pymethods]

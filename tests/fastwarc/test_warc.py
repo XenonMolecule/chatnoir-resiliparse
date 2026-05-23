@@ -486,7 +486,6 @@ def test_pickle_warc_header_map():
     headers.append('x-foo', 'barbaz')
 
     pickled = pickle.loads(pickle.dumps(headers))
-    assert len(pickled) == len(headers)
     assert pickled == headers
 
 
