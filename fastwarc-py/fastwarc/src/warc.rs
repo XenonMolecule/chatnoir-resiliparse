@@ -22,7 +22,7 @@ use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyIterator, PyString, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDateTime, PyDict, PyIterator, PyString, PyTuple};
 use std::io::{self, Read, Seek};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -486,7 +486,7 @@ impl WarcRecordPy {
     }
 
     #[getter]
-    pub fn record_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    pub fn record_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDateTime>>> {
         let inner = self.lock();
         let Some(value) = inner.headers().get("WARC-Date") else {
             return Ok(None);
@@ -495,9 +495,23 @@ impl WarcRecordPy {
         let datetime = datetime_module.getattr("datetime")?;
         let normalized = value.replace('Z', "+00:00");
         match datetime.call_method1("fromisoformat", (normalized,)) {
-            Ok(obj) => Ok(Some(obj)),
+            Ok(obj) => Ok(Some(obj.cast_into::<PyDateTime>()?)),
             Err(_) => Ok(None),
         }
+    }
+
+    #[setter]
+    pub fn set_record_date<'py>(&mut self, record_date: Bound<'_, PyDateTime>) -> PyResult<()> {
+        if record_date.getattr("tzinfo")?.is_none() {
+            return Err(PyValueError::new_err("Trying to set naive datetime without timezone info."));
+        }
+        let formatted: String = record_date.call_method1("isoformat", ())?.extract::<String>()?;
+        self.inner
+            .lock()
+            .unwrap()
+            .headers_mut()
+            .set("WARC-Date", formatted.replace("+00:00", "Z"));
+        Ok(())
     }
 
     #[getter]
