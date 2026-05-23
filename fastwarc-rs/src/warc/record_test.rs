@@ -628,7 +628,7 @@ fn write_record_with_checksum() -> io::Result<()> {
                          Content-Length: 5\r\n\
                          Server: nginx\r\n\
                          \r\n";
-    let expected_payload_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(http_headers)));
+    let expected_payload_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(b"Hello")));
 
     let mut block_data = http_headers.to_vec();
     block_data.extend_from_slice(b"Hello");
@@ -640,6 +640,7 @@ fn write_record_with_checksum() -> io::Result<()> {
     assert_eq!(checksummed_bytes_written, checksummed_serialized.len());
     assert!(checksummed_text.contains(&format!("WARC-Block-Digest: {expected_block_digest}\r\n")));
     assert!(checksummed_text.contains(&format!("WARC-Payload-Digest: {expected_payload_digest}\r\n")));
+    assert!(checksummed_text.contains(&format!("Content-Length: {}\r\n", http_headers.len() + 5)));
     assert!(checksummed_text.contains("HTTP/1.1 200 OK\r\n"));
     assert!(checksummed_serialized.ends_with(b"Hello\r\n\r\n"));
 

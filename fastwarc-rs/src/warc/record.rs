@@ -1593,6 +1593,15 @@ impl WarcRecord {
         checksum_data: bool,
     ) -> io::Result<usize> {
         let mut bytes_written = 0usize;
+        let http_header_len = if self.http_parsed {
+            self.http_headers.as_ref().map_or(0usize, |h| {
+                let mut buf = Vec::with_capacity(512);
+                h.write(&mut buf).unwrap_or_default()
+            })
+        } else {
+            0
+        };
+        let block_content_length = self.content_length as usize + http_header_len;
 
         if checksum_data {
             self.freeze()?;
@@ -1601,28 +1610,32 @@ impl WarcRecord {
             use data_encoding::BASE32;
             use sha1::Sha1;
             let mut block_digest = Sha1::new();
-
+            let mut payload_digest = None;
             if self.http_parsed
                 && let Some(h) = &self.http_headers
             {
+                payload_digest = Some(Sha1::new());
                 let mut buf = Vec::with_capacity(512);
                 h.write(&mut buf)?;
-
-                let mut payload_digest = Sha1::new();
                 Digest::update(&mut block_digest, &buf);
-                Digest::update(&mut payload_digest, &buf);
-                let payload_digest = format!("sha1:{}", BASE32.encode(&payload_digest.finalize()));
-                self.headers
-                    .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
             }
 
             loop {
-                let mut buf = [0u8; 4096];
-                let n = reader.read(&mut buf)?;
+                let mut payload_buf = [0u8; 4096];
+                let n = reader.read(&mut payload_buf)?;
                 if n == 0 {
                     break;
                 }
-                Digest::update(&mut block_digest, &buf[..n]);
+                Digest::update(&mut block_digest, &payload_buf[..n]);
+                if let Some(d) = &mut payload_digest {
+                    Digest::update(d, &payload_buf[..n]);
+                }
+            }
+
+            if let Some(d) = payload_digest {
+                let payload_digest = format!("sha1:{}", BASE32.encode(&d.finalize()));
+                self.headers
+                    .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
             }
             let block_digest = format!("sha1:{}", BASE32.encode(&block_digest.finalize()));
             self.headers.set_bytes(b"WARC-Block-Digest", block_digest.as_bytes());
@@ -1633,7 +1646,7 @@ impl WarcRecord {
 
         // Ensure Content-Length is correct
         self.headers
-            .set_bytes(b"Content-Length", self.content_length.to_string().as_bytes());
+            .set_bytes(b"Content-Length", block_content_length.to_string().as_bytes());
 
         // Write WARC headers
         bytes_written += self.headers.write(writer)?;
