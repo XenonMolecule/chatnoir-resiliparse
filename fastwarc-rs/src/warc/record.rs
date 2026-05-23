@@ -755,6 +755,7 @@ impl Display for DigestError {
         }
     }
 }
+
 /// Internal helper for constructing a digest instance.
 fn _get_digest(algorithm: &str) -> Result<Box<dyn DynDigest>, DigestError> {
     match algorithm.to_ascii_lowercase().as_str() {

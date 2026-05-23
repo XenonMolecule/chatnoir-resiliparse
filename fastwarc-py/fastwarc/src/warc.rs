@@ -639,18 +639,20 @@ impl WarcRecordPy {
 
     #[pyo3(signature = (consume=false))]
     pub fn verify_block_digest(&mut self, consume: bool) -> PyResult<bool> {
-        self.lock().verify_block_digest(consume).map_err(|e| match e {
-            StreamError(_) => PyOSError::new_err(e.to_string()),
-            _ => PyValueError::new_err(e.to_string()),
-        })
+        match self.lock().verify_block_digest(consume) {
+            Ok(valid) => Ok(valid),
+            Err(StreamError(e)) => Err(PyOSError::new_err(e.to_string())),
+            Err(_) => Ok(false),
+        }
     }
 
     #[pyo3(signature = (consume=false))]
     pub fn verify_payload_digest(&mut self, consume: bool) -> PyResult<bool> {
-        self.lock().verify_payload_digest(consume).map_err(|e| match e {
-            StreamError(_) => PyOSError::new_err(e.to_string()),
-            _ => PyValueError::new_err(e.to_string()),
-        })
+        match self.lock().verify_payload_digest(consume) {
+            Ok(valid) => Ok(valid),
+            Err(StreamError(e)) => Err(PyOSError::new_err(e.to_string())),
+            Err(_) => Ok(false),
+        }
     }
 
     #[pyo3(signature = (stream, checksum_data=false, payload_digest=None, chunk_size=16384))]
