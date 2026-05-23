@@ -427,7 +427,7 @@ cdef class MemGuard(_ResiliparseGuard):
         return MemoryLimitExceeded
 
     cdef void exec_before(self) except *:
-        if platform.system() != 'Linux':
+        if platform.system() != 'Linux' or platform.machine() == 'aarch64':
             raise RuntimeError(f'Unsupported platform: {platform.system()}')
 
         cdef pthread_t main_thread = pthread_self()

@@ -201,7 +201,7 @@ def fill_mem_signal_term():
 
 @pytest.mark.slow
 def test_mem_guard():
-    if platform.system() != 'Linux':
+    if platform.system() != 'Linux' or platform.machine() == 'aarch64':
         pytest.skip("Skipping mem_guard test due to unsupported platform")
 
     with pytest.raises(MemoryLimitExceeded):
