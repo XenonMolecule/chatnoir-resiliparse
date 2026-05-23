@@ -151,10 +151,21 @@ pub(crate) trait PyStreamAdapter: Sized {
 }
 
 enum PyReaderType {
-    GzipReader(Py<PyAny>),
-    ZstdReader(Py<PyAny>),
-    Lz4Reader(Py<PyAny>),
+    GzipReader(Py<GzipReaderPy>),
+    ZstdReader(Py<ZstdReaderPy>),
+    Lz4Reader(Py<Lz4ReaderPy>),
     Other(Py<PyAny>),
+}
+
+impl Clone for PyReaderType {
+    fn clone(&self) -> Self {
+        Python::attach(|py| match self {
+            Self::GzipReader(inner) => Self::GzipReader(inner.clone_ref(py)),
+            Self::ZstdReader(inner) => Self::ZstdReader(inner.clone_ref(py)),
+            Self::Lz4Reader(inner) => Self::Lz4Reader(inner.clone_ref(py)),
+            Self::Other(inner) => Self::Other(inner.clone_ref(py)),
+        })
+    }
 }
 
 /// Reader adapter for Python file-like objects.
@@ -168,17 +179,66 @@ pub(crate) struct PyReaderAdapter {
     buf_len: usize,
 }
 
+macro_rules! native_inner_call_path {
+    ($self:ident, $inner:ident, $py:ident, $closure:expr) => {{
+        let inner = &$inner.bind($py).borrow().inner;
+        $closure($self, inner.lock().unwrap().as_mut().unwrap())
+    }};
+}
+
+impl PyReaderAdapter {
+    pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
+        Self::with_capacity(inner, 8192)
+    }
+
+    pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> PyResult<Self> {
+        let inner = Python::attach(|py| {
+            let bound = inner.bind(py);
+            if bound.is_exact_instance_of::<GzipReaderPy>() {
+                PyReaderType::GzipReader(bound.cast::<GzipReaderPy>().unwrap().clone().unbind())
+            } else if bound.is_exact_instance_of::<ZstdReaderPy>() {
+                PyReaderType::ZstdReader(bound.cast::<ZstdReaderPy>().unwrap().clone().unbind())
+            } else if bound.is_exact_instance_of::<Lz4ReaderPy>() {
+                PyReaderType::Lz4Reader(bound.cast::<Lz4ReaderPy>().unwrap().clone().unbind())
+            } else {
+                PyReaderType::Other(inner)
+            }
+        });
+        Ok(Self {
+            inner,
+            pos: None,
+            buf: vec![0; capacity],
+            buf_pos: 0,
+            buf_len: 0,
+        })
+    }
+
+    fn native_call_or_forward<N, F, R>(&mut self, native_call_closure: N, forward_call_closure: F) -> io::Result<R>
+    where
+        N: FnOnce(&mut Self, &mut dyn WarcRead) -> io::Result<R>,
+        F: FnOnce(&mut Self, &Bound<'_, PyAny>) -> PyResult<R>,
+    {
+        Python::attach(|py| -> io::Result<R> {
+            match self.inner.clone() {
+                PyReaderType::GzipReader(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyReaderType::ZstdReader(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyReaderType::Lz4Reader(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyReaderType::Other(inner) => Ok(forward_call_closure(self, inner.bind(py))?),
+            }
+        })
+    }
+}
+
 impl PyStreamAdapter for PyReaderAdapter {
     fn new(inner: Py<PyAny>) -> PyResult<Self> {
         PyReaderAdapter::new(inner)
     }
-}
-
-macro_rules! native_inner_call_path {
-    ($inner:ident, $py:ident, $ReaderType:ident, $($call:tt)+) => {{
-        let inner = &$inner.bind($py).cast::<$ReaderType>().unwrap().borrow().inner;
-        Ok(inner.lock().unwrap().as_mut().unwrap().$($call)+?)
-    }};
 }
 
 impl WarcRead for PyReaderAdapter {
@@ -199,51 +259,13 @@ impl WarcRead for PyReaderAdapter {
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        Ok(Python::attach(|py| -> PyResult<u64> {
-            match &self.inner {
-                PyReaderType::GzipReader(inner) => {
-                    native_inner_call_path!(inner, py, GzipReaderPy, inner_stream_position())
-                }
-                PyReaderType::ZstdReader(inner) => {
-                    native_inner_call_path!(inner, py, ZstdReaderPy, inner_stream_position())
-                }
-                PyReaderType::Lz4Reader(inner) => {
-                    native_inner_call_path!(inner, py, Lz4ReaderPy, inner_stream_position())
-                }
-                PyReaderType::Other(_) => {
-                    // Calling inner.tell() would report wrong offsets due to our buffering
-                    Ok(self.stream_position()?)
-                }
-            }
-        })?)
-    }
-}
-
-impl PyReaderAdapter {
-    pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
-        Self::with_capacity(inner, 8192)
-    }
-
-    pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> PyResult<Self> {
-        let inner = Python::attach(|py| {
-            let bound = inner.bind(py);
-            if bound.is_exact_instance_of::<GzipReaderPy>() {
-                PyReaderType::GzipReader(inner)
-            } else if bound.is_exact_instance_of::<ZstdReaderPy>() {
-                PyReaderType::ZstdReader(inner)
-            } else if bound.is_exact_instance_of::<Lz4ReaderPy>() {
-                PyReaderType::Lz4Reader(inner)
-            } else {
-                PyReaderType::Other(inner)
-            }
-        });
-        Ok(Self {
-            inner,
-            pos: None,
-            buf: vec![0; capacity],
-            buf_pos: 0,
-            buf_len: 0,
-        })
+        self.native_call_or_forward(
+            |_, inner| inner.inner_stream_position(),
+            |slf, _| {
+                // Calling inner.tell() would report wrong offsets due to our buffering
+                Ok(slf.stream_position()?)
+            },
+        )
     }
 }
 
@@ -294,22 +316,17 @@ impl Seek for PyReaderAdapter {
             SeekFrom::Current(offset) => SeekFrom::Current(offset - buffered),
             SeekFrom::End(offset) => SeekFrom::End(offset),
         };
-        let new_pos = Python::attach(|py| -> io::Result<u64> {
-            match &self.inner {
-                PyReaderType::GzipReader(inner) => native_inner_call_path!(inner, py, GzipReaderPy, seek(pos)),
-                PyReaderType::ZstdReader(inner) => native_inner_call_path!(inner, py, ZstdReaderPy, seek(pos)),
-                PyReaderType::Lz4Reader(inner) => native_inner_call_path!(inner, py, Lz4ReaderPy, seek(pos)),
-                PyReaderType::Other(inner) => {
-                    let stream = inner.bind(py);
-                    let result = match pos {
-                        SeekFrom::Start(offset) => stream.call_method1("seek", (offset, 0)),
-                        SeekFrom::Current(offset) => stream.call_method1("seek", (offset, 1)),
-                        SeekFrom::End(offset) => stream.call_method1("seek", (offset, 2)),
-                    }?;
-                    Ok(result.extract::<u64>()?)
-                }
-            }
-        })?;
+        let new_pos = self.native_call_or_forward(
+            |_, inner| inner.seek(pos),
+            |_, inner| {
+                let result = match pos {
+                    SeekFrom::Start(offset) => inner.call_method1("seek", (offset, 0)),
+                    SeekFrom::Current(offset) => inner.call_method1("seek", (offset, 1)),
+                    SeekFrom::End(offset) => inner.call_method1("seek", (offset, 2)),
+                }?;
+                result.extract::<u64>()
+            },
+        )?;
         self.pos = Some(new_pos);
         self.buf_pos = 0;
         self.buf_len = 0;
@@ -318,24 +335,10 @@ impl Seek for PyReaderAdapter {
 
     fn stream_position(&mut self) -> io::Result<u64> {
         if self.pos.is_none() {
-            self.pos = Some(Python::attach(|py| -> PyResult<u64> {
-                match &self.inner {
-                    PyReaderType::GzipReader(inner) => {
-                        native_inner_call_path!(inner, py, GzipReaderPy, stream_position())
-                    }
-                    PyReaderType::ZstdReader(inner) => {
-                        native_inner_call_path!(inner, py, ZstdReaderPy, stream_position())
-                    }
-                    PyReaderType::Lz4Reader(inner) => {
-                        native_inner_call_path!(inner, py, Lz4ReaderPy, stream_position())
-                    }
-                    PyReaderType::Other(inner) => {
-                        let stream = inner.bind(py);
-                        let result = stream.call_method0("tell")?;
-                        Ok(result.extract::<u64>()?)
-                    }
-                }
-            })?);
+            self.pos = Some(self.native_call_or_forward(
+                |_, inner| inner.stream_position(),
+                |_, inner| inner.call_method0("tell").and_then(|result| result.extract::<u64>()),
+            )?);
         }
         Ok(self.pos.unwrap())
     }
@@ -351,33 +354,23 @@ impl BufRead for PyReaderAdapter {
             self.stream_position()?;
         }
 
-        let n = Python::attach(|py| -> io::Result<usize> {
-            match &self.inner {
-                PyReaderType::GzipReader(inner) => {
-                    native_inner_call_path!(inner, py, GzipReaderPy, read(&mut self.buf))
+        let n = self.native_call_or_forward(
+            |slf, inner| inner.read(&mut slf.buf),
+            |slf, inner| {
+                let result = inner.call_method1("read", (slf.buf.len(),))?;
+                if let Ok(bytes) = result.cast::<PyBytes>() {
+                    let data = bytes.as_bytes();
+                    slf.buf[..data.len()].copy_from_slice(data);
+                    Ok(data.len())
+                } else if let Ok(bytearray) = result.cast::<PyByteArray>() {
+                    let data = bytearray.to_vec();
+                    slf.buf[..data.len()].copy_from_slice(&data);
+                    Ok(data.len())
+                } else {
+                    Err(PyTypeError::new_err("read() must return bytes"))
                 }
-                PyReaderType::ZstdReader(inner) => {
-                    native_inner_call_path!(inner, py, ZstdReaderPy, read(&mut self.buf))
-                }
-                PyReaderType::Lz4Reader(inner) => native_inner_call_path!(inner, py, Lz4ReaderPy, read(&mut self.buf)),
-                PyReaderType::Other(inner) => {
-                    let bound = inner.bind(py).call_method1("read", (self.buf.len(),))?;
-
-                    let len = if let Ok(bytes) = bound.cast::<PyBytes>() {
-                        let data = bytes.as_bytes();
-                        self.buf[..data.len()].copy_from_slice(data);
-                        data.len()
-                    } else if let Ok(bytearray) = bound.cast::<PyByteArray>() {
-                        let data = bytearray.to_vec();
-                        self.buf[..data.len()].copy_from_slice(&data);
-                        data.len()
-                    } else {
-                        return Err(PyTypeError::new_err("read() must return bytes").into());
-                    };
-                    Ok(len)
-                }
-            }
-        })?;
+            },
+        )?;
 
         self.buf_len = n;
         self.buf_pos = 0;
@@ -391,10 +384,21 @@ impl BufRead for PyReaderAdapter {
 }
 
 enum PyWriterType {
-    GzipWriter(Py<PyAny>),
-    ZstdWriter(Py<PyAny>),
-    Lz4Writer(Py<PyAny>),
+    GzipWriter(Py<GzipWriterPy>),
+    ZstdWriter(Py<ZstdWriterPy>),
+    Lz4Writer(Py<Lz4WriterPy>),
     Other(Py<PyAny>),
+}
+
+impl Clone for PyWriterType {
+    fn clone(&self) -> Self {
+        Python::attach(|py| match self {
+            Self::GzipWriter(inner) => Self::GzipWriter(inner.clone_ref(py)),
+            Self::ZstdWriter(inner) => Self::ZstdWriter(inner.clone_ref(py)),
+            Self::Lz4Writer(inner) => Self::Lz4Writer(inner.clone_ref(py)),
+            Self::Other(inner) => Self::Other(inner.clone_ref(py)),
+        })
+    }
 }
 
 /// Writer adapter for Python file-like objects.
@@ -414,17 +418,38 @@ impl PyWriterAdapter {
     pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
         let inner = Python::attach(|py| {
             let bound = inner.bind(py);
-            if bound.is_exact_instance_of::<GzipReaderPy>() {
-                PyWriterType::GzipWriter(inner)
-            } else if bound.is_exact_instance_of::<ZstdReaderPy>() {
-                PyWriterType::ZstdWriter(inner)
-            } else if bound.is_exact_instance_of::<Lz4ReaderPy>() {
-                PyWriterType::Lz4Writer(inner)
+            if bound.is_exact_instance_of::<GzipWriterPy>() {
+                PyWriterType::GzipWriter(bound.cast::<GzipWriterPy>().unwrap().clone().unbind())
+            } else if bound.is_exact_instance_of::<ZstdWriterPy>() {
+                PyWriterType::ZstdWriter(bound.cast::<ZstdWriterPy>().unwrap().clone().unbind())
+            } else if bound.is_exact_instance_of::<Lz4WriterPy>() {
+                PyWriterType::Lz4Writer(bound.cast::<Lz4WriterPy>().unwrap().clone().unbind())
             } else {
                 PyWriterType::Other(inner)
             }
         });
         Ok(Self { inner })
+    }
+
+    fn native_call_or_forward<N, F, R>(&mut self, native_call_closure: N, forward_call_closure: F) -> io::Result<R>
+    where
+        N: FnOnce(&mut Self, &mut dyn WarcWrite) -> io::Result<R>,
+        F: FnOnce(&mut Self, &Bound<'_, PyAny>) -> PyResult<R>,
+    {
+        Python::attach(|py| -> io::Result<R> {
+            match self.inner.clone() {
+                PyWriterType::GzipWriter(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyWriterType::ZstdWriter(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyWriterType::Lz4Writer(inner) => {
+                    native_inner_call_path!(self, inner, py, native_call_closure)
+                }
+                PyWriterType::Other(inner) => Ok(forward_call_closure(self, inner.bind(py))?),
+            }
+        })
     }
 }
 
@@ -444,28 +469,18 @@ impl WarcWrite for PyWriterAdapter {
 
 impl Write for PyWriterAdapter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        Python::attach(|py| -> io::Result<usize> {
-            match &self.inner {
-                PyWriterType::GzipWriter(inner) => native_inner_call_path!(inner, py, GzipWriterPy, write(buf)),
-                PyWriterType::ZstdWriter(inner) => native_inner_call_path!(inner, py, ZstdWriterPy, write(buf)),
-                PyWriterType::Lz4Writer(inner) => native_inner_call_path!(inner, py, Lz4WriterPy, write(buf)),
-                PyWriterType::Other(inner) => Ok(inner
-                    .bind(py)
+        self.native_call_or_forward(
+            |_, inner| inner.write(buf),
+            |_, inner| {
+                inner
                     .call_method1("write", (buf,))
-                    .and_then(|result| result.extract::<usize>())?),
-            }
-        })
+                    .and_then(|result| result.extract::<usize>())
+            },
+        )
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Python::attach(|py| -> io::Result<()> {
-            match &self.inner {
-                PyWriterType::GzipWriter(inner) => native_inner_call_path!(inner, py, GzipWriterPy, flush()),
-                PyWriterType::ZstdWriter(inner) => native_inner_call_path!(inner, py, ZstdWriterPy, flush()),
-                PyWriterType::Lz4Writer(inner) => native_inner_call_path!(inner, py, Lz4WriterPy, flush()),
-                PyWriterType::Other(inner) => Ok(inner.bind(py).call_method0("flush").map(|_| ())?),
-            }
-        })
+        self.native_call_or_forward(|_, inner| inner.flush(), |_, inner| inner.call_method0("flush").map(|_| ()))
     }
 }
 
