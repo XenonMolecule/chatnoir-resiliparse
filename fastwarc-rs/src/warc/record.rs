@@ -21,8 +21,7 @@ use sha2::digest;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
 use std::ops::Deref;
 use time::OffsetDateTime;
@@ -701,6 +700,18 @@ impl HeaderMap {
     }
 }
 
+impl Display for HeaderMap {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut buf = Vec::with_capacity(self.len() * 40);
+        let _ = self.write(&mut buf);
+        let headers_str = match self.encoding {
+            HeaderEncoding::Unicode => String::from_utf8_lossy(&buf),
+            HeaderEncoding::Latin1 => Cow::Owned(WINDOWS_1252.decode(&buf, DecoderTrap::Ignore).unwrap_or_default()),
+        };
+        write!(f, "{}", headers_str)
+    }
+}
+
 // ===========================================================
 // WARC record
 // ===========================================================
@@ -796,7 +807,15 @@ pub enum AutoDecode {
     All,
 }
 
-impl fmt::Debug for WarcRecord {
+impl Display for WarcRecord {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let headers = self.headers.to_string();
+        let http_headers = self.http_headers.as_ref().map(|h| h.to_string()).unwrap_or_default();
+        write!(f, "{}{}...", headers, http_headers)
+    }
+}
+
+impl Debug for WarcRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut dbg = f.debug_struct("WarcRecord");
         let mut fields = dbg
