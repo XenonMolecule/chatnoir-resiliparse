@@ -1023,13 +1023,16 @@ impl WarcRecord {
                 Some(reader_any.downcast::<LimitedBufReader>().unwrap().into_inner())
             }
             ReaderType::Original(reader) => Some(reader.into_inner()),
-            ReaderType::Frozen(readers) => readers.1.map(|r| {
-                Box::new(r)
-                    .into_any()
-                    .downcast::<LimitedBufReader>()
-                    .unwrap()
-                    .into_inner()
-            }),
+            ReaderType::Frozen((frozen, orig)) => {
+                self.reader = Some(ReaderType::Frozen((frozen, None)));
+                orig.map(|r| {
+                    Box::new(r)
+                        .into_any()
+                        .downcast::<LimitedBufReader>()
+                        .unwrap()
+                        .into_inner()
+                })
+            }
         }
     }
 
@@ -1751,7 +1754,8 @@ impl Iterator for WarcRecord {
     ///
     /// Next [`WarcRecord`] instance from the stream or `None`.
     fn next(&mut self) -> Option<Self::Item> {
-        if self.content_length > 0
+        if !matches!(self.reader, Some(ReaderType::Frozen(_)))
+            && self.content_length > 0
             && let Err(e) = self.consume()
         {
             return Some(Err(e));
