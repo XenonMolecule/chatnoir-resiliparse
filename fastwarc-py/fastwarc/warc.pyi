@@ -48,12 +48,23 @@ any_type = WarcRecordType.any_type
 
 
 class HeaderMap:
-    reason_phrase: Optional[str]
-    status_code: Optional[int]
-    status_line: Optional[str]
-    status_line_bytes: Optional[bytes]
+    @property
+    def reason_phrase(self) -> Optional[str]: ...
 
-    def __new__(cls, encoding: str = 'utf-8') -> Self: ...
+    @property
+    def status_code(self) -> Optional[int]: ...
+
+    @property
+    def status_line(self) -> Optional[str]: ...
+
+    @status_line.setter
+    def status_line(self, status_line: str): ...
+
+    @property
+    def status_line_bytes(self) -> Optional[bytes]: ...
+
+    @status_line_bytes.setter
+    def status_line_bytes(self, status_line: bytes): ...
 
     def encoding(self) -> str: ...
 
