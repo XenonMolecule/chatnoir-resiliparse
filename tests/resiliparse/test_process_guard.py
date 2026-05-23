@@ -209,24 +209,28 @@ def test_mem_guard():
 
     time.sleep(.5)
     gc.collect()
+    time.sleep(.5)
 
     with pytest.raises(SigIntSent):
         fill_mem_exc_signal()
 
     time.sleep(.5)
     gc.collect()
+    time.sleep(.5)
 
     with pytest.raises(SigIntSent):
         fill_mem_signal()
 
     time.sleep(.5)
     gc.collect()
+    time.sleep(.5)
 
     with pytest.raises(SigTermSent):
         fill_mem_signal_term()
 
     time.sleep(.5)
     gc.collect()
+    time.sleep(.5)
 
     # Test if same guard can be used twice
     with pytest.raises(MemoryLimitExceeded):
@@ -234,6 +238,7 @@ def test_mem_guard():
 
     time.sleep(.5)
     gc.collect()
+    time.sleep(.5)
 
     # Test context manager interface
     with pytest.raises(MemoryLimitExceeded):
