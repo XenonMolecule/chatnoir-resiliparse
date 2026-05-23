@@ -231,7 +231,8 @@ pub struct HeaderMap {
 fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
     let mut value_sanitized = Vec::with_capacity(value.len());
     value_sanitized.extend(value.trim_ascii().iter().flat_map(|b| match b {
-        b'\r' | b'\n' => Some(b' '),
+        b'\r' => None,
+        b'\n' => Some(b' '),
         b':' if is_key => None,
         other => Some(*other),
     }));
@@ -1339,9 +1340,16 @@ impl WarcRecord {
 
     /// Initialize mandatory headers in a fresh WARC record instance.
     ///
+    /// You can set the value of the `Content-Length` header, the record type, and
+    /// a record ID. The record type defaults to [`WarcRecordType::NoType`]. If no
+    /// ID was specified, a random UUID is generated.
+    ///
+    /// The `content_length` argument affects only the WARC header. [`Self::content_length()`]
+    /// always reports the actual payload length of the record.
+    ///
     /// # Arguments
     ///
-    /// * `content_length` - WARC record body length in bytes
+    /// * `content_length` - Value of `Content-Length` header
     /// * `record_type` - WARC-Type
     /// * `record_urn` - WARC-Record-ID as URN without `'<urn:'`, `'>'` (if unset, a random URN will be generated)
     pub fn init_headers(
@@ -1374,7 +1382,6 @@ impl WarcRecord {
 
         self.headers
             ._append_bytes_no_sanitize(b"Content-Length", content_length.to_string().as_bytes());
-        self.content_length = content_length;
     }
 
     /// Parse HTTP headers and advance content reader.
