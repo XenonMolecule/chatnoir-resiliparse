@@ -29,11 +29,14 @@ __all__ = [
     'BrotliStream',
     'FastWARCError',
     'StreamError',
+    'ReaderStaleError',
 ]
 
 FastWARCError = OSError
 
 StreamError = OSError
+
+ReaderStaleError = OSError
 
 
 def _warn_deprecated(msg):
