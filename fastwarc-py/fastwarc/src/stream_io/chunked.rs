@@ -22,6 +22,13 @@ use pyo3::types::PyBytes;
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
+/// HTTP chunked-transfer reader.
+///
+/// :param inner: raw input stream, file-like object, file name, or URL
+/// :param buffer_size: decode buffer size
+/// :type buffer_size: int
+/// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
+/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "ChunkedReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct ChunkedReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
@@ -81,6 +88,13 @@ impl ChunkedReaderPy {
     }
 }
 
+/// HTTP chunked-transfer writer.
+///
+/// :param inner: raw output stream, file-like object, file name, or URL
+/// :param min_chunk_size: minimum chunk size
+/// :type min_chunk_size: int
+/// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
+/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "ChunkedWriter", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct ChunkedWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,

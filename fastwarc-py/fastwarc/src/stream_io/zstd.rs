@@ -18,13 +18,65 @@ use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use fastwarc::stream_io::zstd;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyList, PyString};
 use std::io::{self, Read, Seek, Write};
 use std::sync::Mutex;
 
+/// Zstandard reader.
+///
+/// :param inner: raw input stream, file-like object, file name, or URL
+/// :param buffer_size: decompression buffer size
+/// :type buffer_size: int
+/// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
+/// :type fsspec_args: dict or bool or None
+/// :param dictionary: optional decompression dictionary
+/// :type dictionary: bytes or None
 #[pyclass(name = "ZstdReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct ZstdReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
+}
+
+/// Train a Zstandard dictionary from a stream of samples.
+///
+/// :param sample_data: continuous stream of sample bytes
+/// :param sample_sizes: sample boundaries
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_continuous(
+    sample_data: &[u8],
+    sample_sizes: Vec<usize>,
+    max_size: usize,
+) -> PyResult<Vec<u8>> {
+    Ok(zstd::train_dictionary_from_continuous(sample_data, sample_sizes.as_slice(), max_size)?)
+}
+
+/// Train a Zstandard dictionary from a set of files.
+///
+/// :param filenames: input file names
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_files(filenames: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
+    let it = filenames
+        .iter()
+        .map(|f| Ok(std::path::PathBuf::from(f.cast::<PyString>()?.to_str()?)))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(zstd::train_dictionary_from_files(it, max_size)?)
+}
+
+/// Train a Zstandard dictionary from a set of samples.
+///
+/// :param sample_data: list of byte samples
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_samples(samples: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
+    let it = samples
+        .iter()
+        .map(|f| Ok(f.cast_into::<PyBytes>()?.as_bytes().to_vec()))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(zstd::train_dictionary_from_samples(&it, max_size)?)
 }
 
 // noinspection DuplicatedCode
@@ -90,6 +142,17 @@ impl ZstdReaderPy {
     }
 }
 
+/// Zstandard writer.
+///
+/// :param inner: raw output stream, file-like object, file name, or URL
+/// :param buffer_size: compression buffer size
+/// :type buffer_size: int
+/// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
+/// :type fsspec_args: dict or bool or None
+/// :param dictionary: optional compression dictionary
+/// :type dictionary: bytes or None
+/// :param compress_dictionary_frame: include dictionary frames in compressed output
+/// :type compress_dictionary_frame: bool
 #[pyclass(name = "ZstdWriter", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct ZstdWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,

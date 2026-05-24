@@ -32,7 +32,7 @@ pub struct ZstdReader<T: ReadSeek> {
 
 pub use ::zstd::dict::from_continuous as train_dictionary_from_continuous;
 pub use ::zstd::dict::from_files as train_dictionary_from_files;
-pub use ::zstd::dict::from_sample_iterator as train_dictionary_sample_iterator;
+pub use ::zstd::dict::from_sample_iterator as train_dictionary_from_sample_iterator;
 pub use ::zstd::dict::from_samples as train_dictionary_from_samples;
 
 /// Options for constructing a new [`ZstdReader`].

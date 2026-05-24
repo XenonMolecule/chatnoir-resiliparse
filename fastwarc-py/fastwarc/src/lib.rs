@@ -59,13 +59,16 @@ pub mod _fastwarc {
         pub use crate::stream_io::gzip::{GzipReaderPy, GzipWriterPy};
 
         #[pymodule_export]
+        pub use crate::stream_io::zstd::{
+            ZstdReaderPy, ZstdWriterPy, zstd_train_dictionary_from_continuous, zstd_train_dictionary_from_files,
+            zstd_train_dictionary_from_samples,
+        };
+
+        #[pymodule_export]
         pub use crate::stream_io::lz4::{Lz4ReaderPy, Lz4WriterPy};
 
         #[pymodule_export]
         pub use crate::stream_io::brotli::{BrotliReaderPy, BrotliWriterPy};
-
-        #[pymodule_export]
-        pub use crate::stream_io::zstd::{ZstdReaderPy, ZstdWriterPy};
 
         #[pymodule_export]
         pub use crate::stream_io::chunked::{ChunkedReaderPy, ChunkedWriterPy};

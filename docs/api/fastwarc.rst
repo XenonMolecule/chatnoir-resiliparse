@@ -11,7 +11,6 @@ WARC
 .. automodule:: fastwarc.warc
    :members:
    :special-members: __iter__, __next__
-   :exclude-members: CaseInsensitiveStr, CaseInsensitiveStrDict
    :show-inheritance:
 
    .. autoclass:: WarcRecordType
