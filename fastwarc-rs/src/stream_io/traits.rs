@@ -32,13 +32,13 @@ impl<T: io::BufRead + io::Seek + Send + ?Sized + 'static> BufReadSeek for T {}
 /// Trait for [`io::Read`] stream implementations that read (potentially coded)
 /// data from a WARC stream. A [`WarcRead`] stream may wrap another inner stream.
 pub trait WarcRead: BufReadSeek + Any {
-    /// Get an [`Any`] reference to this [`DecompressingRead`].
+    /// Get an [`Any`] reference to this [`WarcRead`].
     fn as_any(&self) -> &dyn Any;
 
-    /// Get a mutable [`Any`] reference to this [`DecompressingRead`].
+    /// Get a mutable [`Any`] reference to this [`WarcRead`].
     fn as_any_mut(&mut self) -> &mut dyn Any;
 
-    /// Convert the [`DecompressingRead`] into [`Any`].
+    /// Convert the [`WarcRead`] into [`Any`].
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
     /// Seek to an offset, in bytes, in a wrapped inner stream.
@@ -84,13 +84,13 @@ pub trait WarcRead: BufReadSeek + Any {
 /// Trait for [`io::Write`] stream implementations that writes (potentially coded)
 /// data to a WARC stream. A [`WarcWrite`] stream may wrap another inner stream.
 pub trait WarcWrite: io::Write + Any + 'static {
-    /// Get an [`Any`] reference to this [`DecompressingRead`].
+    /// Get an [`Any`] reference to this [`WarcRead`].
     fn as_any(&self) -> &dyn Any;
 
-    /// Get a mutable [`Any`] reference to this [`DecompressingRead`].
+    /// Get a mutable [`Any`] reference to this [`WarcRead`].
     fn as_any_mut(&mut self) -> &mut dyn Any;
 
-    /// Convert the [`DecompressingRead`] into [`Any`].
+    /// Convert the [`WarcRead`] into [`Any`].
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
     /// Finish the stream and reset the inner writer.

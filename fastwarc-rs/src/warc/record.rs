@@ -1444,7 +1444,7 @@ impl WarcRecord {
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
     /// If the HTTP payload is still transfer- or content-encoded, use [`Self::parse_http_with_decode_opts()`]
-    /// to automatically wrap the payload reader in the required [`DecompressingReader(s)`](DecompressingReader).
+    /// to automatically wrap the payload reader in the required [`WarcReader(s)`](WarcReader).
     /// Usually, web archivers already decode the contents, so in most cases, this shouldn't be necessary.
     pub fn parse_http(&mut self) -> Result<(), io::Error> {
         self.parse_http_with_decode_opts(AutoDecode::None)
@@ -1455,7 +1455,7 @@ impl WarcRecord {
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
     /// If `auto_decode` is not `None` and the HTTP payload is still transfer- or content-encoded,
-    /// the payload reader is wrapped automatically in the required [`DecompressingReader(s)`](DecompressingReader).
+    /// the payload reader is wrapped automatically in the required [`WarcReader(s)`](WarcReader).
     /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
     /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
     ///
@@ -1578,8 +1578,8 @@ impl WarcRecord {
     /// Use [`Self::write_with_block_size`] or [`Self::write_with_block_size_checksum`] for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingWrite::finish()`] afterwards.
+    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1598,8 +1598,8 @@ impl WarcRecord {
     /// `write_with_checksum_block_size` for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingWrite::finish()`] afterwards.
+    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1620,8 +1620,8 @@ impl WarcRecord {
     /// for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingWrite::finish()`] afterwards.
+    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
     /// # Arguments
     ///
     /// * `writer` - Output stream
@@ -1636,8 +1636,8 @@ impl WarcRecord {
     /// Write WARC record onto a stream with a given block size and calculate SHA-1 record checksums.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::CompressingWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::CompressingWrite::finish()`] afterwards.
+    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///
