@@ -767,7 +767,7 @@ Barbaz\n"""
 def test_create_new_warc_record():
     # Init basic record
     src_record = WarcRecord()
-    src_record.init_headers(len(new_record_bytes_content), unknown)
+    src_record.init_headers(unknown)
     assert src_record.headers.status_line == 'WARC/1.1'
     assert src_record.record_id.startswith('<urn:')
     assert src_record.record_type == unknown
@@ -778,12 +778,15 @@ def test_create_new_warc_record():
     assert 'WARC-Record-ID' in src_record.headers
     assert src_record.headers['WARC-Record-ID'] == src_record.record_id
     assert 'Content-Length' in src_record.headers
-    assert src_record.headers['Content-Length'] == str(len(new_record_bytes_content))
+    assert src_record.headers['Content-Length'] == '0'
+    assert src_record.content_length == 0
     src_record.headers['X-Multiline-Header'] = 'Hello\r\nWorld'
     assert src_record.headers['X-Multiline-Header'] == 'Hello World'
 
     # Set content
     src_record.set_bytes_content(new_record_bytes_content)
+    assert src_record.content_length == len(new_record_bytes_content)
+    assert src_record.headers['Content-Length'] == str(len(new_record_bytes_content))
 
     # Make this an HTTP record and test different record types
     src_record.is_http = True

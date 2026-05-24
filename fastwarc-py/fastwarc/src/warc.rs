@@ -720,7 +720,7 @@ impl WarcRecordPy {
 
     #[getter]
     pub fn reader<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        if !self.inner.lock().unwrap().reader_mut().is_some() {
+        if self.inner.lock().unwrap().reader_mut().is_none() {
             return Ok(py.None().into_bound(py));
         }
         let reader = Py::new(
@@ -742,10 +742,15 @@ impl WarcRecordPy {
         self.lock().is_frozen()
     }
 
-    #[pyo3(signature = (content_length=0, record_type=WarcRecordTypePy::no_type, record_urn=None))]
-    pub fn init_headers(&mut self, content_length: u64, record_type: WarcRecordTypePy, record_urn: Option<&[u8]>) {
-        self.lock()
-            .init_headers(content_length, Some(record_type.into()), record_urn);
+    #[pyo3(signature = (record_type=WarcRecordTypePy::no_type, record_urn=None, *, content_length=None))]
+    pub fn init_headers(
+        &mut self,
+        record_type: WarcRecordTypePy,
+        record_urn: Option<&[u8]>,
+        content_length: Option<u64>, // deprecated
+    ) {
+        _ = content_length;
+        self.lock().init_headers(Some(record_type.into()), record_urn);
     }
 
     pub fn freeze(&mut self) -> PyResult<bool> {

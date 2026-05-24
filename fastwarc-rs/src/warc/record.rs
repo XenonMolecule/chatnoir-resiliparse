@@ -1340,24 +1340,14 @@ impl WarcRecord {
 
     /// Initialize mandatory headers in a fresh WARC record instance.
     ///
-    /// You can set the value of the `Content-Length` header, the record type, and
-    /// a record ID. The record type defaults to [`WarcRecordType::NoType`]. If no
-    /// ID was specified, a random UUID is generated.
-    ///
-    /// The `content_length` argument affects only the WARC header. [`Self::content_length()`]
-    /// always reports the actual payload length of the record.
+    /// You can set the value of the record type and a record ID. The record type defaults
+    /// to [`WarcRecordType::NoType`]. If no ID was specified, a random UUID is generated.
     ///
     /// # Arguments
     ///
-    /// * `content_length` - Value of `Content-Length` header
     /// * `record_type` - WARC-Type
     /// * `record_urn` - WARC-Record-ID as URN without `'<urn:'`, `'>'` (if unset, a random URN will be generated)
-    pub fn init_headers(
-        &mut self,
-        content_length: u64,
-        record_type: Option<WarcRecordType>,
-        record_urn: Option<&[u8]>,
-    ) {
+    pub fn init_headers(&mut self, record_type: Option<WarcRecordType>, record_urn: Option<&[u8]>) {
         let urn = match record_urn {
             Some(urn) => urn.to_vec(),
             None => format!("uuid:{}", Uuid::new_v4()).into_bytes(),
@@ -1379,9 +1369,7 @@ impl WarcRecord {
         let record_id = format!("<urn:{}>", String::from_utf8_lossy(&urn));
         self.headers
             ._append_bytes_no_sanitize(b"WARC-Record-ID", record_id.as_bytes());
-
-        self.headers
-            ._append_bytes_no_sanitize(b"Content-Length", content_length.to_string().as_bytes());
+        self.headers._append_bytes_no_sanitize(b"Content-Length", b"0");
     }
 
     /// Parse HTTP headers and advance content reader.
