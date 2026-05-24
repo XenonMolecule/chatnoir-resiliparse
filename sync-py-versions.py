@@ -15,21 +15,23 @@
 
 # Keep Python package versions in sync with Rust workspace version
 
+from pathlib import Path
 import tomllib
 import re
 from subprocess import run
 
-cargo_ver = tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version']
+base_path = Path(__file__).parent
+cargo_ver = tomllib.load(open(base_path / 'Cargo.toml', 'rb'))['workspace']['package']['version']
 
 print(f'Updating Python package versions to {cargo_ver}.')
 
-run(['poetry', 'version', '--project=fastwarc-py', cargo_ver], check=True)
-run(['poetry', 'version', '--project=resiliparse-py', cargo_ver], check=True)
+run(['poetry', 'version', '--project=fastwarc-py', cargo_ver], check=True, cwd=base_path)
+run(['poetry', 'version', '--project=resiliparse-py', cargo_ver], check=True, cwd=base_path)
 
 # Patch fastwarc dependency (cannot use `poetry add` for this if fastwarc is not yet published)
-with open('resiliparse-py/pyproject.toml', 'r') as f:
+with open(base_path / 'resiliparse-py/pyproject.toml', 'r') as f:
     resiliparse_toml = f.read()
-with open('resiliparse-py/pyproject.toml', 'w') as f:
+with open(base_path / 'resiliparse-py/pyproject.toml', 'w') as f:
     f.write(re.sub(r'"fastwarc==\d+\.\d+\.\d+"',
                    f'"fastwarc=={cargo_ver}"',
                    resiliparse_toml))
