@@ -33,7 +33,8 @@ ENV RUSTUP_HOME=/opt/rust/rustup
 ENV CARGO_HOME=/opt/rust/cargo
 ENV PATH=/opt/rust/cargo/bin:$PATH
 RUN set -x \
-    && curl --proto '=https' --tlsv1.2 -Ssf https://sh.rustup.rs | sh -s -- -y
+    && curl --proto '=https' --tlsv1.2 -Ssf https://sh.rustup.rs | sh -s -- -y \
+    && cargo install cargo-llvm-cov
 
 ENV CPATH="/opt/libs/include"
 ENV LIBRARY_PATH="/opt/libs/lib"
