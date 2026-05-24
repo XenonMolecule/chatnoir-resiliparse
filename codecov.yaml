@@ -6,5 +6,7 @@ coverage:
     project:
       default:
         threshold: 1%
+  ignore:
+    - "fastwarc-py/fastwarc/legacy/**"
 comment:
   require_changes: true
