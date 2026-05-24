@@ -301,13 +301,14 @@ impl Seek for PyReaderAdapter {
             ),
             SeekFrom::End(p) => SeekFrom::End(p),
         };
-        if let SeekFrom::Start(p) = new_pos
-            && p >= self_pos - self.buf_pos as u64
-            && p < self_pos + self.buf_len as u64
-        {
-            self.buf_pos += (p - self_pos) as usize;
-            self.pos = Some(p);
-            return Ok(p);
+        if let SeekFrom::Start(p) = new_pos {
+            let buf_start = self_pos.saturating_sub(self.buf_pos as u64);
+            let buf_end = buf_start + self.buf_len as u64;
+            if p >= buf_start && p < buf_end {
+                self.buf_pos = (p - buf_start) as usize;
+                self.pos = Some(p);
+                return Ok(p);
+            }
         }
 
         let buffered = (self.buf_len - self.buf_pos) as i64;
