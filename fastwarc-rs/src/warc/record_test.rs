@@ -287,7 +287,7 @@ fn header_sanitization() {
 
     assert_eq!(headers.get("Content-Type").as_deref(), Some("text/html; charset=utf-8"));
     assert_eq!(headers.get("Foobar").as_deref(), Some("bar:baz"));
-    assert_eq!(headers.get("new  line").as_deref(), Some("new\t line"));
+    assert_eq!(headers.get("new line").as_deref(), Some("new\t line"));
 }
 
 #[test]
