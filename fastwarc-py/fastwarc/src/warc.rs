@@ -812,9 +812,7 @@ impl WarcRecordPy {
         payload_digest: Option<&[u8]>,
         chunk_size: usize,
     ) -> PyResult<usize> {
-        if let Some(payload_digest) = payload_digest
-            && !checksum_data
-        {
+        if let Some(payload_digest) = payload_digest {
             let encoded = py
                 .import("base64")?
                 .getattr("b32encode")?
