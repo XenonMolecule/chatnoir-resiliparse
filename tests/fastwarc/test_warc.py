@@ -225,10 +225,10 @@ def test_record_date():
 
     new_rec = WarcRecord()
     assert new_rec.record_date is None
-    print(new_rec.headers)
     new_rec.init_headers()
+    if new_rec.record_date is None:
+        raise Exception(str(new_rec.headers))
     assert new_rec.record_date is not None
-    print(new_rec.headers)
     assert new_rec.record_date.tzinfo is datetime.timezone.utc
 
     dt_now_utc = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).astimezone(datetime.timezone.utc)

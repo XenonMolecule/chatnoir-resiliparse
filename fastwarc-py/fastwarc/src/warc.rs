@@ -21,10 +21,15 @@ use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, Sh
 use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
+use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDateTime, PyDict, PyIterator, PyString, PyTuple};
+use pyo3::types::{
+    PyBool, PyBytes, PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyIterator, PyString, PyTimeAccess,
+    PyTuple,
+};
 use std::io::{self, Read, Seek};
 use std::sync::{Arc, Mutex, MutexGuard};
+use time::{Date, Month, OffsetDateTime, Time, UtcOffset};
 
 // ===========================================================
 // WarcRecordType
@@ -639,29 +644,61 @@ impl WarcRecordPy {
     #[getter]
     pub fn record_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDateTime>>> {
         let inner = self.lock();
-        let Some(value) = inner.headers().get("WARC-Date") else {
+        let Some(parsed) = inner.record_date() else {
             return Ok(None);
         };
-        let datetime_module = py.import("datetime")?;
-        let datetime = datetime_module.getattr("datetime")?;
-        let normalized = value.replace('Z', "+00:00");
-        match datetime.call_method1("fromisoformat", (normalized,)) {
-            Ok(obj) => Ok(Some(obj.cast_into::<PyDateTime>()?)),
-            Err(_) => Ok(None),
-        }
+
+        let tz = py
+            .import(intern!(py, "datetime"))?
+            .getattr(intern!(py, "timezone"))?
+            .call1((py
+                .import(intern!(py, "datetime"))?
+                .getattr(intern!(py, "timedelta"))?
+                .call1((0, parsed.offset().whole_seconds()))?,))?;
+
+        Ok(Some(PyDateTime::new(
+            py,
+            parsed.year(),
+            u8::from(parsed.month()),
+            parsed.day(),
+            parsed.hour(),
+            parsed.minute(),
+            parsed.second(),
+            parsed.microsecond(),
+            Some(tz.cast()?),
+        )?))
     }
 
     #[setter]
-    pub fn set_record_date<'py>(&mut self, record_date: Bound<'_, PyDateTime>) -> PyResult<()> {
+    pub fn set_record_date<'py>(&mut self, py: Python<'py>, record_date: Bound<'py, PyDateTime>) -> PyResult<()> {
         if record_date.getattr("tzinfo")?.is_none() {
             return Err(PyValueError::new_err("Trying to set naive datetime without timezone info."));
         }
-        let formatted: String = record_date.call_method1("isoformat", ())?.extract::<String>()?;
-        self.inner
-            .lock()
-            .unwrap()
-            .headers_mut()
-            .set("WARC-Date", formatted.replace("+00:00", "Z"));
+
+        let date = Date::from_calendar_date(
+            record_date.get_year(),
+            Month::try_from(record_date.get_month()).map_err(|_| PyValueError::new_err("Invalid month"))?,
+            record_date.get_day(),
+        )
+        .map_err(|e| PyValueError::new_err(format!("Failed to create date: {}", e)))?;
+
+        let time = Time::from_hms_micro(
+            record_date.get_hour(),
+            record_date.get_minute(),
+            record_date.get_second(),
+            record_date.get_microsecond(),
+        )
+        .map_err(|e| PyValueError::new_err(format!("Failed to create time: {}", e)))?;
+
+        let tzinfo = record_date.getattr(intern!(py, "tzinfo"))?;
+        let delta = tzinfo
+            .call_method1(intern!(py, "utcoffset"), (record_date,))?
+            .cast_into::<PyDelta>()?;
+        let offset = UtcOffset::from_whole_seconds(delta.get_days() * 86400 + delta.get_seconds())
+            .map_err(|e| PyValueError::new_err(format!("Failed to create UTC offset: {}", e)))?;
+
+        self.lock()
+            .set_record_date(OffsetDateTime::new_in_offset(date, time, offset));
         Ok(())
     }
 
@@ -819,8 +856,8 @@ impl WarcRecordPy {
     ) -> PyResult<usize> {
         if let Some(payload_digest) = payload_digest {
             let encoded = py
-                .import("base64")?
-                .getattr("b32encode")?
+                .import(intern!(py, "base64"))?
+                .getattr(intern!(py, "b32encode"))?
                 .call1((PyBytes::new(py, payload_digest),))?
                 .extract::<Bound<'_, PyBytes>>()?;
             let mut digest_header = b"sha1:".to_vec();
@@ -867,8 +904,8 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
         return Ok(None);
     };
     let parsed = py
-        .import("email.utils")?
-        .getattr("parsedate_to_datetime")?
+        .import(intern!(py, "email.utils"))?
+        .getattr(intern!(py, "parsedate_to_datetime"))?
         .call1((value,));
     match parsed {
         Ok(obj) => Ok(Some(obj)),

@@ -25,7 +25,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
 use std::ops::Deref;
 use time::OffsetDateTime;
-use time::format_description::well_known::Rfc3339;
+use time::format_description::well_known::Iso8601;
 use uuid::Uuid;
 
 // ===========================================================
@@ -1247,14 +1247,43 @@ impl WarcRecord {
         Ok(bytes_read)
     }
 
-    /// WARC record ID
+    /// WARC record ID.
     pub fn record_id(&self) -> Option<Cow<'_, str>> {
         self.headers.get("WARC-Record-ID")
     }
 
-    /// Set WARC record ID
+    /// Set WARC record ID.
     pub fn set_record_id(&mut self, record_id: impl AsRef<str>) {
         self.headers.set("WARC-Record-ID", record_id)
+    }
+
+    /// WARC record date.
+    pub fn record_date(&self) -> Option<OffsetDateTime> {
+        if let Some(date) = self.headers.get("WARC-Date") {
+            return OffsetDateTime::parse(&date, &Iso8601::DEFAULT).ok();
+        }
+        None
+    }
+
+    /// Trim subsecond part to six digits
+    fn _clean_iso_datetime(&mut self, date: String) -> String {
+        if let Some((datetime, rest)) = date.split_once('.') {
+            let (subsec, offset) = rest.split_at(9); // 9 digits nanoseconds
+            let trimmed = &subsec[..6];
+            if trimmed == "0".repeat(6) {
+                format!("{datetime}{offset}")
+            } else {
+                format!("{datetime}.{trimmed}{offset}")
+            }
+        } else {
+            date
+        }
+    }
+
+    /// Set WARC record date.
+    pub fn set_record_date(&mut self, date: OffsetDateTime) {
+        let formatted = self._clean_iso_datetime(date.format(&Iso8601::DEFAULT).unwrap());
+        self.headers.set_bytes(b"WARC-Date", formatted.as_bytes());
     }
 
     /// WARC record headers.
@@ -1363,7 +1392,7 @@ impl WarcRecord {
         self.headers.set_status_line_bytes(b"WARC/1.1");
         self.headers
             ._append_bytes_no_sanitize(b"WARC-Type", self.record_type.as_str().as_bytes());
-        let date = OffsetDateTime::now_utc().format(&Rfc3339).unwrap();
+        let date = self._clean_iso_datetime(OffsetDateTime::now_utc().format(&Iso8601::DEFAULT).unwrap());
         self.headers._append_bytes_no_sanitize(b"WARC-Date", date.as_bytes());
 
         let record_id = format!("<urn:{}>", String::from_utf8_lossy(&urn));

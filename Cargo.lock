@@ -278,6 +278,7 @@ dependencies = [
  "fastwarc",
  "pyo3",
  "pyo3-build-config",
+ "time",
 ]
 
 [[package]]
