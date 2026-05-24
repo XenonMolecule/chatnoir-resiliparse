@@ -254,7 +254,7 @@ checksum = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 
 [[package]]
 name = "fastwarc"
-version = "0.16.0"
+version = "1.0.0"
 dependencies = [
  "brotli",
  "data-encoding",
@@ -388,8 +388,9 @@ checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "lz4_flex"
-version = "0.13.0"
-source = "git+https://github.com/phoerious/lz4_flex?branch=fix%2Ffrom-ioerr-impl#a98fc149bd555a2c5b54b8cfbe7ff5e358d1e532"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ef0d4ed8669f8f8826eb00dc878084aa8f253506c4fd5e8f58f5bce72ddb97e"
 dependencies = [
  "twox-hash",
 ]
@@ -621,7 +622,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "resiliparse"
-version = "0.16.0"
+version = "1.0.0"
 dependencies = [
  "bindgen",
  "parking_lot",
