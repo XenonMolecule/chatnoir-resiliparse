@@ -391,8 +391,8 @@ where
 /// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
 pub type FilteredArchiveIterator<F> = FilteredArchiveIteratorImpl<Rc<RefCell<WarcRecord>>, F>;
 
-/// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
-/// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
+/// Filtered wrapper for [`ArchiveIteratorThreadSafe`] that filters records based on a predicate.
+/// Use [`FilteredArchiveIteratorThreadSafe::with_filter()`] to construct a [`FilteredArchiveIteratorThreadSafe`].
 ///
 /// This is a thread-safe variant of [`FilteredArchiveIterator`].
 pub type FilteredArchiveIteratorThreadSafe<F> = FilteredArchiveIteratorImpl<Arc<Mutex<WarcRecord>>, F>;
