@@ -41,6 +41,7 @@ extensions = [
     'sphinx_click',
     'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
+    'sphinx_substitution_extensions',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -53,6 +54,12 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '*.swp', 'requirements.t
 
 autodoc_member_order = 'groupwise'
 highlight_language = "none"
+
+# Inject version into epilog
+rst_prolog = f"""
+.. |project_release| replace:: {release}
+.. |project_release_minor| replace:: {'.'.join(release.split('.')[:2])}
+"""
 
 # -- Options for HTML output -------------------------------------------------
 

@@ -4,7 +4,8 @@
 [![Codecov](https://codecov.io/gh/chatnoir-eu/chatnoir-resiliparse/branch/develop/graph/badge.svg?token=VA51APYHU5)](https://codecov.io/gh/chatnoir-eu/chatnoir-resiliparse)
 [![Documentation Status](https://readthedocs.org/projects/chatnoir-resiliparse/badge/?version=latest)](https://resiliparse.chatnoir.eu/en/latest/?badge=latest)
 
-A collection of robust and fast processing tools for parsing and analyzing web archive data.
+A collection of robust and fast processing tools for parsing and analyzing web archive data written in Rust and
+Cython/C++ with bindings for Python.
 
 ## Usage Instructions
 
@@ -53,86 +54,51 @@ Main documentation: [Resiliparse Itertools](https://resiliparse.chatnoir.eu/en/l
 
 ### 2. FastWARC
 
-FastWARC is a high-performance WARC parsing library for Python written in C++/Cython. The API is inspired in large parts
-by [WARCIO](https://github.com/webrecorder/warcio), but does not aim at being a drop-in replacement. FastWARC supports
-compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are GZip and LZ4.
+FastWARC is a high-performance WARC parsing library for Python written in Rust with bindings for Python.
+compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are GZip, Zstd, and LZ4.
 
 Main documentation: [FastWARC](https://resiliparse.chatnoir.eu/en/latest/man/fastwarc.html)
 and [FastWARC CLI](https://resiliparse.chatnoir.eu/en/latest/man/fastwarc-cli.html)
 
-## Installation
+## Installation (Rust)
 
-The main Resiliparse package can be installed from PyPi as follows:
+To use FastWARC as a library in your Rust project, add the following to your `Cargo.toml`:
+
+```toml
+[dependencies]
+fastwarc = "*" # Specify the correct version here
+```
+
+Then build your project like normal with `cargo build`.
+
+Resiliparse is not yet available as a stable crate.
+
+## Installation (Python)
+
+Pre-built wheels are available for Linux, macOS, and Windows on PyPi, which can be installed via `pip`:
+
+Resiliparse:
 
 ```bash
 pip install resiliparse
 ```
 
-FastWARC is being distributed as its own package and can be installed like so:
+FastWARC:
 
 ```bash
 pip install fastwarc
 ```
 
-## Building From Source
+### Building Bindings From Source
 
-To build Resiliparse and FastWARC from sources, you need to install all required build-time dependencies listed in
-`vcpkg.json`. It's possible to install them globally via your package manager, but the easiest and most consistent way
-is to use [vcpkg](https://vcpkg.io/en/):
+You can also build the Resiliparse and FastWARC Python bindings yourself from source. FastWARC has been fully ported to
+Rust. Resiliparse is still written in Cython.
 
-```bash
-# Install vcpkg itself (skip if you have a working vcpkg installation already)
-git clone https://github.com/Microsoft/vcpkg
-./vcpkg/bootstrap-vcpkg.sh
+For detailed build instructions, please refer to
+the [build documentation](https://resiliparse.chatnoir.eu/en/stable/man/installation.html) or the individual READMEs:
 
-# Install dependencies to vcpkg_installed (must be run from sources root)
-./vcpkg/vcpkg install --triplet=x64-linux
-```
-
-Replace the triplet value with one suitable for your platform. Valid values are: `x64-windows`, `x64-osx`, `arm64-osx`,
-`aarch64-linux` (or any of the vcpkg default triplets).
-
-After installing the dependencies, you can build the actual Python packages:
-
-```bash
-# Create a fresh venv first (recommended)
-python3 -m venv venv && source venv/bin/activate
-
-# Option 1: Build and install in editable mode (best for development)
-python3 -m pip install -e ./fastwarc ./resiliparse
-
-# Option 2 (alternative): Build and install wheels in separate steps (best for redistribution)
-python3 -m pip wheel -w build ./fastwarc ./resiliparse
-ls ./build/*.whl | xargs python3 -m pip install
-```
-
-In most cases, the build routine should be smart enough to detect the location of the installed vcpkg dependencies.
-However, in some cases you may be getting errors about missing header files or undefined symbols. This can happen if you
-don't build from the source repository, use Python's new `build` module, or run `pip wheel` with `--isolated`. To work
-around that, set the `RESILIPARSE_VCPKG_PATH` environment variable to the absolute path of the vcpkg installation
-directory:
-
-```bash
-export RESILIPARSE_VCPKG_PATH="$(pwd)/vcpkg_installed"
-```
-
-**NOTE:** Unless you fix up the wheels to embed the linked shared libraries (
-via [auditwheel](https://github.com/pypa/auditwheel) on
-Linux, [delocate-wheel](https://github.com/matthew-brett/delocate) on macOS,
-or [delvewheel](https://github.com/adang1345/delvewheel) on Windows), you will have to add the vcpkg library directory (
-`vcpkg_installed/TRIPLET/lib`) to your library search path to use them. On Linux, add the directory path to the
-`LD_LIBRARY_PATH` environment variable, on macOS to `DYLD_LIBRARY_PATH`. On Windows, you have to add the directory to
-the `Path` environment variable.
-
-Here's an example of how to use `auditwheel` on Linux to fix up the build wheels:
-
-```bash
-LD_LIBRARY_PATH=$(pwd)/vcpkg_installed/x64-linux/lib \
-  auditwheel repair --plat linux_x86_64 build/Resiliparse*.whl build/FastWARC*.whl
-```
-
-(Please note that `linux_x86_64` platform wheels
-are [not suitable for general redistribution](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/#platform-tag).)
+- [Resiliparse](resiliparse-py/README.md)
+- [FastWARC](fastwarc-py/README.md)
 
 ## Cite Us
 

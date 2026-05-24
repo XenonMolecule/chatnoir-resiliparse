@@ -1,50 +1,87 @@
 # ChatNoir Resiliparse
 
-A collection of robust and fast processing tools for parsing and analyzing (not only) web archive data.
+A collection of robust and fast processing tools for parsing and analyzing web archive data written in Rust and
+Cython/C++ with bindings for Python.
 
 Resiliparse is a part of the [ChatNoir web analytics toolkit](https://github.com/chatnoir-eu/).
 
 ## Installing Resiliparse
+
 Pre-built Resiliparse binaries can be installed from PyPi:
+
 ```bash
 pip install resiliparse
 ```
 
 ## Building Resiliparse From Source
-You can compile Resiliparse either from the PyPi source package or directly from this repository, though in any case, you need to install all required build-time dependencies first. On Ubuntu, this is done as follows:
-```bash
-# Add Lexbor repository
-curl -sL https://lexbor.com/keys/lexbor_signing.key | \
-  sudo gpg --dearmor --output /etc/apt/trusted.gpg.d/lexbor.gpg
-echo "deb https://packages.lexbor.com/ubuntu/ $(lsb_release -sc) liblexbor" | \
-    sudo tee /etc/apt/sources.list.d/lexbor.list
 
-# Install build dependencies (requires libre2-dev>=2022-04-01)
-sudo apt update
-sudo apt install build-essential python3-dev libuchardet-dev liblexbor-dev libre2-dev
-```
-To build and install Resiliparse from PyPi, run
-```bash
-pip install --no-binary resiliparse resiliparse
-```
-That's it. If you prefer to build and install directly from this repository instead, run:
-```bash
-pip install -e resiliparse
-```
-To build the wheels without installing them, run:
-```bash
-pip wheel -e resiliparse
+To build Resiliparse from sources, you need to install all required build-time dependencies listed in
+`vcpkg.json`. It's possible to install them globally via your package manager, but the easiest and most consistent way
+is to use [vcpkg](https://vcpkg.io/en/):
 
-# Or:
-pip install build && python -m build --wheel resiliparse
+```bash
+# Install vcpkg itself (skip if you have a working vcpkg installation already)
+git clone https://github.com/Microsoft/vcpkg
+./vcpkg/bootstrap-vcpkg.sh
+
+# Install dependencies to vcpkg_installed (must be run from sources root)
+./vcpkg/vcpkg install --triplet=x64-linux
 ```
+
+Replace the triplet value with one suitable for your platform. Valid values are: `x64-windows`, `x64-osx`, `arm64-osx`,
+`aarch64-linux` (or any of the vcpkg default triplets).
+
+After installing the dependencies, you can build the actual Python packages:
+
+```bash
+# Create a fresh venv first (recommended)
+python3 -m venv venv && source venv/bin/activate
+
+# Option 1: Build and install in editable mode (best for development)
+python3 -m pip install -e ./resiliparse-py
+
+# Option 2 (alternative): Build and install wheels in separate steps (best for redistribution)
+python3 -m pip wheel -w build ./resiliparse-py
+ls ./build/*.whl | xargs python3 -m pip install
+```
+
+In most cases, the build routine should be smart enough to detect the location of the installed vcpkg dependencies.
+However, in some cases you may be getting errors about missing header files or undefined symbols. This can happen if you
+don't build from the source repository, use Python's new `build` module, or run `pip wheel` with `--isolated`. To work
+around that, set the `RESILIPARSE_VCPKG_PATH` environment variable to the absolute path of the vcpkg installation
+directory:
+
+```bash
+export RESILIPARSE_VCPKG_PATH="$(pwd)/vcpkg_installed"
+```
+
+**NOTE:** Unless you fix up the wheels to embed the linked shared libraries (
+via [auditwheel](https://github.com/pypa/auditwheel) on
+Linux, [delocate-wheel](https://github.com/matthew-brett/delocate) on macOS,
+or [delvewheel](https://github.com/adang1345/delvewheel) on Windows), you will have to add the vcpkg library directory (
+`vcpkg_installed/TRIPLET/lib`) to your library search path to use them. On Linux, add the directory path to the
+`LD_LIBRARY_PATH` environment variable, on macOS to `DYLD_LIBRARY_PATH`. On Windows, you have to add the directory to
+the `Path` environment variable.
+
+Here's an example of how to use `auditwheel` on Linux to fix up the build wheels:
+
+```bash
+LD_LIBRARY_PATH=$(pwd)/vcpkg_installed/x64-linux/lib \
+  auditwheel repair --plat linux_x86_64 build/Resiliparse*.whl
+```
+
+(Please note that `linux_x86_64` platform wheels
+are [not suitable for general redistribution](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/#platform-tag).)
 
 ## Usage Instructions
-For detailed usage instructions, please consult the [Resiliparse User Manual](https://resiliparse.chatnoir.eu/en/latest/).
+
+For detailed usage instructions, please consult
+the [Resiliparse User Manual](https://resiliparse.chatnoir.eu/en/latest/).
 
 ## Cite Us
 
-If you use ChatNoir or Resiliparse, please consider citing our [ECIR 2018 demo paper](https://webis.de/downloads/publications/papers/bevendorff_2018.pdf):
+If you use ChatNoir or Resiliparse, please consider citing
+our [ECIR 2018 demo paper](https://webis.de/downloads/publications/papers/bevendorff_2018.pdf):
 
 ```bibtex
 @InProceedings{bevendorff:2018,
