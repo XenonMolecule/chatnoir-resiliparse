@@ -1,6 +1,7 @@
 [package]
 name = "resiliparse-parse-html"
 edition.workspace = true
+publish = false
 
 [lib]
 path = "lib.rs"
