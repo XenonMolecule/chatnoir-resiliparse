@@ -125,9 +125,7 @@ jobs:
           package-dir: fastwarc-py
           output-dir: wheelhouse
         env:
-          # TODO: Re-enable when tests fixed
-          # CIBW_TEST_COMMAND: python -m pytest --capture=sys --verbose {project}/tests/fastwarc
-          CIBW_TEST_COMMAND: true
+          CIBW_TEST_COMMAND: python -m pytest --capture=sys --verbose {project}/tests/fastwarc
 
       - name: Build Resiliparse
         uses: pypa/cibuildwheel@v3.4
@@ -173,8 +171,6 @@ jobs:
           path: ./dist/*.tar.gz
 
   build-asan:
-    # TODO: Re-enable when tests fixed
-    if: false
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/chatnoir-eu/resiliparse-manylinux_2_28_x86_64:latest
@@ -202,8 +198,6 @@ jobs:
           python${PYTHON_VERSION} -m pytest --capture=sys --verbose tests/
 
   build-coverage:
-    # TODO: Re-enable when tests fixed
-    if: false
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/chatnoir-eu/resiliparse-manylinux_2_28_x86_64:latest
