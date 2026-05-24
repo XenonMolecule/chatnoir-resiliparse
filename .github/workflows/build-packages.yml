@@ -211,17 +211,39 @@ jobs:
           fetch-depth: 0
 
       - name: Build Extensions
+        shell: bash
         run: |
           set -e
-          python${PYTHON_VERSION} -m pip install cython codecov-cli
-          python${PYTHON_VERSION} -m pip install -e "fastwarc-py[all,test]"
-          python${PYTHON_VERSION} -m pip install -e "resiliparse-py[all,test]"
+          
+          # Set up llvm-cov env
+          source <(cargo llvm-cov show-env --sh)
+          
+          # Build wheels
+          python${PYTHON_VERSION} -m pip install cython setuptools setuptools-rust codecov-cli
+          python${PYTHON_VERSION} -m pip install --no-build-isolation -e "fastwarc-py[all,test]"
+          python${PYTHON_VERSION} -m pip install --no-build-isolation -e "resiliparse-py[all,test]"
 
       - name: Run Tests
-        run: python${PYTHON_VERSION} -m pytest --cov --cov-report xml --junitxml=report.junit.xml tests/
+        shell: bash
+        run: |
+          set -e
+          
+          # Set up llvm-cov env
+          source <(cargo llvm-cov show-env --sh)
+          
+          # Run FastWARC tests
+          # TODO: Run Resiliparse as well
+          cargo test --package fastwarc
+          
+          # Run Python tests
+          python${PYTHON_VERSION} -m pytest --cov --cov-report xml:pytest-coverage.xml --junitxml=pytest-report.junit.xml tests/
+          
+          # Generate Rust coverage report
+          cargo llvm-cov report --codecov --output-path cargo-coverage.json
 
       # We cannot use the Codecov GitHub action due to incompatible Glibc versions
       - name: Upload to Codecov
+        shell: bash
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           TOKENLESS: ${{ github.event.pull_request.head.label }}
@@ -233,8 +255,10 @@ jobs:
             PR="--pr ${{ github.event.number }}"
           fi
 
+          # Upload test result report
           python${PYTHON_VERSION} -m codecov_cli.main do-upload \
-            --file report.junit.xml \
+            --file pytest-report.junit.xml \
+            --disable-search  \
             --report-type test_results \
             --sha ${{ github.event.pull_request.head.sha || github.sha }} \
             --branch ${{ github.event.pull_request.head.label || github.ref_name }} \
@@ -243,8 +267,11 @@ jobs:
             --git-service github \
             --fail-on-error
 
+          # Upload coverage
           python${PYTHON_VERSION} -m codecov_cli.main upload-process \
-            --file coverage.xml \
+            --file pytest-coverage.xml \
+            --file cargo-coverage.json \
+            --disable-search  \
             --report-type coverage \
             --sha ${{ github.event.pull_request.head.sha || github.sha }} \
             --branch ${{ github.event.pull_request.head.label || github.ref_name }} \
@@ -258,8 +285,9 @@ jobs:
         with:
           name: coverage
           path: |
-            report.junit.xml
-            coverage.xml
+            pytest-report.junit.xml
+            pytest-coverage.xml
+            cargo-coverage.json
 
   build-documentation:
     runs-on: ubuntu-latest

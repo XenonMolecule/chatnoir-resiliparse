@@ -1,7 +1,7 @@
 # FastWARC (Python)
 
 FastWARC is a high-performance WARC parsing library for Python written in Rust with Python bindings. FastWARC supports
-compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are GZip and LZ4.
+compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip and LZ4.
 
 This crate contains the Python bindings for FastWARC.
 
