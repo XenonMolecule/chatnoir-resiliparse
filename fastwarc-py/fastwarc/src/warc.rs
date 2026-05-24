@@ -17,7 +17,10 @@ use crate::stream_io::{
 };
 use fastwarc::stream_io::LimitedBufReader;
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
-use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
+use fastwarc::warc::iter::{
+    ArchiveIteratorOptions, ArchiveIteratorThreadSafe, ArchiveIteratorTrait, FilteredArchiveIteratorThreadSafe,
+    SharedWarcRecord, filter,
+};
 use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
@@ -991,7 +994,8 @@ impl WarcRecordPy {
     /// :type record_urn: bytes or None
     /// :param content_length: deprecated compatibility argument, ignored
     /// :type content_length: int or None
-    #[pyo3(signature = (record_type=WarcRecordTypePy::no_type, record_urn=None, *, content_length=None))]
+    #[pyo3(signature = (record_type=WarcRecordTypePy::no_type, record_urn=None, *, content_length=None)
+    )]
     pub fn init_headers(
         &mut self,
         record_type: WarcRecordTypePy,
@@ -1249,8 +1253,8 @@ impl ArchiveIteratorPy {
         stream,
         record_types=WarcRecordTypePy::any_type as u16,
         parse_http=true,
-        min_content_length=-1,
-        max_content_length=-1,
+        min_content_length=None,
+        max_content_length=None,
         func_filter=None,
         verify_digests=false,
         quirks_mode=false,
@@ -1265,8 +1269,8 @@ impl ArchiveIteratorPy {
         stream: Py<PyAny>,
         record_types: u16,
         parse_http: bool,
-        min_content_length: i64,
-        max_content_length: i64,
+        min_content_length: Option<u64>,
+        max_content_length: Option<u64>,
         func_filter: Option<Py<PyAny>>,
         verify_digests: bool,
         quirks_mode: bool,
@@ -1301,17 +1305,25 @@ impl ArchiveIteratorPy {
             )?;
             iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
         }
+
         iterator = iterator
             .with_quirks_mode(quirks_mode)
             .with_parse_http(parse_http)
             .with_verify_digests(verify_digests)
             .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?);
 
+        // TODO: Move common methods to trait and define filters here.
+        // let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
+        // let max_filter = filter::has_content_length_lte(max_content_length.unwrap_or(u64::MAX));
+        // let type_filter = filter::has_record_type(record_types);
+        // let filter = |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r);
+        // let iterator = iterator.with_filter(filter);
+
         Ok(Self {
             inner: iterator,
             record_types,
-            min_content_length: u64::try_from(min_content_length).ok(),
-            max_content_length: u64::try_from(max_content_length).ok(),
+            min_content_length,
+            max_content_length,
             func_filter,
         })
     }
@@ -1331,7 +1343,7 @@ impl ArchiveIteratorPy {
             let record = next?;
             let record_ref = record.lock().unwrap();
 
-            // TODO: Proper implementation with filters
+            // TODO: Move this out of here once we have a common archive iterator trait
             let content_length = record_ref.content_length();
             if !record_ref.record_type().matches_bitmask(self.record_types)
                 || self.min_content_length.is_some_and(|min| content_length < min)
@@ -1342,6 +1354,7 @@ impl ArchiveIteratorPy {
             drop(record_ref);
 
             let record_obj = Py::new(py, WarcRecordPy { inner: record.clone() })?;
+            // TODO: Use native dispatch for pre-defined filters
             if let Some(func_filter) = &self.func_filter {
                 let keep = func_filter.bind(py).call1((record_obj.bind(py),))?.is_truthy()?;
                 if !keep {

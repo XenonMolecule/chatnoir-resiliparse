@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
-use std::ops::Deref;
+use std::ops::{BitAnd, BitOr, BitXor, Deref, Not};
 use time::OffsetDateTime;
 use time::format_description::well_known::Iso8601;
 use uuid::Uuid;
@@ -87,6 +87,44 @@ impl TryFrom<u16> for WarcRecordType {
             0 => Ok(WarcRecordType::NoType),
             _ => Err("Invalid enum value."),
         }
+    }
+}
+
+impl From<WarcRecordType> for u16 {
+    fn from(value: WarcRecordType) -> Self {
+        value as u16
+    }
+}
+
+impl BitOr for WarcRecordType {
+    type Output = u16;
+
+    fn bitor(self, rhs: Self) -> u16 {
+        self as u16 | rhs as u16
+    }
+}
+
+impl BitAnd for WarcRecordType {
+    type Output = u16;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        self as u16 & rhs as u16
+    }
+}
+
+impl BitXor for WarcRecordType {
+    type Output = u16;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        self as u16 ^ rhs as u16
+    }
+}
+
+impl Not for WarcRecordType {
+    type Output = u16;
+
+    fn not(self) -> u16 {
+        !(self as u16)
     }
 }
 

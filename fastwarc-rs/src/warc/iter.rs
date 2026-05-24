@@ -25,6 +25,10 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+/// Common trait for different types of archive iterators.
+pub trait ArchiveIteratorTrait: Iterator<Item = Result<WarcRecord, io::Error>> {}
+impl<I: Iterator<Item = Result<WarcRecord, io::Error>>> ArchiveIteratorTrait for I {}
+
 #[doc(hidden)]
 /// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
 ///
@@ -277,18 +281,18 @@ where
         self
     }
 
-    /// Create a new WARC record iterator with a filter predicate.
+    /// Convert the iterator into a [`FilteredArchiveIterator`] for filtering records
+    /// based on function predicates.
     ///
     /// # Arguments
     ///
-    /// * `reader` - buffered reader instance to attach to records
     /// * `filter` - boolean filter predicate (must take a [`&mut WarcRecord`] as parameter)
-    pub fn with_filter<F>(reader: impl IntoWarcReader, filter: F) -> FilteredArchiveIteratorImpl<R, F>
+    pub fn with_filter<F>(self, filter: F) -> FilteredArchiveIteratorImpl<R, F>
     where
         F: Fn(&mut WarcRecord) -> bool,
     {
         FilteredArchiveIteratorImpl {
-            inner: ArchiveIteratorImpl::new(reader),
+            inner: self,
             pred: filter,
         }
     }
@@ -440,7 +444,8 @@ where
 
 /// Filter predicates to be used with [`ArchiveIterator::with_filter()`].
 pub mod filter {
-    use crate::warc::record::{WarcRecord, WarcRecordType};
+    use crate::warc::record::WarcRecord;
+    use std::fmt::Debug;
 
     /// Filter predicate for checking if a record is a WARC/1.0 record.
     pub fn is_warc_10(record: &mut WarcRecord) -> bool {
@@ -490,9 +495,13 @@ pub mod filter {
         record.headers().contains_key_bytes(b"WARC-Concurrent-To")
     }
 
-    /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
-    pub fn has_record_type(record_type: WarcRecordType) -> impl Fn(&mut WarcRecord) -> bool {
-        move |r: &mut WarcRecord| r.record_type() == record_type
+    /// Parameterized filter predicate for checking if a record's record type matches the given bitmask
+    pub fn has_record_type<T: TryInto<u16>>(record_type_bitmask: T) -> impl Fn(&mut WarcRecord) -> bool
+    where
+        <T as TryInto<u16>>::Error: Debug,
+    {
+        let mask = record_type_bitmask.try_into().unwrap();
+        move |r: &mut WarcRecord| r.record_type() as u16 & mask != 0
     }
 
     /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.

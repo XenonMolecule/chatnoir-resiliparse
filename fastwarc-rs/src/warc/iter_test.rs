@@ -16,10 +16,7 @@ use super::*;
 use crate::stream_io::traits::WarcWrite;
 use crate::stream_io::zstd::ZstdWriterOptions;
 use crate::stream_io::{brotli, chunked, gzip, lz4, zstd};
-use crate::warc::iter::{
-    ArchiveIterator, ArchiveIteratorOptions, ArchiveIteratorThreadSafe, FilteredArchiveIterator, SharedWarcRecord,
-    filter,
-};
+use crate::warc::iter::{ArchiveIterator, ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
 use crate::warc::mod_test::{
     get_fixture_path, http_response_warc_data_encoded, warc_record_data, warc_record_data_with_headers,
 };
@@ -302,23 +299,6 @@ fn archive_iterator_with_encoded_http_payloads() -> io::Result<()> {
     Ok(())
 }
 
-#[test]
-fn filtered_archive_iterator() -> io::Result<()> {
-    let mut filtered: FilteredArchiveIterator<_> = ArchiveIterator::with_filter(
-        io::Cursor::new(filter_test_warc_data()),
-        filter::has_record_type(WarcRecordType::Resource),
-    );
-    filtered.set_parse_http(false);
-    let _: &ArchiveIterator = &filtered;
-
-    let record = filtered.next().unwrap()?;
-    assert_eq!(record.borrow().record_id().as_deref(), Some("<urn:uuid:filter-block>"));
-    assert_eq!(record.borrow().record_type(), WarcRecordType::Resource);
-    assert!(filtered.next().is_none());
-
-    Ok(())
-}
-
 /// Test fixture: WARC records for testing filter predicates.
 fn filter_test_warc_data() -> Vec<u8> {
     let warc10 =
@@ -362,34 +342,12 @@ fn filter_test_warc_data() -> Vec<u8> {
     let metadata = warc_record_data("metadata", "<urn:uuid:filter-metadata>", None, b"LONGER");
 
     [
+        metadata.as_slice(),
         warc10.as_slice(),
         http.as_slice(),
         block.as_slice(),
-        metadata.as_slice(),
     ]
     .concat()
-}
-
-/// Helper for running iterator checks on both [`ArchiveIterator`] and [`ArchiveIteratorThreadSafe`].
-fn run_archive_iterator_variants<R, M, F>(mut make_reader: M, mut check: F) -> io::Result<()>
-where
-    R: IntoWarcReader,
-    M: FnMut() -> io::Result<R>,
-    F: FnMut(&mut WarcRecord) -> io::Result<()>,
-{
-    let opts = ArchiveIteratorOptions {
-        parse_http: false,
-        ..Default::default()
-    };
-    for r in ArchiveIterator::with_options(make_reader()?, opts) {
-        r?.with_mut(|rm| check(rm))?;
-    }
-
-    for r in ArchiveIteratorThreadSafe::with_options(make_reader()?, opts) {
-        r?.with_mut(|rm| check(rm))?;
-    }
-
-    Ok(())
 }
 
 /// Test fixture: IDs of records matching a filter predicate
@@ -398,24 +356,23 @@ where
     F: Fn(&mut WarcRecord) -> bool,
 {
     let mut ids = Vec::new();
-    run_archive_iterator_variants(
-        || Ok(io::Cursor::new(filter_test_warc_data())),
-        |record| {
-            if filter(record) {
+    ArchiveIterator::new(io::Cursor::new(filter_test_warc_data()))
+        .with_parse_http(false)
+        .with_filter(filter)
+        .for_each(|r| {
+            r.unwrap().with_mut(|record| {
                 ids.push(record.record_id().unwrap().to_string());
-            }
-            Ok(())
-        },
-    )?;
+            })
+        });
 
     Ok(ids)
 }
 
 #[test]
-fn archive_iterator_filter_predicates() -> io::Result<()> {
+fn filter_predicates() -> io::Result<()> {
     macro_rules! assert_filtered_ids {
         ($name:literal, $predicate:expr, $expected:expr) => {
-            assert_eq!(filtered_record_ids($predicate)?, $expected.repeat(2), "{}", $name);
+            assert_eq!(filtered_record_ids($predicate)?, $expected, "{}", $name);
         };
     }
 
@@ -424,9 +381,9 @@ fn archive_iterator_filter_predicates() -> io::Result<()> {
         "is_warc_11",
         filter::is_warc_11,
         [
+            "<urn:uuid:filter-metadata>",
             "<urn:uuid:filter-http>",
             "<urn:uuid:filter-block>",
-            "<urn:uuid:filter-metadata>"
         ]
     );
     assert_filtered_ids!("has_block_digest", filter::has_block_digest, ["<urn:uuid:filter-block>"]);
@@ -451,7 +408,27 @@ fn archive_iterator_filter_predicates() -> io::Result<()> {
     assert_filtered_ids!(
         "has_content_length_gte",
         filter::has_content_length_gte(6),
-        ["<urn:uuid:filter-http>", "<urn:uuid:filter-metadata>"]
+        ["<urn:uuid:filter-metadata>", "<urn:uuid:filter-http>"]
+    );
+    assert_filtered_ids!(
+        "record_type_resource",
+        filter::has_record_type(WarcRecordType::Resource),
+        ["<urn:uuid:filter-block>"]
+    );
+    assert_filtered_ids!(
+        "record_type_response",
+        filter::has_record_type(WarcRecordType::Response),
+        ["<urn:uuid:filter-http>"]
+    );
+    assert_filtered_ids!(
+        "record_type_response_or_metadata",
+        filter::has_record_type(WarcRecordType::Response | WarcRecordType::Metadata),
+        ["<urn:uuid:filter-metadata>", "<urn:uuid:filter-http>"]
+    );
+    assert_filtered_ids!(
+        "record_type_impossible",
+        filter::has_record_type(WarcRecordType::Response & WarcRecordType::Metadata),
+        [] as [&str; 0]
     );
     // Custom closure filter.
     assert_filtered_ids!(
@@ -459,6 +436,28 @@ fn archive_iterator_filter_predicates() -> io::Result<()> {
         |record: &mut WarcRecord| record.record_id().is_some_and(|id| id.contains("metadata")),
         ["<urn:uuid:filter-metadata>"]
     );
+
+    Ok(())
+}
+
+/// Helper for running iterator checks on both [`ArchiveIterator`] and [`ArchiveIteratorThreadSafe`].
+fn run_archive_iterator_variants<R, M, F>(mut make_reader: M, mut check: F) -> io::Result<()>
+where
+    R: IntoWarcReader,
+    M: FnMut() -> io::Result<R>,
+    F: FnMut(&mut WarcRecord) -> io::Result<()>,
+{
+    let opts = ArchiveIteratorOptions {
+        parse_http: false,
+        ..Default::default()
+    };
+    for r in ArchiveIterator::with_options(make_reader()?, opts) {
+        r?.with_mut(|rm| check(rm))?;
+    }
+
+    for r in ArchiveIteratorThreadSafe::with_options(make_reader()?, opts) {
+        r?.with_mut(|rm| check(rm))?;
+    }
 
     Ok(())
 }
