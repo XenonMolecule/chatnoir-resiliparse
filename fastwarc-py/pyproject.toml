@@ -7,7 +7,7 @@ name = "FastWARC"
 version = "1.0.0"
 description = "A high-performance WARC parsing library for Python written in C++/Cython."
 authors = [
-  { name = "Janek Bevendorff" }
+    { name = "Janek Bevendorff" }
 ]
 license = { text = "Apache License 2.0" }
 # TODO: Replace with this once we deprecate Python 3.8 and upgrade to setuptools 77:
@@ -15,9 +15,9 @@ license = { text = "Apache License 2.0" }
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-  "brotli",
-  "click",
-  "tqdm"
+    "brotli",
+    "click",
+    "tqdm"
 ]
 
 [project.urls]
@@ -27,16 +27,16 @@ documentation = "https://resiliparse.chatnoir.eu"
 
 [project.optional-dependencies]
 all = [
-  "fastwarc[fsspec]"
+    "fastwarc[fsspec]"
 ]
 fsspec = [
-  "fsspec"
+    "fsspec"
 ]
 test = [
-  "fastwarc[all]",
-  "pytest>=7.2.2",
-  "pytest-cov>=4.0.0",
-  "lz4",
+    "fastwarc[all]",
+    "pytest>=7.2.2",
+    "pytest-cov>=4.0.0",
+    "lz4",
 ]
 
 [project.scripts]
@@ -53,3 +53,10 @@ archs = "native"
 build = "cp3*"
 build-frontend = "build"
 test-extras = ["all", "test"]
+
+[tool.mypy]
+exclude = ["fastwarc/cli\\.py", "fastwarc/legacy/.*"]
+
+[[tool.mypy.overrides]]
+module = ["fsspec.*"]
+ignore_missing_imports = true
