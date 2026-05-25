@@ -143,7 +143,6 @@ impl WarcRecordTypePy {
 /// Dict-like type representing a WARC or HTTP header block.
 ///
 /// :param encoding: header source encoding
-/// :type encoding: str
 #[pyclass(name = "HeaderMap", module = "fastwarc.warc")]
 pub struct HeaderMapPy {
     inner: HeaderMapBacking,
@@ -269,7 +268,6 @@ impl HeaderMapPy {
 
     /// Header source encoding.
     ///
-    /// :rtype: str
     pub fn encoding(&self) -> &'static str {
         match self.with_headers(|h| h.encoding()) {
             HeaderEncoding::Unicode => "utf-8",
@@ -281,9 +279,7 @@ impl HeaderMapPy {
     ///
     /// :param reader: input stream or reader object
     /// :param has_status_line: whether the first line is a status line
-    /// :type has_status_line: bool
     /// :return: number of bytes read
-    /// :rtype: int
     #[pyo3(signature = (reader, has_status_line=true))]
     pub fn parse(&mut self, reader: Py<PyAny>, has_status_line: bool) -> PyResult<usize> {
         let mut reader = PyReaderAdapter::new(reader)?;
@@ -294,7 +290,6 @@ impl HeaderMapPy {
     ///
     /// :param writer: output stream or writer object
     /// :return: number of bytes written
-    /// :rtype: int
     pub fn write(&self, writer: Py<PyAny>) -> PyResult<usize> {
         let mut writer = PyWriterAdapter::new(writer)?;
         Ok(self.with_headers(|h| h.write(&mut writer))?)
@@ -327,7 +322,6 @@ impl HeaderMapPy {
     /// Set status line contents.
     ///
     /// :param status_line: new status line
-    /// :type status_line: str
     #[setter]
     pub fn set_status_line(&mut self, status_line: &str) {
         self.with_headers_mut(|h| h.set_status_line(status_line));
@@ -348,9 +342,7 @@ impl HeaderMapPy {
     /// Use this if the header name is not unique.
     ///
     /// :param key: header key
-    /// :type key: str
     /// :param value: header value
-    /// :type value: str
     pub fn append(&mut self, key: &str, value: &str) {
         self.with_headers_mut(|h| h.append(key, value));
     }
@@ -359,7 +351,6 @@ impl HeaderMapPy {
     ///
     /// If multiple headers have the same key, only the last occurrence is returned.
     ///
-    /// :rtype: dict[str, str]
     pub fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         let items = self.with_headers(|h| {
@@ -382,7 +373,6 @@ impl HeaderMapPy {
     ///
     /// Use this instead of :meth:`to_dict` if header keys are not unique.
     ///
-    /// :rtype: tuple[tuple[str, str], ...]
     pub fn to_tuples<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         self.items(py)
     }
@@ -393,7 +383,6 @@ impl HeaderMapPy {
 
     /// Whether the header map is empty.
     ///
-    /// :rtype: bool
     pub fn is_empty(&self) -> bool {
         self.with_headers(HeaderMap::is_empty)
     }
@@ -408,9 +397,7 @@ impl HeaderMapPy {
     /// If multiple headers have the same key, only the last occurrence is returned.
     ///
     /// :param key: header key
-    /// :type key: str
     /// :param default: default value if ``key`` is not present
-    /// :rtype: str | object
     #[pyo3(signature = (key, default=None))]
     pub fn get<'py>(
         &self,
@@ -427,8 +414,6 @@ impl HeaderMapPy {
     /// Get all occurrences of a header.
     ///
     /// :param key: header key
-    /// :type key: str
-    /// :rtype: tuple[str, ...]
     pub fn get_multiple<'py>(&self, py: Python<'py>, key: &str) -> PyResult<Bound<'py, PyTuple>> {
         let values = self.with_headers(|h| {
             h.get_multiple(key)
@@ -473,9 +458,7 @@ impl HeaderMapPy {
     /// Set a header value, overwriting any previous value for the same key.
     ///
     /// :param key: header key
-    /// :type key: str
     /// :param value: header value
-    /// :type value: str
     pub fn set(&mut self, key: &str, value: &str) {
         self.with_headers_mut(|h| h.set(key, value));
     }
@@ -491,7 +474,6 @@ impl HeaderMapPy {
     /// Remove all headers matching ``key``.
     ///
     /// :param key: header key
-    /// :type key: str
     pub fn remove(&mut self, key: &str) {
         self.with_headers_mut(|h| h.remove(key));
     }
@@ -502,7 +484,6 @@ impl HeaderMapPy {
 
     /// Item view of keys and values.
     ///
-    /// :rtype: tuple[tuple[str, str], ...]
     pub fn items<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let items = self.with_headers(|h| {
             h.items()
@@ -523,7 +504,6 @@ impl HeaderMapPy {
 
     /// Iterable of header keys.
     ///
-    /// :rtype: tuple[str, ...]
     pub fn keys<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let keys = self.with_headers(|h| h.keys().map(|k| PyString::new(py, &k)).collect::<Vec<_>>());
         PyTuple::new(py, keys)
@@ -536,7 +516,6 @@ impl HeaderMapPy {
 
     /// Iterable of header values.
     ///
-    /// :rtype: tuple[str, ...]
     pub fn values<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let values = self.with_headers(|h| h.values().map(|k| PyString::new(py, &k)).collect::<Vec<_>>());
         PyTuple::new(py, values)
@@ -614,8 +593,6 @@ impl WarcRecordPayloadReaderPy {
     /// Read payload bytes.
     ///
     /// :param size: maximum number of bytes to read, or ``-1`` for all remaining bytes
-    /// :type size: int
-    /// :rtype: bytes
     #[pyo3(signature = (size=-1))]
     pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Bound<'py, PyBytes>> {
         self.with_payload_reader(|reader| {
@@ -635,8 +612,6 @@ impl WarcRecordPayloadReaderPy {
     /// Read a single payload line.
     ///
     /// :param max_line_len: maximum line length
-    /// :type max_line_len: int
-    /// :rtype: bytes
     #[pyo3(signature = (max_line_len=8192))]
     pub fn readline<'py>(&self, py: Python<'py>, max_line_len: usize) -> PyResult<Bound<'py, PyBytes>> {
         self.with_payload_reader(|reader| {
@@ -649,8 +624,6 @@ impl WarcRecordPayloadReaderPy {
     /// Consume payload bytes without returning them.
     ///
     /// :param size: maximum number of bytes to consume, or ``-1`` for all remaining bytes
-    /// :type size: int
-    /// :rtype: int
     #[pyo3(signature = (size=-1))]
     pub fn consume(&self, size: i128) -> PyResult<usize> {
         let mut record = self.record.lock().unwrap();
@@ -663,7 +636,6 @@ impl WarcRecordPayloadReaderPy {
 
     /// Return the current payload offset.
     ///
-    /// :rtype: int
     pub fn tell(&self) -> PyResult<u64> {
         self.with_payload_reader(|reader| Ok(reader.stream_position()?))
     }
@@ -674,9 +646,6 @@ impl WarcRecordPayloadReaderPy {
     ///
     /// :param offset: seek offset
     /// :param whence: seek mode (``0`` = start, ``1`` = current, ``2`` = end)
-    /// :type offset: int
-    /// :type whence: int
-    /// :rtype: int
     #[pyo3(signature = (offset, whence=0))]
     pub fn seek(&self, offset: i128, whence: u8) -> PyResult<u64> {
         self.with_payload_reader(|reader| Ok(reader.seek(python_whence_to_seekfrom(offset, whence)?)?))
@@ -763,7 +732,6 @@ impl WarcRecordPy {
     /// Set record ID.
     ///
     /// :param record_id: record identifier
-    /// :type record_id: str
     #[setter]
     pub fn set_record_id<'py>(&self, record_id: &str) {
         self.lock().set_record_id(record_id);
@@ -780,7 +748,6 @@ impl WarcRecordPy {
     /// Set record type.
     ///
     /// :param record_type: record type
-    /// :type record_type: WarcRecordType
     #[setter]
     pub fn set_record_type(&mut self, record_type: WarcRecordTypePy) {
         self.lock().set_record_type(record_type.into());
@@ -832,7 +799,6 @@ impl WarcRecordPy {
     /// ``record_date`` must be timezone-aware.
     ///
     /// :param record_date: datetime object
-    /// :type record_date: datetime.datetime
     #[setter]
     pub fn set_record_date<'py>(&mut self, py: Python<'py>, record_date: Bound<'py, PyDateTime>) -> PyResult<()> {
         if record_date.getattr("tzinfo")?.is_none() {
@@ -889,7 +855,6 @@ impl WarcRecordPy {
     /// Set whether this record is an HTTP record.
     ///
     /// :param is_http: whether the record is an HTTP record
-    /// :type is_http: bool
     #[setter]
     pub fn set_is_http(&mut self, is_http: bool) {
         self.lock().set_is_http(is_http);
@@ -994,11 +959,8 @@ impl WarcRecordPy {
     /// record payload.
     ///
     /// :param record_type: WARC-Type
-    /// :type record_type: WarcRecordType
     /// :param record_urn: WARC-Record-ID as URN without ``'<'`` and ``'>'``
-    /// :type record_urn: bytes or None
     /// :param content_length: deprecated compatibility argument, ignored
-    /// :type content_length: int or None
     #[pyo3(signature = (record_type=WarcRecordTypePy::no_type, record_urn=None, *, content_length=None)
     )]
     pub fn init_headers(
@@ -1016,7 +978,6 @@ impl WarcRecordPy {
     /// Freezing copies the remaining payload bytes into memory so the record can
     /// outlive the iterator stream and support backward seeking.
     ///
-    /// :rtype: bool
     pub fn freeze(&mut self) -> PyResult<bool> {
         self.lock().freeze()?;
         Ok(true)
@@ -1025,7 +986,6 @@ impl WarcRecordPy {
     /// Set the WARC payload as bytes.
     ///
     /// :param content: payload as bytes
-    /// :type content: bytes
     pub fn set_bytes_content(&mut self, content: &[u8]) {
         self.set_bytes_payload(content);
     }
@@ -1033,7 +993,6 @@ impl WarcRecordPy {
     /// Set the WARC payload as bytes.
     ///
     /// :param content: payload as bytes
-    /// :type content: bytes
     pub fn set_bytes_payload(&mut self, content: &[u8]) {
         self.lock().set_bytes_payload(content.to_vec());
     }
@@ -1041,8 +1000,6 @@ impl WarcRecordPy {
     /// Consume payload bytes without returning them.
     ///
     /// :param n: maximum number of bytes to consume, or ``None`` for all remaining bytes
-    /// :type n: int or None
-    /// :rtype: int
     #[pyo3(signature = (n=None))]
     pub fn consume(&mut self, n: Option<usize>) -> PyResult<usize> {
         match n {
@@ -1054,9 +1011,7 @@ impl WarcRecordPy {
     /// Parse the WARC header block from the attached stream.
     ///
     /// :param quirks_mode: enable lenient parsing
-    /// :type quirks_mode: bool
     /// :return: number of bytes read
-    /// :rtype: int
     #[pyo3(signature = (quirks_mode=false))]
     pub fn parse_warc_headers(&mut self, quirks_mode: bool) -> PyResult<usize> {
         if quirks_mode {
@@ -1073,7 +1028,6 @@ impl WarcRecordPy {
     ///
     /// :param auto_decode: automatically decode HTTP payload encodings
     ///                     (accepted values: ``'none'``, ``'content'``, ``'transfer'``, ``'all'``)
-    /// :type auto_decode: str
     /// :param strict_mode: this argument is deprecated and ignored.
     /// :param type strict_mode: bool
     #[pyo3(signature = (auto_decode="none", *, strict_mode=true))]
@@ -1090,8 +1044,6 @@ impl WarcRecordPy {
     /// :class:`OSError` only for stream I/O failures.
     ///
     /// :param consume: consume the remaining record payload instead of preserving it
-    /// :type consume: bool
-    /// :rtype: bool
     #[pyo3(signature = (consume=false))]
     pub fn verify_block_digest(&mut self, consume: bool) -> PyResult<bool> {
         match self.lock().verify_block_digest(consume) {
@@ -1108,8 +1060,6 @@ impl WarcRecordPy {
     /// :class:`OSError` only for stream I/O failures.
     ///
     /// :param consume: consume the remaining payload instead of preserving it
-    /// :type consume: bool
-    /// :rtype: bool
     #[pyo3(signature = (consume=false))]
     pub fn verify_payload_digest(&mut self, consume: bool) -> PyResult<bool> {
         match self.lock().verify_payload_digest(consume) {
@@ -1123,13 +1073,9 @@ impl WarcRecordPy {
     ///
     /// :param stream: output stream
     /// :param checksum_data: calculate and add block and payload digests
-    /// :type checksum_data: bool
     /// :param payload_digest: optional SHA-1 payload digest bytes
-    /// :type payload_digest: bytes or None
     /// :param chunk_size: write block size
-    /// :type chunk_size: int
     /// :return: number of bytes written
-    /// :rtype: int
     #[pyo3(signature = (stream, checksum_data=false, payload_digest=None, chunk_size=16384))]
     pub fn write<'py>(
         &mut self,
@@ -1210,25 +1156,15 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 ///
 /// :param stream: input stream, file-like object, file name, or URL
 /// :param record_types: bitmask of :class:`WarcRecordType` values to return
-/// :type record_types: int
 /// :param parse_http: parse HTTP records automatically
-/// :type parse_http: bool
 /// :param min_content_length: skip records smaller than this length, or ``-1`` to disable
-/// :type min_content_length: int
 /// :param max_content_length: skip records larger than this length, or ``-1`` to disable
-/// :type max_content_length: int
 /// :param func_filter: Python callable taking a :class:`WarcRecord` and returning ``bool``
-/// :type func_filter: Callable or None
 /// :param verify_digests: skip records with missing or invalid block digests
-/// :type verify_digests: bool
 /// :param quirks_mode: enable lenient parsing for malformed records
-/// :type quirks_mode: bool
 /// :param auto_decode: automatically decode HTTP payload encodings
-/// :type auto_decode: str
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
-/// :type stream_detect: bool
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
-/// :type fsspec_args: dict or bool or None
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
 /// :param type strict_mode: bool
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
@@ -1339,7 +1275,6 @@ impl ArchiveIteratorPy {
 
     /// Return the next :class:`WarcRecord` from the stream.
     ///
-    /// :rtype: WarcRecord
     pub fn __next__<'py>(&mut self, py: Python<'py>) -> PyResult<Option<Py<WarcRecordPy>>> {
         loop {
             let Some(next) = self.inner.next() else {
@@ -1383,8 +1318,6 @@ fn apply_filter(record: &WarcRecordPy, predicate: impl FnOnce(&mut WarcRecord) -
 /// Filter predicate for checking if a record is a WARC/1.0 record.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "is_warc_10")]
 pub fn is_warc_10_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_warc_10)
@@ -1393,8 +1326,6 @@ pub fn is_warc_10_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record is a WARC/1.1 record.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "is_warc_11")]
 pub fn is_warc_11_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_warc_11)
@@ -1403,8 +1334,6 @@ pub fn is_warc_11_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record has a block digest.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "has_block_digest")]
 pub fn has_block_digest_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::has_block_digest)
@@ -1413,8 +1342,6 @@ pub fn has_block_digest_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record has a valid block digest.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "has_valid_block_digest")]
 pub fn has_valid_block_digest_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::has_valid_block_digest)
@@ -1423,8 +1350,6 @@ pub fn has_valid_block_digest_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record has a payload digest.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "has_payload_digest")]
 pub fn has_payload_digest_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::has_payload_digest)
@@ -1433,8 +1358,6 @@ pub fn has_payload_digest_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record has a valid payload digest.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "has_valid_payload_digest")]
 pub fn has_valid_payload_digest_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::has_valid_payload_digest)
@@ -1443,8 +1366,6 @@ pub fn has_valid_payload_digest_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record is an HTTP record.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "is_http")]
 pub fn is_http_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_http)
@@ -1453,8 +1374,6 @@ pub fn is_http_py(record: &WarcRecordPy) -> bool {
 /// Filter predicate for checking if a record is concurrent to another record.
 ///
 /// :param record: WARC record
-/// :type record: WarcRecord
-/// :rtype: bool
 #[pyfunction(name = "is_concurrent")]
 pub fn is_concurrent_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_concurrent)

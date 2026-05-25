@@ -50,8 +50,6 @@ impl WarcReaderPy {
     /// Read bytes from the stream.
     ///
     /// :param size: maximum number of bytes to read, or ``-1`` for all remaining bytes
-    /// :type size: int
-    /// :rtype: bytes
     #[pyo3(signature = (size=-1))]
     pub fn read<'py>(&self, py: Python<'py>, size: i128) -> PyResult<Py<PyAny>> {
         let _ = size;
@@ -62,9 +60,6 @@ impl WarcReaderPy {
     ///
     /// :param offset: seek offset
     /// :param whence: seek mode (``0`` = start, ``1`` = current, ``2`` = end)
-    /// :type offset: int
-    /// :type whence: int
-    /// :rtype: int
     #[pyo3(signature = (offset, whence=0))]
     pub fn seek(&self, py: Python<'_>, offset: i128, whence: u8) -> PyResult<Py<PyAny>> {
         let _ = (offset, whence);
@@ -73,7 +68,6 @@ impl WarcReaderPy {
 
     /// Return the current decoded stream offset.
     ///
-    /// :rtype: int
     pub fn tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
@@ -103,9 +97,6 @@ impl WarcReaderPy {
     ///
     /// :param offset: seek offset
     /// :param whence: seek mode (``0`` = start, ``1`` = current, ``2`` = end)
-    /// :type offset: int
-    /// :type whence: int
-    /// :rtype: int
     #[pyo3(signature = (offset, whence=0))]
     pub fn inner_seek(&self, py: Python<'_>, offset: i128, whence: u8) -> PyResult<Py<PyAny>> {
         let _ = (offset, whence);
@@ -114,14 +105,12 @@ impl WarcReaderPy {
 
     /// Return the current inner stream offset.
     ///
-    /// :rtype: int
     pub fn inner_tell(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
 
     /// Return the start offset of the current compression frame or member, if supported.
     ///
-    /// :rtype: int or None
     pub fn frame_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(py.NotImplemented())
     }
@@ -141,9 +130,7 @@ impl WarcWriterPy {
     /// Write bytes to the stream.
     ///
     /// :param data: bytes to write
-    /// :type data: bytes
     /// :return: number of bytes written
-    /// :rtype: int
     pub fn write(&self, py: Python<'_>, data: Py<PyBytes>) -> PyResult<Py<PyAny>> {
         let _ = data;
         Ok(py.NotImplemented())

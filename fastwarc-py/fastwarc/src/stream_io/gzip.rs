@@ -26,11 +26,8 @@ use std::sync::Mutex;
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
 /// :param buffer_size: decompression buffer size
-/// :type buffer_size: int
 /// :param zlib: use zlib-wrapped deflate instead of gzip framing
-/// :type zlib: bool
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
-/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "GzipReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct GzipReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
@@ -104,13 +101,9 @@ impl GzipReaderPy {
 ///
 /// :param inner: raw output stream, file-like object, file name, or URL
 /// :param compression_level: compression level
-/// :type compression_level: int
 /// :param buffer_size: compression buffer size
-/// :type buffer_size: int
 /// :param zlib: use zlib-wrapped deflate instead of gzip framing
-/// :type zlib: bool
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
-/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "GzipWriter", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct GzipWriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,

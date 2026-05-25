@@ -26,9 +26,7 @@ use std::sync::Mutex;
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
 /// :param buffer_size: decompression buffer size
-/// :type buffer_size: int
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
-/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "Lz4Reader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct Lz4ReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
@@ -97,9 +95,7 @@ impl Lz4ReaderPy {
 ///
 /// :param inner: raw output stream, file-like object, file name, or URL
 /// :param buffer_size: compression buffer size
-/// :type buffer_size: int
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
-/// :type fsspec_args: dict or bool or None
 #[pyclass(name = "Lz4Writer", module = "fastwarc.stream_io", extends = WarcWriterPy, subclass)]
 pub struct Lz4WriterPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcWrite + Send>>>,
