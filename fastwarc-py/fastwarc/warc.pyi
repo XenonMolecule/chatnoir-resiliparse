@@ -37,9 +37,11 @@ class WarcRecordType(IntFlag):
 
     def __index__(self) -> int: ...
 
-    def __str__(self) -> str: ...
+    def __str__(self) -> str:
+        return self.name
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        return self.name
 
 
 warcinfo = WarcRecordType.warcinfo

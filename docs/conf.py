@@ -12,6 +12,9 @@
 #
 
 import datetime
+import importlib
+from importlib.abc import MetaPathFinder
+from importlib.machinery import EXTENSION_SUFFIXES, ModuleSpec, SourceFileLoader
 import os
 import re
 import sys
@@ -42,6 +45,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
     'sphinx_substitution_extensions',
+    # 'sphinx_autodoc_typehints',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -53,6 +57,9 @@ extensions = [
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '*.swp', 'requirements.txt']
 
 autodoc_member_order = 'groupwise'
+
+autodoc_typehints = 'description'
+autodoc_use_type_comments = False
 
 # Inject version into epilog
 rst_prolog = f"""
@@ -79,3 +86,94 @@ html_static_path = ['_static']
 html_css_files = [
     'style.css',
 ]
+
+# -- Stub patching -----------------------------------------------------------
+
+_fastwarc_pkg_dir = os.path.join(src_dir, 'fastwarc-py', 'fastwarc')
+_STUBBED_NATIVE_MODULES = {
+    'fastwarc.warc': os.path.join(_fastwarc_pkg_dir, 'warc.pyi'),
+    'fastwarc.stream_io': os.path.join(_fastwarc_pkg_dir, 'stream_io.pyi'),
+}
+
+
+class _NativeStubFinder(MetaPathFinder):
+    """
+    Make PyO3 submodules look like native extension modules to autodoc.
+
+    Native Sphinx stub loading only activates when ``find_spec()`` returns a
+    native-extension origin, for which we need to patch in the .pyi path.
+    """
+
+    def __init__(self, module_specs):
+        self.pyi_paths = module_specs
+
+    def find_spec(self, fullname, path=None, target=None):
+        pyi_file = self.pyi_paths.get(fullname)
+        if pyi_file is None:
+            return None
+
+        mock_native_lib_path = pyi_file.rsplit('.', 1)[0] + EXTENSION_SUFFIXES[0]
+        return ModuleSpec(
+            fullname,
+            SourceFileLoader(fullname, pyi_file),
+            origin=mock_native_lib_path
+        )
+
+
+def _copy_docstring(src, dst):
+    if not getattr(dst, '__doc__', None) and getattr(src, '__doc__', None):
+        dst.__doc__ = src.__doc__
+
+
+def _hydrate_member_docstrings(dst, src):
+    _copy_docstring(src, dst)
+
+    dst_dict = getattr(dst, '__dict__', None)
+    src_dict = getattr(src, '__dict__', None)
+    if not isinstance(dst_dict, dict) or not isinstance(src_dict, dict):
+        return
+
+    for name, dst_member in dst_dict.items():
+        src_member = src_dict.get(name)
+        if src_member is None:
+            continue
+
+        _copy_docstring(src_member, dst_member)
+
+        if isinstance(dst_member, property) and isinstance(src_member, property):
+            for accessor_name in ('fget', 'fset', 'fdel'):
+                dst_accessor = getattr(dst_member, accessor_name)
+                src_accessor = getattr(src_member, accessor_name)
+                if dst_accessor is not None and src_accessor is not None:
+                    _copy_docstring(src_accessor, dst_accessor)
+
+
+def setup(_):
+    from sphinx.ext.autodoc._dynamic import _importer
+    original_importer = _importer._import_module
+
+    sys.meta_path.insert(0, _NativeStubFinder(_STUBBED_NATIVE_MODULES))
+
+    native_mods = {}
+    for m in _STUBBED_NATIVE_MODULES:
+        # Load all stubbed modules once, keep a reference, and then pop them from the list of loaded modules
+        parent, name = m.rsplit('.', 1)
+        importlib.import_module(parent, name)
+        native_mods[m] = sys.modules.pop(m, None)
+
+    def import_module(modname, try_reload=False):
+        if modname not in _STUBBED_NATIVE_MODULES:
+            return original_importer(modname, try_reload=try_reload)
+
+        # Load new module and copy docstrings from original module
+        module = original_importer(modname, try_reload=try_reload)
+        _copy_docstring(native_mods[modname], module)
+        for name, member in vars(module).items():
+            native_member = getattr(native_mods[modname], name, None)
+            if native_member is not None:
+                _hydrate_member_docstrings(member, native_member)
+
+        return module
+
+    # Patch _importer._import_module to load stub files properly
+    _importer._import_module = import_module
