@@ -10,6 +10,7 @@ WARC
 
 .. automodule:: fastwarc.warc
    :members:
+   :exclude-members: WarcRecordType
    :special-members: __iter__, __next__
    :show-inheritance:
 
