@@ -570,7 +570,7 @@ impl HeaderMapPy {
 ///
 /// This object is tied to the lifetime of its parent :class:`WarcRecord`. If the
 /// record belongs to an active :class:`ArchiveIterator`, the reader becomes stale
-/// once iteration advances unless the record has been :meth:`WarcRecord.freeze`d.
+/// once iteration advances unless the record has been frozen with :meth:`WarcRecord.freeze`.
 #[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy)]
 pub struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,

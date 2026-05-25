@@ -20,10 +20,10 @@ import re
 import sys
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.extend([
+sys.path[:0] = [
     os.path.join(src_dir, 'resiliparse-py'),
     os.path.join(src_dir, 'fastwarc-py')
-])
+]
 
 # -- Project information -----------------------------------------------------
 
@@ -152,14 +152,20 @@ def setup(_):
     from sphinx.ext.autodoc._dynamic import _importer
     original_importer = _importer._import_module
 
-    sys.meta_path.insert(0, _NativeStubFinder(_STUBBED_NATIVE_MODULES))
-
     native_mods = {}
+
     for m in _STUBBED_NATIVE_MODULES:
-        # Load all stubbed modules once, keep a reference, and then pop them from the list of loaded modules
+        # Import the parent package once, capture the native submodule object it
+        # exposes, then remove the submodule import entry so autodoc can load the
+        # stub-backed replacement later.
         parent, name = m.rsplit('.', 1)
-        importlib.import_module(parent, name)
-        native_mods[m] = sys.modules.pop(m, None)
+        parent_mod = importlib.import_module(parent)
+        native_mods[m] = getattr(parent_mod, name)
+        sys.modules.pop(m, None)
+        if hasattr(parent_mod, name):
+            delattr(parent_mod, name)
+
+    sys.meta_path.insert(0, _NativeStubFinder(_STUBBED_NATIVE_MODULES))
 
     def import_module(modname, try_reload=False):
         if modname not in _STUBBED_NATIVE_MODULES:
