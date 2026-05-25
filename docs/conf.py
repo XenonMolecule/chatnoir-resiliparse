@@ -53,7 +53,6 @@ extensions = [
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '*.swp', 'requirements.txt']
 
 autodoc_member_order = 'groupwise'
-highlight_language = "none"
 
 # Inject version into epilog
 rst_prolog = f"""
@@ -69,7 +68,7 @@ rst_prolog = f"""
 html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'collapse_navigation': False,
-    'display_version': True,
+    'version_selector': True,
     'style_external_links': True,
 }
 
