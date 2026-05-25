@@ -20,10 +20,11 @@ import re
 import sys
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path[:0] = [
-    os.path.join(src_dir, 'resiliparse-py'),
-    os.path.join(src_dir, 'fastwarc-py')
-]
+if not os.environ.get("BUILD_DOCS_IGNORE_SOURCE_TREE"):
+    sys.path[:0] = [
+        os.path.join(src_dir, 'resiliparse-py'),
+        os.path.join(src_dir, 'fastwarc-py')
+    ]
 
 # -- Project information -----------------------------------------------------
 
