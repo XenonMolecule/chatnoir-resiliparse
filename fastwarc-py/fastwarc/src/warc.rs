@@ -1158,8 +1158,8 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param stream: input stream, file-like object, file name, or URL
 /// :param record_types: bitmask of :class:`WarcRecordType` values to return
 /// :param parse_http: parse HTTP records automatically
-/// :param min_content_length: skip records smaller than this length, or ``-1`` to disable
-/// :param max_content_length: skip records larger than this length, or ``-1`` to disable
+/// :param min_content_length: skip records smaller than this length, or ``None`` to disable
+/// :param max_content_length: skip records larger than this length, or ``None`` to disable
 /// :param func_filter: Python callable taking a :class:`WarcRecord` and returning ``bool``
 /// :param verify_digests: skip records with missing or invalid block digests
 /// :param quirks_mode: enable lenient parsing for malformed records
