@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._fastwarc import *
-from .legacy import (
+from .warc import ArchiveIterator, WarcRecord, WarcRecordType
+from .stream_io import (
+    GzipReader,
+    GzipWriter,
+    ZstdReader,
+    ZstdWriter,
+    Lz4Reader,
+    Lz4Writer,
+
+    # Legacy names
     FileStream,
     GZipStream,
     LZ4Stream,

@@ -39,9 +39,9 @@ StreamError = _legacy_shims.StreamError
 
 __all__ = [
     *_native.__all__,
-    "FileStream",
-    "GZipStream",
-    "LZ4Stream",
-    "FastWARCError",
-    "StreamError",
+    'FileStream',
+    'GZipStream',
+    'LZ4Stream',
+    'FastWARCError',
+    'StreamError',
 ]

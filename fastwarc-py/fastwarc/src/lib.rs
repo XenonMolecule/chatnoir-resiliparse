@@ -31,14 +31,6 @@ pub mod _fastwarc {
         m.add("ArchiveIterator", warc.getattr("ArchiveIterator")?)?;
         m.add("WarcRecord", warc.getattr("WarcRecord")?)?;
         m.add("WarcRecordType", warc.getattr("WarcRecordType")?)?;
-        m.add("is_warc_10", warc.getattr("is_warc_10")?)?;
-        m.add("is_warc_11", warc.getattr("is_warc_11")?)?;
-        m.add("has_block_digest", warc.getattr("has_block_digest")?)?;
-        m.add("has_valid_block_digest", warc.getattr("has_valid_block_digest")?)?;
-        m.add("has_payload_digest", warc.getattr("has_payload_digest")?)?;
-        m.add("has_valid_payload_digest", warc.getattr("has_valid_payload_digest")?)?;
-        m.add("is_http", warc.getattr("is_http")?)?;
-        m.add("is_concurrent", warc.getattr("is_concurrent")?)?;
 
         m.add("GzipReader", stream_io.getattr("GzipReader")?)?;
         m.add("GzipWriter", stream_io.getattr("GzipWriter")?)?;

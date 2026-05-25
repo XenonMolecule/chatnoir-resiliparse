@@ -17,10 +17,7 @@ use crate::stream_io::{
 };
 use fastwarc::stream_io::LimitedBufReader;
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
-use fastwarc::warc::iter::{
-    ArchiveIteratorOptions, ArchiveIteratorThreadSafe, ArchiveIteratorTrait, FilteredArchiveIteratorThreadSafe,
-    SharedWarcRecord, filter,
-};
+use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
 use fastwarc::warc::record::DigestError::StreamError;
 use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
@@ -106,14 +103,6 @@ impl WarcRecordTypePy {
         *self as u16
     }
 
-    pub fn __and__(&self, other: u16) -> u16 {
-        (*self as u16) & other
-    }
-
-    pub fn __rand__(&self, other: u16) -> u16 {
-        other & (*self as u16)
-    }
-
     pub fn __or__(&self, other: u16) -> u16 {
         (*self as u16) | other
     }
@@ -122,12 +111,24 @@ impl WarcRecordTypePy {
         other | (*self as u16)
     }
 
+    pub fn __and__(&self, other: u16) -> u16 {
+        (*self as u16) & other
+    }
+
+    pub fn __rand__(&self, other: u16) -> u16 {
+        other & (*self as u16)
+    }
+
     pub fn __xor__(&self, other: u16) -> u16 {
         (*self as u16) ^ other
     }
 
     pub fn __rxor__(&self, other: u16) -> u16 {
         other ^ (*self as u16)
+    }
+
+    pub fn __invert__(&self) -> u16 {
+        !(*self as u16)
     }
 
     pub fn __repr__(&self) -> &'static str {
@@ -568,11 +569,15 @@ impl HeaderMapPy {
         self.with_headers(|h| h.contains_key(item))
     }
 
-    fn __eq__(&self, other: &HeaderMapPy) -> bool {
-        self.with_headers(|left| other.with_headers(|right| left == right))
+    fn __eq__(&self, other: Bound<'_, PyAny>) -> bool {
+        if let Ok(other) = other.cast::<HeaderMapPy>() {
+            self.with_headers(|left| other.borrow().with_headers(|right| left == right))
+        } else {
+            false
+        }
     }
 
-    fn __ne__(&self, other: &HeaderMapPy) -> bool {
+    fn __ne__(&self, other: Bound<'_, PyAny>) -> bool {
         !self.__eq__(other)
     }
 }
