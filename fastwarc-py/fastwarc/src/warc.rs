@@ -1167,7 +1167,6 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
-/// :param type strict_mode: bool
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
 pub struct ArchiveIteratorPy {
     inner: ArchiveIteratorThreadSafe,
