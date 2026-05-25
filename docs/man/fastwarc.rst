@@ -3,7 +3,7 @@
 FastWARC
 ========
 
-FastWARC is a high-performance WARC parsing library written in Rust with bindings available for Python. The API is inspired in large parts by `WARCIO <https://github.com/webrecorder/warcio>`_, but does not aim at being a drop-in replacement.  FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip, Zstd, and LZ4.
+FastWARC is a high-performance WARC parsing library written in Rust with bindings available for Python. The API is inspired in large parts by `WARCIO <https://github.com/webrecorder/warcio>`__, but does not aim at being a drop-in replacement.  FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip, Zstd, and LZ4.
 
 FastWARC belongs to the :ref:`ChatNoir Resiliparse toolkit <resiliparse-docs-index>` for fast and robust web data processing.
 
@@ -27,7 +27,7 @@ Pre-built FastWARC binaries for Python can be installed from `PyPi <https://pypi
 Building FastWARC From Source
 -----------------------------
 
-To build FastWARC from the `source repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`_, you need Rust and Cargo installed. If that is not the case, install ``rustup`` first and follow the
+To build FastWARC from the `source repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`__, you need Rust and Cargo installed. If that is not the case, install ``rustup`` first and follow the
 instructions:
 
 .. code-block:: bash
@@ -98,7 +98,7 @@ The central class for stream-processing WARC files is :class:`.ArchiveIterator`:
   for record in ArchiveIterator('warcfile.warc.gz'):
       print(record.record_id)
 
-This will iterate over all records in the file and print out their IDs. You can pass any file-like Python object or a file path as a string to :class:`.ArchiveIterator`. The stream or file can be either uncompressed or a Gzip-, Zstd-, or LZ4-compressed WARC. FastWARC will try to auto-detect the stream format (unless you pass `stream_detect=False`). But if you already know the compression algorithm beforehand, you can optimize the process a little by explicitly passing a :class:`.GzipReader`, :class:`.ZstdReader`, or :class:`.LZ4Reader` object instead:
+This will iterate over all records in the file and print out their IDs. You can pass any file-like Python object or a file path as a string to :class:`.ArchiveIterator`. The stream or file can be either uncompressed or a Gzip-, Zstd-, or LZ4-compressed WARC. FastWARC will try to auto-detect the stream format (unless you pass ``stream_detect=False``). But if you already know the compression algorithm beforehand, you can optimize the process a little by explicitly passing a :class:`.GzipReader`, :class:`.ZstdReader`, or :class:`.LZ4Reader` object instead:
 
 .. code-block:: python
 
@@ -347,4 +347,4 @@ The :ref:`fastwarc-cli` comes with a benchmarking tool for measuring WARC record
 (Direct comparison not possible, since WARCIO does not support LZ4.)
 
 The read benchmarking tool has additional options, such as reading WARCs directly from a remote S3 data source
-using `Boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/index.html>`_.
+using `Boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/index.html>`__.

@@ -9,7 +9,7 @@ Utilities for detecting and working with (potentially broken) text encodings.
 
 Character Encoding Detection
 ----------------------------
-Resiliparse provides fast and accurate text encoding detection with :class:`~.parse.encoding.EncodingDetector`, a wrapper around the `uchardet <https://github.com/freedesktop/uchardet>`_ library, which is based on Mozilla's *Universal Charset Detector*.
+Resiliparse provides fast and accurate text encoding detection with :class:`~.parse.encoding.EncodingDetector`, a wrapper around the `uchardet <https://github.com/freedesktop/uchardet>`__ library, which is based on Mozilla's *Universal Charset Detector*.
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ As a convenience shortcut, Resiliparse also provides :func:`~.parse.encoding.det
 Map Encodings to WHATWG Specification
 -------------------------------------
 Before decoding the contents of a web page with an encoding that was extracted from either the HTTP ``Content-Type`` header or the HTML body itself, it often makes sense to remap the encoding according to `WHATWG encoding specification
-<https://encoding.spec.whatwg.org/#names-and-labels>`_. The WHATWG mapping is designed to boil down the many possible encoding names to a smaller subset of canonical names while taking into account common encoding mislabelling practices. The mapping is primarily designed for author-supplied encoding names, but it also makes sense to apply it to auto-detected encoding names, since it remaps some encodings based on observed practices on the web, such as the mapping from ISO-8859-1 to Windows-1252, which is more likely to be correct, even if both are possible. You can remap a given encoding name as follows:
+<https://encoding.spec.whatwg.org/#names-and-labels>`__. The WHATWG mapping is designed to boil down the many possible encoding names to a smaller subset of canonical names while taking into account common encoding mislabelling practices. The mapping is primarily designed for author-supplied encoding names, but it also makes sense to apply it to auto-detected encoding names, since it remaps some encodings based on observed practices on the web, such as the mapping from ISO-8859-1 to Windows-1252, which is more likely to be correct, even if both are possible. You can remap a given encoding name as follows:
 
 .. code-block:: python
 

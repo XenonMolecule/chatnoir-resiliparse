@@ -376,7 +376,7 @@ Resiliparse supports DOM manipulation and the creation of new nodes with a basic
 
 .. warning::
 
-  A :class:`.DOMNode` object is valid only for as long as its parent tree has not been modified or deallocated. Thus, **DO NOT** use existing instances after any sort of DOM tree manipulation! Doing so may result in Python crashes or (worse) security vulnerabilities due to dangling pointers (*use after free*). This is a `known Lexbor limitation <https://github.com/lexbor/lexbor/issues/132>`_ for which there is no workaround at the moment.
+  A :class:`.DOMNode` object is valid only for as long as its parent tree has not been modified or deallocated. Thus, **DO NOT** use existing instances after any sort of DOM tree manipulation! Doing so may result in Python crashes or (worse) security vulnerabilities due to dangling pointers (*use after free*). This is a `known Lexbor limitation <https://github.com/lexbor/lexbor/issues/132>`__ for which there is no workaround at the moment.
 
 Elements
 ^^^^^^^^
@@ -476,7 +476,7 @@ An easier, but less efficient way of manipulating the DOM is to assign a string 
 Benchmarks
 ----------
 
-The :ref:`resiliparse-cli` parser comes with a small HTML parser benchmarking tool that can measure the parsing engine's performance and compare it to other Python HTML parsing libraries. Supported third-party libraries are `Selectolax <https://github.com/rushter/selectolax>`_ (both the old MyHTML and the new Lexbor engine) and `BeautifulSoup4 <https://www.crummy.com/software/BeautifulSoup/bs4/doc/>`_ (lxml engine only, which is the fastest BS4 backend).
+The :ref:`resiliparse-cli` parser comes with a small HTML parser benchmarking tool that can measure the parsing engine's performance and compare it to other Python HTML parsing libraries. Supported third-party libraries are `Selectolax <https://github.com/rushter/selectolax>`__ (both the old MyHTML and the new Lexbor engine) and `BeautifulSoup4 <https://www.crummy.com/software/BeautifulSoup/bs4/doc/>`__ (lxml engine only, which is the fastest BS4 backend).
 
 Here are the results of extracting the titles from all web pages in an uncompressed 42,015-document WARC file on a Ryzen Threadripper 2920X machine:
 

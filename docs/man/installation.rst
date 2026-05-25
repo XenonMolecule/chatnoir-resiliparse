@@ -7,7 +7,7 @@ Installation Instructions
 
   These installation instructions are for the main Resiliparse module. For installing FastWARC, see :ref:`fastwarc-installation`.
 
-Pre-built Resiliparse binaries can be installed from `PyPi <https://pypi.org/project/Resiliparse/>`_:
+Pre-built Resiliparse binaries can be installed from `PyPi <https://pypi.org/project/Resiliparse/>`__:
 
 .. code-block:: console
 
@@ -23,7 +23,7 @@ To install the Resiliparse CLI and its dependencies, install the package with th
 Building Resiliparse From Source
 --------------------------------
 
-You can compile Resiliparse either from the `PyPi <https://pypi.org/project/Resiliparse/>`_ source package or directly from the `Github repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`_.
+You can compile Resiliparse either from the `PyPi <https://pypi.org/project/Resiliparse/>`__source package or directly from the `Github repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`_.
 
 In either case, you need to install all required build-time dependencies listed in `vcpkg.json`. It's possible to install them globally via your package manager, but the easiest and most consistent way is to use [vcpkg](https://vcpkg.io/en/):
 
