@@ -1,0 +1,2 @@
+fastwarc.cli
+fastwarc.legacy.*

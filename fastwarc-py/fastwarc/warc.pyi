@@ -15,11 +15,43 @@
 from datetime import datetime
 from enum import IntFlag
 from os import PathLike
-from typing import BinaryIO, Callable, Dict, Iterable, Iterator, Literal, Optional, Self, Tuple, Union
+from typing import BinaryIO, Callable, Dict, final, Iterable, Iterator, Literal, Optional, Self, Tuple, Union
+from typing_extensions import disjoint_base
 
 from .stream_io import _GenericReader, _GenericWriter, WarcReader, WarcWriter
 
+__all__ = [
+    'WarcRecordType',
+    'WarcRecord',
+    'ArchiveIterator',
+    'HeaderMap',
+    'WarcHeaderMap',
+    'WarcRecordPayloadReader',
 
+    'warcinfo',
+    'response',
+    'resource',
+    'request',
+    'metadata',
+    'revisit',
+    'conversion',
+    'continuation',
+    'unknown',
+    'any_type',
+    'no_type',
+
+    'is_warc_10',
+    'is_warc_11',
+    'has_block_digest',
+    'has_valid_block_digest',
+    'has_payload_digest',
+    'has_valid_payload_digest',
+    'is_http',
+    'is_concurrent',
+]
+
+
+@final
 class WarcRecordType(IntFlag):
     warcinfo = 2
     response = 4
@@ -37,11 +69,17 @@ class WarcRecordType(IntFlag):
 
     def __index__(self) -> int: ...
 
+    def __and__(self, other: int, /) -> Self: ...
+
+    def __or__(self, other: int, /) -> Self: ...
+
+    def __xor__(self, other: int, /) -> Self: ...
+
     def __str__(self) -> str:
-        return self.name
+        return self.name or str(self.value)
 
     def __repr__(self) -> str:
-        return self.name
+        return self.name or str(self.value)
 
 
 warcinfo = WarcRecordType.warcinfo
@@ -57,6 +95,7 @@ no_type = WarcRecordType.no_type
 any_type = WarcRecordType.any_type
 
 
+@final
 class HeaderMap:
     def __new__(cls, encoding: str = "utf-8") -> Self: ...
 
@@ -134,19 +173,19 @@ class HeaderMap:
 
     def values_bytes(self) -> Tuple[bytes, ...]: ...
 
-    def __getitem__(self, item: str) -> str: ...
+    def __getitem__(self, item: str, /) -> str: ...
 
     def __iter__(self) -> Iterator[Tuple[str, str]]: ...
 
     def __len__(self) -> int: ...
 
-    def __setitem__(self, key: str, value: str): ...
+    def __setitem__(self, key: str, value: str, /): ...
 
-    def __contains__(self, item: str) -> bool: ...
+    def __contains__(self, item: str, /) -> bool: ...
 
-    def __eq__(self, other) -> bool: ...
+    def __eq__(self, other, /) -> bool: ...
 
-    def __ne__(self, other) -> bool: ...
+    def __ne__(self, other, /) -> bool: ...
 
     def __str__(self) -> str: ...
 
@@ -163,12 +202,14 @@ class HeaderMap:
 WarcHeaderMap = HeaderMap
 
 
+@final
 class WarcRecordPayloadReader(WarcReader):
     def readline(self, max_line_len: int = 8192) -> bytes: ...
 
-    def consume(self, size: int = -1) -> int: ...
+    def consume(self, size: int = ...) -> int: ...
 
 
+@disjoint_base
 class WarcRecord:
     def __new__(cls) -> Self: ...
 
@@ -229,9 +270,8 @@ class WarcRecord:
     @property
     def is_frozen(self) -> bool: ...
 
-    def init_headers(
-            self, content_length: int = 0, record_type: WarcRecordType = no_type, record_urn: Optional[bytes] = None
-    ): ...
+    def init_headers(self, record_type: WarcRecordType = ..., record_urn: bytes | None = None, *,
+                     content_length: int | None = None): ...
 
     def freeze(self) -> bool: ...
 
@@ -239,11 +279,12 @@ class WarcRecord:
 
     def set_bytes_payload(self, content: bytes): ...
 
-    def consume(self, n: Optional[int] = None) -> int: ...
+    def consume(self, n: int | None = None) -> int: ...
 
     def parse_warc_headers(self, quirks_mode: bool = False) -> int: ...
 
-    def parse_http(self, auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none'): ...
+    def parse_http(self, auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none', *,
+                   strict_mode: bool = True): ...
 
     def verify_block_digest(self, consume: bool = False) -> bool: ...
 
@@ -268,20 +309,23 @@ class WarcRecord:
     def __setstate__(self, state: Tuple[bytes, bool]): ...
 
 
+@final
 class ArchiveIterator(Iterable[WarcRecord]):
     def __new__(
             cls,
-            stream: Union[WarcReader, BinaryIO, _GenericReader, PathLike, str],
+            stream: WarcReader | BinaryIO | _GenericReader | PathLike | str,
             record_types: WarcRecordType = any_type,
             parse_http: bool = True,
-            min_content_length: int = -1,
-            max_content_length: int = -1,
-            func_filter: Optional[Callable[[WarcRecord], bool]] = None,
+            min_content_length: int | None = None,
+            max_content_length: int | None = None,
+            func_filter: Callable[[WarcRecord], bool] | None = None,
             verify_digests: bool = False,
             quirks_mode: bool = False,
             auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none',
             stream_detect: bool = True,
             fsspec_args=None,
+            *,
+            strict_mode: bool = True
     ) -> Self: ...
 
     def __iter__(self) -> Iterator[WarcRecord]: ...

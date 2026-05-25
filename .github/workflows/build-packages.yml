@@ -144,6 +144,26 @@ jobs:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
+  check-mypy:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/chatnoir-eu/resiliparse-manylinux_2_28_x86_64:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install mypy
+        run: python -m pip install mypy
+
+      - name: Build FastWARC
+        run: pip install -e "fastwarc-py[all,test]"
+
+      - name: Check stubs
+        run: |
+          set -e
+          cd fastwarc-py
+          stubtest fastwarc --mypy-config-file pyproject.toml --allowlist=stubtest-allowlist.txt
+
   build-sdist:
     runs-on: ubuntu-latest
     steps:

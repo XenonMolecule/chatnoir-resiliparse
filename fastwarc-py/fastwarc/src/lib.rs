@@ -105,7 +105,7 @@ pub mod _warc {
     }
 
     #[pymodule_export]
-    pub use crate::warc::{ArchiveIteratorPy, HeaderMapPy, WarcRecordPy, WarcRecordTypePy};
+    pub use crate::warc::{ArchiveIteratorPy, HeaderMapPy, WarcRecordPayloadReaderPy, WarcRecordPy, WarcRecordTypePy};
 
     #[pymodule_export]
     pub use crate::warc::{

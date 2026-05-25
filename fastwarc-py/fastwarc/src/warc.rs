@@ -425,6 +425,7 @@ impl HeaderMapPy {
         PyTuple::new(py, items)
     }
 
+    #[pyo3(signature = (key, default=None))]
     pub fn get_bytes<'py>(
         &self,
         py: Python<'py>,
@@ -571,7 +572,7 @@ impl HeaderMapPy {
 /// record belongs to an active :class:`ArchiveIterator`, the reader becomes stale
 /// once iteration advances unless the record has been :meth:`WarcRecord.freeze`d.
 #[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy)]
-struct WarcRecordPayloadReaderPy {
+pub struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,
 }
 
@@ -656,9 +657,9 @@ impl WarcRecordPayloadReaderPy {
 
 /// A WARC record.
 ///
-/// WARC records are picklable. Pickling preserves the current record state,
+/// WARC records are pickleable. Pickling preserves the current record state,
 /// including parsed HTTP headers if they have already been parsed.
-#[pyclass(name = "WarcRecord", module = "fastwarc.warc")]
+#[pyclass(name = "WarcRecord", subclass, module = "fastwarc.warc")]
 pub struct WarcRecordPy {
     inner: Arc<Mutex<WarcRecord>>,
 }
