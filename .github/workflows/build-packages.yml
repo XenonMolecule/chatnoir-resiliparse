@@ -16,7 +16,7 @@ on:
       - develop
 
 env:
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.14"
   FORCE_COLOR: "1"
   MACOSX_DEPLOYMENT_TARGET: "12.0"
 
@@ -370,6 +370,11 @@ jobs:
         with:
           name: sdist
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Publish to PyPi
         env:
           TWINE_USERNAME: __token__
@@ -378,10 +383,10 @@ jobs:
         run: |
           set -ex
 
-          python3 -m pip install twine
+          python${PYTHON_VERSION} -m pip install --upgrade twine
 
-          TWINE_PASSWORD="$TWINE_PASSWORD1" python3 -m twine upload fastwarc-*.whl fastwarc-*.tar.gz
-          TWINE_PASSWORD="$TWINE_PASSWORD2" python3 -m twine upload resiliparse-*.whl resiliparse-*.tar.gz
+          TWINE_PASSWORD="$TWINE_PASSWORD1" python${PYTHON_VERSION} -m twine upload fastwarc-*.whl fastwarc-*.tar.gz
+          TWINE_PASSWORD="$TWINE_PASSWORD2" python${PYTHON_VERSION} -m twine upload resiliparse-*.whl resiliparse-*.tar.gz
 
       - name: Wait
         run: sleep 120
