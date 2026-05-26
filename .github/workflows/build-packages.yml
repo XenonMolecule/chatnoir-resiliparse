@@ -384,7 +384,7 @@ jobs:
           TWINE_PASSWORD="$TWINE_PASSWORD2" python3 -m twine upload resiliparse-*.whl resiliparse-*.tar.gz
 
       - name: Wait
-        run: sleep 30
+        run: sleep 120
 
       - name: Trigger Readthedocs Build
         uses: dfm/rtds-action@v1
