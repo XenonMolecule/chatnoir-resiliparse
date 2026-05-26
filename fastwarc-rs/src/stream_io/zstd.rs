@@ -27,7 +27,7 @@ pub struct ZstdReader<T: ReadSeek> {
     inner: Option<BufReader<Decoder<'static, BufReader<T>>>>,
     dict: Option<Vec<u8>>,
     stream_pos: u64,
-    frame_start_pos: u64,
+    frame_start_pos: Option<u64>,
 }
 
 pub use ::zstd::dict::from_continuous as train_dictionary_from_continuous;
@@ -81,7 +81,7 @@ impl<T: ReadSeek> ZstdReader<T> {
     /// * `inner` - input (inner) stream to read from
     /// * `options` - reader options
     pub fn with_options(inner: T, options: ZstdReaderOptions) -> Self {
-        Self::_with_dict_options_internal(inner, None, Some(options))
+        Self::with_dict_options_internal(inner, None, Some(options))
     }
 
     /// Create a new [`ZstdReader`] with the supplied decompression dictionary and options.
@@ -96,13 +96,11 @@ impl<T: ReadSeek> ZstdReader<T> {
     /// * `dict` - zstd dictionary
     /// * `options` - reader options
     pub fn with_dictionary(inner: T, dict: Vec<u8>, options: Option<ZstdReaderOptions>) -> Self {
-        Self::_with_dict_options_internal(inner, Some(dict), options)
+        Self::with_dict_options_internal(inner, Some(dict), options)
     }
 
-    fn _with_dict_options_internal(mut inner: T, dict: Option<Vec<u8>>, options: Option<ZstdReaderOptions>) -> Self {
+    fn with_dict_options_internal(inner: T, dict: Option<Vec<u8>>, options: Option<ZstdReaderOptions>) -> Self {
         let options = options.unwrap_or_default();
-
-        let member_pos = inner.stream_position().unwrap_or(0);
         let decoder = if let Some(dict) = &dict {
             // zstd_safe::DCtx::in_size() is used as buffer size in Decoder::new()
             Decoder::with_dictionary(BufReader::with_capacity(zstd_safe::DCtx::in_size(), inner), dict)
@@ -116,7 +114,7 @@ impl<T: ReadSeek> ZstdReader<T> {
             inner: Some(BufReader::with_capacity(options.capacity, decoder)),
             dict,
             stream_pos: 0,
-            frame_start_pos: member_pos,
+            frame_start_pos: None,
         }
     }
 
@@ -197,15 +195,16 @@ impl<T: ReadSeek> ZstdReader<T> {
         }
         .single_frame();
         self.inner = Some(BufReader::with_capacity(capacity, decoder));
-        self.frame_start_pos = mpos;
+        self.frame_start_pos = Some(mpos);
         Ok(mpos)
     }
 
     /// Internal: Load dictionary frame at stream start if one is available and
     /// no explicit dictionary was supplied by the user.
     fn maybe_load_dict_frame(&mut self) -> io::Result<()> {
+        let frame_start_pos = self.ensure_frame_start_pos()?;
         if self.stream_pos == 0
-            && self.frame_start_pos == 0
+            && frame_start_pos == 0
             && self.dict.is_none()
             && let Some(dict) = self.read_dict_frame()?
         {
@@ -213,6 +212,14 @@ impl<T: ReadSeek> ZstdReader<T> {
             self.reset_decoder(None)?;
         }
         Ok(())
+    }
+
+    /// Internal: Lazily load the frame start position from the inner stream (needs to be run as early as possible!)
+    fn ensure_frame_start_pos(&mut self) -> io::Result<u64> {
+        if self.frame_start_pos.is_none() {
+            self.frame_start_pos = Some(self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()?);
+        }
+        Ok(self.frame_start_pos.unwrap())
     }
 
     /// Internal: Ensure that more data can be read and reset Decoder at frame boundaries.
@@ -278,7 +285,7 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let new_pos = self.reset_decoder(Some(pos))?;
         self.stream_pos = 0;
-        self.frame_start_pos = new_pos;
+        self.frame_start_pos = Some(new_pos);
         Ok(new_pos)
     }
 
@@ -287,7 +294,8 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
     }
 
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
-        Ok(Some(self.frame_start_pos))
+        self.ensure_frame_start_pos()?;
+        Ok(self.frame_start_pos)
     }
 
     fn is_stream_decoder(&self) -> bool {

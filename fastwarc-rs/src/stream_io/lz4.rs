@@ -26,7 +26,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 pub struct Lz4Reader<T: ReadSeek> {
     inner: Option<FrameDecoder<BufReader<T>>>,
     stream_pos: u64,
-    frame_start_pos: u64,
+    frame_start_pos: Option<u64>,
 }
 
 /// Options for constructing a new [`Lz4Reader`].
@@ -73,12 +73,11 @@ impl<T: ReadSeek> Lz4Reader<T> {
     ///
     /// * `inner` - input (inner) stream to read from
     /// * `options` - reader options
-    pub fn with_options(mut inner: T, options: Lz4ReaderOptions) -> Self {
-        let member_pos = inner.stream_position().unwrap_or(0);
+    pub fn with_options(inner: T, options: Lz4ReaderOptions) -> Self {
         Self {
             inner: Some(FrameDecoder::new(BufReader::with_capacity(options.capacity, inner))),
             stream_pos: 0,
-            frame_start_pos: member_pos,
+            frame_start_pos: None,
         }
     }
 
@@ -89,11 +88,20 @@ impl<T: ReadSeek> Lz4Reader<T> {
         self.inner.unwrap().into_inner().into_inner()
     }
 
+    /// Internal: Lazily load the frame start position from the inner stream (needs to be run as early as possible!)
+    fn ensure_frame_start_pos(&mut self) -> io::Result<u64> {
+        if self.frame_start_pos.is_none() {
+            self.frame_start_pos = Some(self.inner.as_mut().unwrap().get_mut().stream_position()?);
+        }
+        Ok(self.frame_start_pos.unwrap())
+    }
+
     /// Internal: Helper for syncing decoder state with LZ4 frame boundaries.
     /// This needs to be called in `fill_buf()` to not terminate early and in
     /// `stream_position()` to not get incorrect values (usually off by the four
     /// bytes at the end of a frame).
     fn sync_next_frame(&mut self) -> io::Result<()> {
+        self.ensure_frame_start_pos()?;
         if self.stream_pos == 0 {
             return Ok(());
         }
@@ -109,7 +117,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
             let old_pos = self.stream_pos;
             let new_pos = self.inner_seek(SeekFrom::Current(0))?;
             self.stream_pos = old_pos;
-            self.frame_start_pos = new_pos;
+            self.frame_start_pos = Some(new_pos);
         }
 
         Ok(())
@@ -157,7 +165,7 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
         let mut inner = self.inner.take().unwrap().into_inner();
         let new_pos = inner.seek(pos)?;
         self.inner = Some(FrameDecoder::new(inner));
-        self.frame_start_pos = new_pos;
+        self.frame_start_pos = Some(new_pos);
         self.stream_pos = 0;
         Ok(new_pos)
     }
@@ -168,7 +176,7 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
     }
 
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
-        Ok(Some(self.frame_start_pos))
+        Ok(self.frame_start_pos)
     }
 
     fn is_stream_decoder(&self) -> bool {
