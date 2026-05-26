@@ -170,8 +170,8 @@ impl From<WarcRecordType> for &'static str {
 pub struct CaseInsensitiveKey<'a>(Cow<'a, str>);
 
 /// Helper shorthand for constructing a [`CaseInsensitiveKey`] from a string slice.
-pub fn ci(s: &'_ str) -> CaseInsensitiveKey<'_> {
-    CaseInsensitiveKey::from(s)
+pub fn ci<S: AsRef<str> + ?Sized>(s: &S) -> CaseInsensitiveKey<'_> {
+    CaseInsensitiveKey::from(s.as_ref())
 }
 
 impl PartialEq for CaseInsensitiveKey<'_> {
@@ -411,7 +411,8 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `status_line` - New status line
-    pub fn set_status_line_bytes(&mut self, status_line: &[u8]) {
+    pub fn set_status_line_bytes(&mut self, status_line: impl AsRef<[u8]>) {
+        let status_line = status_line.as_ref();
         let mut status_line_sanitized = Vec::with_capacity(status_line.len());
         status_line_sanitized.extend(_sanitize_header_value(status_line, true));
         self.status_line = Some(status_line_sanitized);
@@ -487,7 +488,8 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `key` - Header key
-    pub fn get_bytes(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
+    pub fn get_bytes(&self, key: impl AsRef<[u8]>) -> Option<Cow<'_, [u8]>> {
+        let key = key.as_ref();
         self.headers
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(key))
@@ -501,7 +503,8 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `key` - Header key as bytes
-    pub fn get_bytes_multiple(&self, key: &[u8]) -> Vec<Cow<'_, [u8]>> {
+    pub fn get_bytes_multiple(&self, key: impl AsRef<[u8]>) -> Vec<Cow<'_, [u8]>> {
+        let key = key.as_ref();
         self.headers
             .iter()
             .filter(|(k, _)| k.eq_ignore_ascii_case(key))
@@ -526,7 +529,8 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `key` - Header key as bytes
-    pub fn contains_key_bytes(&self, key: &[u8]) -> bool {
+    pub fn contains_key_bytes(&self, key: impl AsRef<[u8]>) -> bool {
+        let key = key.as_ref();
         self.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case(key))
     }
 
@@ -562,7 +566,9 @@ impl HeaderMap {
     ///
     /// * `key` - Header key as bytes
     /// * `value` - Header value as bytes
-    pub fn set_bytes(&mut self, key: &[u8], value: &[u8]) {
+    pub fn set_bytes(&mut self, key: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
+        let key = key.as_ref();
+        let value = value.as_ref();
         let mut key_lower = Vec::with_capacity(key.len());
         key_lower.extend(_sanitize_header_value(&key.to_ascii_lowercase(), true));
 
@@ -612,7 +618,9 @@ impl HeaderMap {
     ///
     /// * `key` - Header key as bytes
     /// * `value` - Header value as bytes
-    pub fn append_bytes(&mut self, key: &[u8], value: &[u8]) {
+    pub fn append_bytes(&mut self, key: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
+        let key = key.as_ref();
+        let value = value.as_ref();
         self.headers
             .push((_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
     }
@@ -644,7 +652,8 @@ impl HeaderMap {
     }
 
     /// Remove a header if it exists.
-    pub fn remove_bytes(&mut self, key: &[u8]) {
+    pub fn remove_bytes(&mut self, key: impl AsRef<[u8]>) {
+        let key = key.as_ref();
         let key = _sanitize_header_value(key, true);
         self.headers.retain(|(k, _)| !k.eq_ignore_ascii_case(key.as_slice()));
     }
@@ -1344,14 +1353,12 @@ impl WarcRecord {
     pub fn set_is_http(&mut self, is_http: bool) {
         self.is_http = is_http;
         if self.is_http {
-            self.headers.set_bytes(
-                b"Content-Type",
-                match self.record_type {
-                    WarcRecordType::Request => b"application/http; msgtype=request",
-                    WarcRecordType::Response => b"application/http; msgtype=response",
-                    _ => b"application/http",
-                },
-            );
+            let content_type: &[u8] = match self.record_type {
+                WarcRecordType::Request => b"application/http; msgtype=request",
+                WarcRecordType::Response => b"application/http; msgtype=response",
+                _ => b"application/http",
+            };
+            self.headers.set_bytes(b"Content-Type", content_type);
         }
     }
 
