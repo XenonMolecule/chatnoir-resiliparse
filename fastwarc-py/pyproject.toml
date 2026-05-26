@@ -41,7 +41,7 @@ test = [
 fastwarc = "fastwarc.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["fastwarc*"]
+include = ["fastwarc", "fastwarc.legacy"]
 
 [tool.setuptools.package-data]
 "*" = ["*.pyi"]
