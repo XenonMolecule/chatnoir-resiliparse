@@ -356,7 +356,7 @@ jobs:
 
   publish-crates:
     runs-on: ubuntu-latest
-    # if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [ build-rust, build-wheels, build-sdist, build-asan, build-documentation, check-mypy ]
     steps:
       - name: Checkout
