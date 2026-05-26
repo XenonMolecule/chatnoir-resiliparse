@@ -259,7 +259,7 @@ jobs:
           python${PYTHON_VERSION} -m pytest --cov --cov-report xml:pytest-coverage.xml --junitxml=pytest-report.junit.xml tests/
           
           # Generate Rust coverage report
-          cargo llvm-cov report --lcov --output-path cargo-coverage.lcov
+          cargo llvm-cov report --lcov --output-path cargo-coverage.info
 
       # We cannot use the Codecov GitHub action due to incompatible Glibc versions
       - name: Upload to Codecov
@@ -290,7 +290,7 @@ jobs:
           # Upload coverage
           python${PYTHON_VERSION} -m codecov_cli.main upload-process \
             --file pytest-coverage.xml \
-            --file cargo-coverage.lcov \
+            --file cargo-coverage.info \
             --disable-search  \
             --report-type coverage \
             --sha ${{ github.event.pull_request.head.sha || github.sha }} \
@@ -307,7 +307,7 @@ jobs:
           path: |
             pytest-report.junit.xml
             pytest-coverage.xml
-            cargo-coverage.lcov
+            cargo-coverage.info
 
   build-documentation:
     runs-on: ubuntu-latest
