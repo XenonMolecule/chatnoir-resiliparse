@@ -27,7 +27,8 @@ all = [
     "resiliparse[beam,cli]"
 ]
 beam = [
-    "apache_beam[aws]>=2.37.0; python_version<'3.15'",
+    # apache_beam on 3.14t requires building grpcio
+    "apache_beam[aws]>=2.37.0; python_version<'3.14'",
     "boto3>=1.9",
     "elasticsearch>=7.0.0"
 ]

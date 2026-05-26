@@ -331,8 +331,7 @@ jobs:
         shell: bash
         run: |
           set -ex
-
-          python${PYTHON_VERSION} -m pip install twine
+          
           grep -vE "fastwarc|resiliparse" docs/requirements.txt | xargs python${PYTHON_VERSION} -m pip install
 
           PYTHON_ABI="$(python${PYTHON_VERSION} -c 'from packaging.tags import sys_tags; print(next(iter(sys_tags())).interpreter)')"
