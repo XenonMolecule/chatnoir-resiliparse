@@ -160,7 +160,7 @@ jobs:
 
       - name: Check stubs
         run: |
-          set -e
+          set -ex
           cd fastwarc-py
           python${PYTHON_VERSION} -m mypy.stubtest fastwarc --mypy-config-file pyproject.toml --allowlist=stubtest-allowlist.txt
 
@@ -208,7 +208,7 @@ jobs:
 
       - name: Build Extensions
         run: |
-          set -e
+          set -ex
           python${PYTHON_VERSION} -m pip install -e "fastwarc-py[all,test]"
           python${PYTHON_VERSION} -m pip install -e "resiliparse-py[all,test]"
 
@@ -233,7 +233,7 @@ jobs:
       - name: Build Extensions
         shell: bash
         run: |
-          set -e
+          set -ex
           
           # Set up llvm-cov env
           source <(cargo llvm-cov show-env --sh)
@@ -246,7 +246,7 @@ jobs:
       - name: Run Tests
         shell: bash
         run: |
-          set -e
+          set -ex
           
           # Set up llvm-cov env
           source <(cargo llvm-cov show-env --sh)
@@ -268,7 +268,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           TOKENLESS: ${{ github.event.pull_request.head.label }}
         run: |
-          set -e
+          set -ex
 
           PR=""
           if [ -n '${{ github.event.pull_request.head.sha }}' ]; then
@@ -312,8 +312,6 @@ jobs:
   build-documentation:
     runs-on: ubuntu-latest
     needs: build-wheels
-    env:
-      BUILD_DOCS_IGNORE_SOURCE_TREE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -330,15 +328,20 @@ jobs:
           path: wheelhouse
 
       - name: Build Documentation
+        shell: bash
         run: |
-          set -e
+          set -ex
 
-          python -m pip install twine
-          grep -vE "fastwarc|resiliparse" docs/requirements.txt | xargs python -m pip install
+          python${PYTHON_VERSION} -m pip install twine
+          grep -vE "fastwarc|resiliparse" docs/requirements.txt | xargs python${PYTHON_VERSION} -m pip install
 
-          PYTHON_ABI="cp${PYTHON_VERSION/./}"
-          find wheelhouse -name "fastwarc-*-${PYTHON_ABI}-*-manylinux_x86_64.whl" | xargs -I% python -m pip install "%[all]"
-          find wheelhouse -name "resiliparse-*-${PYTHON_ABI}-*-manylinux_x86_64.whl" | xargs -I% python -m pip install "%[all]"
+          PYTHON_ABI="$(python${PYTHON_VERSION} -c 'from packaging.tags import sys_tags; print(next(iter(sys_tags())).interpreter)')"
+          
+          find wheelhouse -name "fastwarc-*-${PYTHON_ABI}-*-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
+          python${PYTHON_VERSION} -c 'import fastwarc' 2> /dev/null || { echo 'No FastWARC wheel matched architecture'; exit 1; }
+          
+          find wheelhouse -name "resiliparse-*-${PYTHON_ABI}-*-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
+          python${PYTHON_VERSION} -c 'import resiliparse' 2> /dev/null || { echo 'No Resiliparse wheel matched architecture'; exit 1; }
 
           cd docs
           make html
@@ -373,7 +376,7 @@ jobs:
           TWINE_PASSWORD1: ${{ secrets.PYPI_FASTWARC_API_TOKEN }}
           TWINE_PASSWORD2: ${{ secrets.PYPI_RESILIPARSE_API_TOKEN }}
         run: |
-          set -e
+          set -ex
 
           python3 -m pip install twine
 

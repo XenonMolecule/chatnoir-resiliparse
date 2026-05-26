@@ -15,15 +15,15 @@ import datetime
 import importlib
 from importlib.abc import MetaPathFinder
 from importlib.machinery import EXTENSION_SUFFIXES, ModuleSpec, SourceFileLoader
-import os
+from pathlib import Path
 import re
 import sys
 
-src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if not os.environ.get("BUILD_DOCS_IGNORE_SOURCE_TREE"):
+src_dir = Path(__file__).parent.parent.absolute()
+if src_dir.joinpath('fastwarc-py', 'fastwarc', f'_fastwarc{EXTENSION_SUFFIXES[0]}').is_file():
     sys.path[:0] = [
-        os.path.join(src_dir, 'resiliparse-py'),
-        os.path.join(src_dir, 'fastwarc-py')
+        str(src_dir.joinpath('resiliparse-py')),
+        str(src_dir.joinpath('fastwarc-py'))
     ]
 
 # -- Project information -----------------------------------------------------
@@ -32,7 +32,7 @@ project = 'ChatNoir Resiliparse'
 copyright = f'2021-{datetime.datetime.today().year}, Janek Bevendorff'
 author = 'Janek Bevendorff'
 release = re.search(r'^version\s*=\s*"([\d.]+)"$',
-                    open(os.path.join(src_dir, 'resiliparse-py', 'pyproject.toml')).read(), re.M).group(1)
+                    open(src_dir.joinpath('resiliparse-py', 'pyproject.toml')).read(), re.M).group(1)
 master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------
@@ -43,10 +43,8 @@ master_doc = 'index'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx_click',
-    'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
     'sphinx_substitution_extensions',
-    # 'sphinx_autodoc_typehints',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -90,10 +88,10 @@ html_css_files = [
 
 # -- Stub patching -----------------------------------------------------------
 
-_fastwarc_pkg_dir = os.path.join(src_dir, 'fastwarc-py', 'fastwarc')
+_fastwarc_pkg_dir = src_dir.joinpath('fastwarc-py', 'fastwarc')
 _STUBBED_NATIVE_MODULES = {
-    'fastwarc.warc': os.path.join(_fastwarc_pkg_dir, 'warc.pyi'),
-    'fastwarc.stream_io': os.path.join(_fastwarc_pkg_dir, 'stream_io.pyi'),
+    'fastwarc.warc': _fastwarc_pkg_dir.joinpath('warc.pyi'),
+    'fastwarc.stream_io': _fastwarc_pkg_dir.joinpath('stream_io.pyi'),
 }
 
 
@@ -109,20 +107,20 @@ class _NativeStubFinder(MetaPathFinder):
         self.pyi_paths = module_specs
 
     def find_spec(self, fullname, path=None, target=None):
-        pyi_file = self.pyi_paths.get(fullname)
+        pyi_file: Path = self.pyi_paths.get(fullname)
         if pyi_file is None:
             return None
 
-        mock_native_lib_path = pyi_file.rsplit('.', 1)[0] + EXTENSION_SUFFIXES[0]
+        mock_native_lib_path = str(pyi_file.parent.joinpath(pyi_file.stem + EXTENSION_SUFFIXES[0]))
         return ModuleSpec(
             fullname,
-            SourceFileLoader(fullname, pyi_file),
+            SourceFileLoader(fullname, str(pyi_file)),
             origin=mock_native_lib_path
         )
 
 
 def _copy_docstring(src, dst):
-    if not getattr(dst, '__doc__', None) and getattr(src, '__doc__', None):
+    if dst is not None and not getattr(dst, '__doc__', None) and getattr(src, '__doc__', None):
         dst.__doc__ = src.__doc__
 
 
@@ -169,11 +167,12 @@ def setup(_):
     sys.meta_path.insert(0, _NativeStubFinder(_STUBBED_NATIVE_MODULES))
 
     def import_module(modname, try_reload=False):
-        if modname not in _STUBBED_NATIVE_MODULES:
-            return original_importer(modname, try_reload=try_reload)
-
-        # Load new module and copy docstrings from original module
+        # Load new module
         module = original_importer(modname, try_reload=try_reload)
+        if modname not in _STUBBED_NATIVE_MODULES:
+            return module
+
+        #  Copy docstrings from original module
         _copy_docstring(native_mods[modname], module)
         for name, member in vars(module).items():
             native_member = getattr(native_mods[modname], name, None)

@@ -8,7 +8,7 @@ name = "Resiliparse"
 version = "1.0.0"
 description = "A collection of robust and fast processing tools for parsing and analyzing (not only) web archive data."
 authors = [
-  { name = "Janek Bevendorff" }
+    { name = "Janek Bevendorff" }
 ]
 license = { text = "Apache License 2.0" }
 # TODO: Replace with this once we deprecate Python 3.8 and upgrade to setuptools 77:
@@ -16,7 +16,7 @@ license = { text = "Apache License 2.0" }
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-  "fastwarc==1.0.0"
+    "fastwarc==1.0.0"
 ]
 
 [project.urls]
@@ -26,27 +26,27 @@ documentation = "https://resiliparse.chatnoir.eu"
 
 [project.optional-dependencies]
 all = [
-  "resiliparse[beam,cli]"
+    "resiliparse[beam,cli]"
 ]
 beam = [
-  "apache_beam[aws]>=2.37.0; python_version<'3.12'",
-  "boto3>=1.9",
-  "elasticsearch>=7.0.0"
+    "apache_beam[aws]>=2.37.0; python_version<'3.14'",
+    "boto3>=1.9",
+    "elasticsearch>=7.0.0"
 ]
 cli = [
-  "click",
-  "joblib",
-  "tqdm"
+    "click",
+    "joblib",
+    "tqdm"
 ]
 cli-benchmark = [
-  "beautifulsoup4",
-  "langid",
-  "selectolax"
+    "beautifulsoup4",
+    "langid",
+    "selectolax"
 ]
 test = [
-  "resiliparse[all]",
-  "pytest>=7.2.2",
-  "pytest-cov>=4.0.0"
+    "resiliparse[all]",
+    "pytest>=7.2.2",
+    "pytest-cov>=4.0.0"
 ]
 
 [project.scripts]

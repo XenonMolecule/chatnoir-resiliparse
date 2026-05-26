@@ -2,6 +2,5 @@ fastwarc[all]
 resiliparse[all]
 sphinx
 sphinx-click
-sphinxcontrib-napoleon
 sphinx_rtd_theme
 sphinx-substitution-extensions
