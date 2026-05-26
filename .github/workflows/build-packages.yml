@@ -337,10 +337,10 @@ jobs:
 
           PYTHON_ABI="$(python${PYTHON_VERSION} -c 'from packaging.tags import sys_tags; print(next(iter(sys_tags())).interpreter)')"
           
-          find wheelhouse -name "fastwarc-*-${PYTHON_ABI}-*-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
+          find wheelhouse -name "fastwarc-*-cp*-${PYTHON_ABI}-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
           python${PYTHON_VERSION} -c 'import fastwarc' 2> /dev/null || { echo 'No FastWARC wheel matched architecture' >&2; exit 1; }
           
-          find wheelhouse -name "resiliparse-*-${PYTHON_ABI}-*-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
+          find wheelhouse -name "resiliparse-*-cp*-${PYTHON_ABI}-manylinux*_x86_64.whl" | xargs -I% python${PYTHON_VERSION} -m pip install "%[all]"
           python${PYTHON_VERSION} -c 'import resiliparse' 2> /dev/null || { echo 'No Resiliparse wheel matched architecture' >&2; exit 1; }
 
           cd docs
@@ -383,7 +383,7 @@ jobs:
         run: |
           set -ex
 
-          python${PYTHON_VERSION} -m pip install --upgrade twine
+          python${PYTHON_VERSION} -m pip install --upgrade twine packaging
 
           TWINE_PASSWORD="$TWINE_PASSWORD1" python${PYTHON_VERSION} -m twine upload fastwarc-*.whl fastwarc-*.tar.gz
           TWINE_PASSWORD="$TWINE_PASSWORD2" python${PYTHON_VERSION} -m twine upload resiliparse-*.whl resiliparse-*.tar.gz
