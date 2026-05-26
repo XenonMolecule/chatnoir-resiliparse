@@ -463,6 +463,80 @@ fn parse_http_headers() -> io::Result<()> {
 }
 
 #[test]
+fn record_http_parsing() -> io::Result<()> {
+    let file = get_fixture_path("warcfile.warc");
+    let mut parsed_count = 0usize;
+
+    for rec in ArchiveIterator::from_path(&file)?.with_parse_http(true) {
+        let rec = rec?;
+        let mut rec = rec.borrow_mut();
+        if rec.record_type() != WarcRecordType::Response {
+            continue;
+        }
+
+        parsed_count += 1;
+
+        assert!(rec.is_http());
+        assert!(rec.is_http_parsed());
+
+        let warc_headers = rec.headers();
+        assert_eq!(warc_headers.status_code(), None);
+        assert_eq!(warc_headers.reason_phrase(), None);
+
+        let http_headers = rec.http_headers().unwrap();
+        assert!(http_headers.status_code().is_some());
+        assert!(http_headers.reason_phrase().is_some());
+        let status_code = http_headers.status_code().unwrap();
+        let reason_phrase = http_headers.reason_phrase().unwrap();
+        let status_line = http_headers.status_line().unwrap();
+        assert!(status_line.contains(&status_code.to_string()));
+        assert!(status_line.contains(reason_phrase.as_ref()));
+        assert!(http_headers.to_map().len() <= http_headers.items().count());
+
+        let content_type = rec.http_content_type().unwrap();
+        assert!(content_type.starts_with("text/"));
+        assert!(http_headers.contains_key("Content-Type"));
+        let content_type_header = http_headers.get("Content-Type").unwrap();
+        if let Some((_, charset)) = content_type_header.split_once("charset=") {
+            assert_eq!(rec.http_charset().map(|c| c.into_owned()), Some(charset.trim().to_ascii_lowercase()));
+        }
+
+        let mut prefix = [0u8; 5];
+        rec.reader_mut().unwrap().read_exact(&mut prefix)?;
+        assert_ne!(&prefix, b"HTTP/");
+    }
+
+    assert!(parsed_count > 0);
+
+    let mut raw_count = 0usize;
+    for rec in ArchiveIterator::from_path(&file)?.with_parse_http(false) {
+        let rec = rec?;
+        let mut rec = rec.borrow_mut();
+        if rec.record_type() != WarcRecordType::Response {
+            continue;
+        }
+
+        raw_count += 1;
+
+        assert!(rec.is_http());
+        assert!(!rec.is_http_parsed());
+        assert!(rec.http_headers().is_none());
+        assert_eq!(rec.http_content_type(), None);
+        assert_eq!(rec.http_charset(), None);
+        assert_eq!(rec.headers().status_code(), None);
+        assert_eq!(rec.headers().reason_phrase(), None);
+
+        let mut prefix = [0u8; 5];
+        rec.reader_mut().unwrap().read_exact(&mut prefix)?;
+        assert_eq!(&prefix, b"HTTP/");
+    }
+
+    assert_eq!(parsed_count, raw_count);
+
+    Ok(())
+}
+
+#[test]
 fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
     let warc_data = b"garbage before header\r\n\
                       \r\n\
