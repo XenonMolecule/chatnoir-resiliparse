@@ -21,8 +21,10 @@ use crate::warc::mod_test::{
     get_fixture_path, http_response_warc_data_encoded, warc_record_data, warc_record_data_with_headers,
 };
 use crate::warc::record::{AutoDecode, WarcRecord, WarcRecordType};
-use data_encoding::BASE32;
+use data_encoding::{BASE32, HEXLOWER};
 use digest::Digest;
+use md5::Md5;
+use pretty_assertions::{assert_eq, assert_ne};
 use sha1::Sha1;
 use std::fs::File;
 use std::io;
@@ -483,6 +485,71 @@ where
         r?.with_mut(|rm| check(rm))?;
     }
 
+    Ok(())
+}
+
+fn check_warc_integrity(stream: impl IntoWarcReader) -> io::Result<(usize, usize)> {
+    let mut count = 0usize;
+    let mut count_response = 0usize;
+
+    for rec in ArchiveIterator::new(stream).with_parse_http(false) {
+        let rec = rec?;
+        let mut rec = rec.borrow_mut();
+        if rec.record_type() == WarcRecordType::Response {
+            assert!(
+                rec.verify_block_digest(false)
+                    .map_err(|e| io::Error::other(e.to_string()))?
+            );
+            rec.parse_http()?;
+            assert!(
+                rec.verify_payload_digest(false)
+                    .map_err(|e| io::Error::other(e.to_string()))?
+            );
+            count_response += 1;
+        }
+        count += 1;
+    }
+
+    Ok((count, count_response))
+}
+
+#[test]
+fn clone_warc_file() -> io::Result<()> {
+    let file = get_fixture_path("warcfile.warc");
+    let source_bytes = std::fs::read(&file)?;
+    let (expected_count, expected_response_count) = check_warc_integrity(io::Cursor::new(source_bytes.clone()))?;
+
+    // Clone all entries in the input WARC file and compare input and output bytes are identical
+    let mut buf = Vec::new();
+    let mut written = 0usize;
+    for rec in ArchiveIterator::new(io::Cursor::new(source_bytes.clone())).with_parse_http(false) {
+        let rec = rec?;
+        written += rec.borrow_mut().write(&mut buf)?;
+        assert_eq!(written, buf.len());
+    }
+    assert_eq!(HEXLOWER.encode(&Md5::digest(&source_bytes)), HEXLOWER.encode(&Md5::digest(&buf)));
+
+    // Clone all entries in the input WARC file with HTTP parsing and check that record numbers match
+    let mut buf = Vec::new();
+    let mut written = 0usize;
+    for rec in ArchiveIterator::from_path(&file)?.with_parse_http(true) {
+        let rec = rec?;
+        written += rec.borrow_mut().write(&mut buf)?;
+        assert_eq!(written, buf.len());
+    }
+    let (count, response_count) = check_warc_integrity(io::Cursor::new(buf.clone()))?;
+    assert_eq!((count, response_count), (expected_count, expected_response_count));
+
+    // Clone all entries in the input WARC file with HTTP parsing and write and verify checksums
+    let mut buf = Vec::new();
+    let mut written = 0usize;
+    for rec in ArchiveIterator::from_path(&file)?.with_parse_http(true) {
+        let rec = rec?;
+        written += rec.borrow_mut().write_with_checksum(&mut buf)?;
+        assert_eq!(written, buf.len());
+    }
+    let (count, response_count) = check_warc_integrity(io::Cursor::new(buf.clone()))?;
+    assert_eq!((count, response_count), (expected_count, expected_response_count));
     Ok(())
 }
 
