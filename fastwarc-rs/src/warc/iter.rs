@@ -318,7 +318,9 @@ where
             };
             let reader = match magic_bytes.as_deref() {
                 Some(b) if &b[..3] == b"\x1F\x8B\x08" => LimitedBufReader::new(Box::new(GzipReader::new(reader)), None),
-                Some(b"\x28\xB5\x2F\xFD") => LimitedBufReader::new(Box::new(ZstdReader::new(reader)), None),
+                Some(b"\x28\xB5\x2F\xFD") | Some(b"\x5D\x2A\x4D\x18") => {
+                    LimitedBufReader::new(Box::new(ZstdReader::new(reader)), None)
+                }
                 Some(b"\x04\x22\x4D\x18") => LimitedBufReader::new(Box::new(Lz4Reader::new(reader)), None),
                 _ => reader,
             };

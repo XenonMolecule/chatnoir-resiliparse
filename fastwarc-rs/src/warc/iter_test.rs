@@ -27,6 +27,7 @@ use sha1::Sha1;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, Write};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -155,6 +156,16 @@ fn archive_iterator_stream_compression_autodetection() -> io::Result<()> {
     it.next().transpose()?;
     it.next().transpose()?;
 
+    let zstd_warc = get_fixture_path("warcfile.warc.zst");
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(zstd_warc)?));
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    let zstd_dict_warc = get_fixture_path("warcfile-with-dict.warc.zst");
+    let mut it = ArchiveIterator::new(io::BufReader::new(File::open(zstd_dict_warc)?));
+    it.next().transpose()?;
+    it.next().transpose()?;
+
     let lz4_warc = get_fixture_path("warcfile.warc.lz4");
     let mut it = ArchiveIterator::new(io::BufReader::new(File::open(lz4_warc)?));
     it.next().transpose()?;
@@ -177,6 +188,14 @@ fn archive_iterator_no_stream_detect_for_decoding_readers() -> io::Result<()> {
     // First position is 0, not already start of the next frame.
     assert_eq!(record.borrow().stream_pos(), 0);
 
+    // Different start offset for Zstandard WARC with dictionary
+    let zstd_warc = get_fixture_path("warcfile-with-dict.warc.zst");
+    let reader = zstd::ZstdReader::from_path(zstd_warc)?;
+    assert!(reader.is_stream_decoder());
+    let record = ArchiveIterator::new(reader).with_stream_detect(true).next().unwrap()?;
+    // First position is 89996 this time
+    assert_eq!(record.borrow().stream_pos(), 89996);
+
     Ok(())
 }
 
@@ -192,13 +211,18 @@ fn archive_iterator_from_path() -> io::Result<()> {
     assert_eq!(ArchiveIterator::from_path(plain_warc).unwrap_err().kind(), io::ErrorKind::NotFound);
 
     // With autodetection
-    let plain_warc = get_fixture_path("warcfile.warc.gz");
-    let mut it = ArchiveIterator::from_path(plain_warc)?;
+    let gzip_warc = get_fixture_path("warcfile.warc.gz");
+    let mut it = ArchiveIterator::from_path(gzip_warc)?;
     it.next().transpose()?;
     it.next().transpose()?;
 
-    let plain_warc = get_fixture_path("warcfile.warc.lz4");
-    let mut it = ArchiveIterator::from_path(plain_warc)?;
+    let zstd_warc = get_fixture_path("warcfile.warc.zst");
+    let mut it = ArchiveIterator::from_path(zstd_warc)?;
+    it.next().transpose()?;
+    it.next().transpose()?;
+
+    let lz4_warc = get_fixture_path("warcfile.warc.lz4");
+    let mut it = ArchiveIterator::from_path(lz4_warc)?;
     it.next().transpose()?;
     it.next().transpose()?;
 
@@ -500,34 +524,39 @@ fn archive_iterator_read_clipped_warc_file() -> io::Result<()> {
 
 /// Helper for testing whether iterating over a WARC reports the correct record offsets,
 /// and whether we can restart a new iterator from those record / compression member boundaries.
-fn iterate_archive_members_with_offsets<R, M>(mut make_reader: M) -> io::Result<()>
+fn iterate_archive_members_with_offsets<R, M>(file_name: &PathBuf, mut make_reader: M, first_pos: u64) -> io::Result<()>
 where
     R: IntoWarcReader,
-    M: FnMut() -> io::Result<R>,
+    M: FnMut(BufReader<File>) -> io::Result<R>,
 {
     let mut iterator_variant_runs = Vec::new();
     let mut offsets = Vec::new();
     let mut record_ids = Vec::new();
 
+    let make_file = || -> io::Result<_> { Ok(BufReader::new(File::open(file_name)?)) };
+
     // First, iterate over all records and collect their offsets and record IDs.
-    run_archive_iterator_variants(&mut make_reader, |record| {
-        let stream_pos = record.stream_pos();
+    run_archive_iterator_variants(
+        || make_reader(make_file()?),
+        |record| {
+            let stream_pos = record.stream_pos();
 
-        if !offsets.is_empty() && stream_pos == 0 {
-            // First iteration of second variant
-            iterator_variant_runs.push((std::mem::take(&mut offsets), std::mem::take(&mut record_ids)));
-        } else if let Some(&previous) = offsets.last() {
-            assert!(stream_pos > previous);
-        } else {
-            // First overall
-            assert_eq!(stream_pos, 0);
-        }
+            if !offsets.is_empty() && stream_pos == first_pos {
+                // First iteration of second variant
+                iterator_variant_runs.push((std::mem::take(&mut offsets), std::mem::take(&mut record_ids)));
+            } else if let Some(&previous) = offsets.last() {
+                assert!(stream_pos > previous);
+            } else {
+                // First overall
+                assert_eq!(stream_pos, first_pos);
+            }
 
-        offsets.push(stream_pos);
-        record_ids.push(record.record_id().unwrap().to_string());
+            offsets.push(stream_pos);
+            record_ids.push(record.record_id().unwrap().to_string());
 
-        Ok(())
-    })?;
+            Ok(())
+        },
+    )?;
     iterator_variant_runs.push((offsets, record_ids));
 
     // Recorded two variant runs (non-thread-safe and thread-safe).
@@ -537,18 +566,22 @@ where
 
     // Discard the second variant run.
     let (offsets, record_ids) = &iterator_variant_runs[0];
-    let num_records = offsets.len();
-    assert!(num_records > 0);
+    assert!(!offsets.is_empty());
 
     // Test whether we can restart the iterator from any of the previously recorded offsets.
     for (i, &offset) in offsets.iter().enumerate() {
         let expected_id = &record_ids[i];
 
-        let mut reader = make_reader()?.into_warc_reader();
+        // 1. Seek in the raw file and check that we end up at the correct record.
+        let mut file = make_file()?;
+        file.seek(io::SeekFrom::Start(offset))?;
+        let record = WarcRecord::from_reader(make_reader(file)?)?;
+        assert_eq!(record.record_id().as_deref(), Some(expected_id.as_str()));
+
+        // 2. Same, but with inner seek on WarcReader
+        let mut reader = make_reader(make_file()?)?.into_warc_reader();
         reader.inner_seek(io::SeekFrom::Start(offset))?;
         let record = WarcRecord::from_reader(reader)?;
-
-        // Check that we are at the correct record.
         assert_eq!(record.record_id().as_deref(), Some(expected_id.as_str()));
     }
 
@@ -557,14 +590,26 @@ where
 
 #[test]
 fn archive_iterator_record_offsets() -> io::Result<()> {
-    let warc = get_fixture_path("warcfile.warc");
-    iterate_archive_members_with_offsets(|| Ok(io::BufReader::new(File::open(warc.clone())?)))?;
+    iterate_archive_members_with_offsets(&get_fixture_path("warcfile.warc"), Ok, 0)?;
+    iterate_archive_members_with_offsets(&get_fixture_path("warcfile.warc.gz"), |f| Ok(gzip::GzipReader::new(f)), 0)?;
+    iterate_archive_members_with_offsets(&get_fixture_path("warcfile.warc.zst"), |f| Ok(zstd::ZstdReader::new(f)), 0)?;
+    iterate_archive_members_with_offsets(&get_fixture_path("warcfile.warc.lz4"), |f| Ok(lz4::Lz4Reader::new(f)), 0)?;
 
-    let warc_gz = get_fixture_path("warcfile.warc.gz");
-    iterate_archive_members_with_offsets(|| Ok(gzip::GzipReader::new(File::open(warc_gz.clone())?)))?;
+    // Extract dictionary from Zstandard WARC dictionary frame.
+    let zstd_path = get_fixture_path("warcfile-with-dict.warc.zst");
+    let mut zstd_reader = zstd::ZstdReader::from_path(&zstd_path)?;
+    let _ = zstd_reader.read(&mut [0; 100])?;
+    let dict = zstd_reader.dictionary().unwrap();
+    let first_pos = dict.len() as u64 + 8;
+    assert_eq!(first_pos, 89996);
 
-    let warc_lz4 = get_fixture_path("warcfile.warc.lz4");
-    iterate_archive_members_with_offsets(|| Ok(lz4::Lz4Reader::new(File::open(warc_lz4.clone())?)))?;
+    // Cannot restart from an arbitrary position in a Zstd WARC with dictionary frame, unless supplied explicitly.
+    assert!(iterate_archive_members_with_offsets(&zstd_path, |f| Ok(zstd::ZstdReader::new(f)), first_pos).is_err());
+    iterate_archive_members_with_offsets(
+        &zstd_path,
+        |f| Ok(zstd::ZstdReader::with_dictionary(f, dict.clone(), None)),
+        first_pos,
+    )?;
 
     Ok(())
 }
