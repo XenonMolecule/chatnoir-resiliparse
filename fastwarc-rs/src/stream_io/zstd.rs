@@ -34,6 +34,7 @@ pub use ::zstd::dict::from_continuous as train_dictionary_from_continuous;
 pub use ::zstd::dict::from_files as train_dictionary_from_files;
 pub use ::zstd::dict::from_sample_iterator as train_dictionary_from_sample_iterator;
 pub use ::zstd::dict::from_samples as train_dictionary_from_samples;
+use zstd::zstd_safe;
 
 /// Options for constructing a new [`ZstdReader`].
 ///
@@ -79,20 +80,8 @@ impl<T: ReadSeek> ZstdReader<T> {
     ///
     /// * `inner` - input (inner) stream to read from
     /// * `options` - reader options
-    pub fn with_options(mut inner: T, options: ZstdReaderOptions) -> Self {
-        let member_pos = inner.stream_position().unwrap_or(0);
-        let decoder = BufReader::with_capacity(
-            options.capacity,
-            Decoder::new(inner)
-                .expect("Failed to create Zstd decoder.")
-                .single_frame(),
-        );
-        Self {
-            inner: Some(decoder),
-            dict: None,
-            stream_pos: 0,
-            frame_start_pos: member_pos,
-        }
+    pub fn with_options(inner: T, options: ZstdReaderOptions) -> Self {
+        Self::_with_dict_options_internal(inner, None, Some(options))
     }
 
     /// Create a new [`ZstdReader`] with the supplied decompression dictionary and options.
@@ -107,9 +96,34 @@ impl<T: ReadSeek> ZstdReader<T> {
     /// * `dict` - zstd dictionary
     /// * `options` - reader options
     pub fn with_dictionary(inner: T, dict: Vec<u8>, options: Option<ZstdReaderOptions>) -> Self {
-        let mut obj = Self::with_options(inner, options.unwrap_or_default());
-        obj.dict = Some(dict);
-        obj
+        Self::_with_dict_options_internal(inner, Some(dict), options)
+    }
+
+    fn _with_dict_options_internal(mut inner: T, dict: Option<Vec<u8>>, options: Option<ZstdReaderOptions>) -> Self {
+        let options = options.unwrap_or_default();
+
+        let member_pos = inner.stream_position().unwrap_or(0);
+        let decoder = if let Some(dict) = &dict {
+            // zstd_safe::DCtx::in_size() is used as buffer size in Decoder::new()
+            Decoder::with_dictionary(BufReader::with_capacity(zstd_safe::DCtx::in_size(), inner), dict)
+        } else {
+            Decoder::new(inner)
+        }
+        .expect("Failed to create Zstd decoder.")
+        .single_frame();
+
+        Self {
+            inner: Some(BufReader::with_capacity(options.capacity, decoder)),
+            dict,
+            stream_pos: 0,
+            frame_start_pos: member_pos,
+        }
+    }
+
+    /// Get the dictionary used for decompression.
+    /// Returns `None` if no dictionary has been set, and the stream did not start with a dictionary frame.
+    pub fn dictionary(&self) -> Option<&Vec<u8>> {
+        self.dict.as_ref()
     }
 
     /// Unwrap this [`ZstdReader`], returning the underlying reader.
