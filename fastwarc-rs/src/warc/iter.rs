@@ -29,7 +29,6 @@ use std::sync::{Arc, Mutex};
 pub trait ArchiveIteratorTrait: Iterator<Item = Result<WarcRecord, io::Error>> {}
 impl<I: Iterator<Item = Result<WarcRecord, io::Error>>> ArchiveIteratorTrait for I {}
 
-#[doc(hidden)]
 /// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
 ///
 /// This is an internal generic interface for implementing the single-threaded and
@@ -375,7 +374,6 @@ where
     }
 }
 
-#[doc(hidden)]
 /// Filtered wrapper for [`ArchiveIterator`] that filters records based on a predicate.
 /// Use [`ArchiveIterator::with_filter()`] to construct a [`FilteredArchiveIterator`].
 ///
