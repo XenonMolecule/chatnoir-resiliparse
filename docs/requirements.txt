@@ -1,6 +1,6 @@
 fastwarc[all]
 resiliparse[all]
-sphinx
+sphinx>=9.0
 sphinx-click
 sphinx_rtd_theme
 sphinx-substitution-extensions
