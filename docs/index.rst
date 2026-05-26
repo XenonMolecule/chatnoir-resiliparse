@@ -35,6 +35,7 @@ This is the full table of contents for this documentation:
    api/itertools
    api/beam
    api/fastwarc
+   FastWARC (Rust) <https://docs.rs/fastwarc/latest/fastwarc/>
 
 
 .. toctree::

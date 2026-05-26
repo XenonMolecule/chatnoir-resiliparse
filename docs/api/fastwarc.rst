@@ -1,9 +1,9 @@
 .. _fastwarc-warc-api:
 
-FastWARC
-========
+FastWARC (Python)
+=================
 
-Resiliparse FastWARC API documentation.
+Resiliparse FastWARC API documentation (Python bindings).
 
 WARC
 ----

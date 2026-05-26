@@ -1,7 +1,7 @@
 # FastWARC
 
 FastWARC is a high-performance WARC parsing library written in Rust with bindings for Python.
-FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are GZip,
+FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip,
 Zstd, and LZ4.
 
 FastWARC belongs to the [ChatNoir Resiliparse toolkit](https://github.com/chatnoir-eu/chatnoir-resiliparse/) for fast
@@ -29,7 +29,7 @@ fastwarc = "*" # Specify the correct version here
 
 Then build your project like normal with `cargo build`.
 
-### Building Python Binaries From Source
+### Building Python Bindings From Source
 
 You can build the FastWARC Python bindings from source as follows:
 
@@ -67,5 +67,22 @@ If you use FastWARC, please consider citing our [OSSYM 2021 abstract paper](http
   site =                  {CERN, Geneva, Switzerland},
   title =                 {{FastWARC: Optimizing Large-Scale Web Archive Analytics}},
   year =                  2021
+}
+```
+
+You can also cite our [ECIR 2018 demo paper](https://webis.de/downloads/publications/papers/bevendorff_2018.pdf):
+
+```bibtex
+@InProceedings{bevendorff:2018,
+  address =             {Berlin Heidelberg New York},
+  author =              {Janek Bevendorff and Benno Stein and Matthias Hagen and Martin Potthast},
+  booktitle =           {Advances in Information Retrieval. 40th European Conference on IR Research (ECIR 2018)},
+  editor =              {Leif Azzopardi and Allan Hanbury and Gabriella Pasi and Benjamin Piwowarski},
+  month =               mar,
+  publisher =           {Springer},
+  series =              {Lecture Notes in Computer Science},
+  site =                {Grenoble, France},
+  title =               {{Elastic ChatNoir: Search Engine for the ClueWeb and the Common Crawl}},
+  year =                2018
 }
 ```
