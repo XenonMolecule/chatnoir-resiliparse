@@ -18,7 +18,7 @@ use crate::warc::iter::{ArchiveIterator, SharedWarcRecord};
 use crate::warc::mod_test::*;
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_ne};
 use sha1::{Digest, Sha1};
 use sha2::{Sha256, Sha512};
 use std::borrow::Cow;
@@ -572,6 +572,93 @@ fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
     let detached = record.detach_reader().unwrap();
     let mut detached = detached;
     assert!(detached.stream_position()? > 0);
+
+    Ok(())
+}
+
+#[test]
+fn create_new_warc_record() -> io::Result<()> {
+    let new_record_bytes_content = b"HTTP/1.1 200 OK\r\n\
+Content-Type: text/html; charset=utf-8\r\n\
+Content-Length: 69\r\n\
+X-Multiline-Header: Hello\r\n\
+\x20\x20World\r\n\r\n\
+<!doctype html>\n\
+<meta charset=\"utf-8\">\n\
+<title>Test</title>\n\n\
+Barbaz\n";
+
+    let mut src_record = WarcRecord::new();
+    src_record.init_headers(Some(WarcRecordType::Unknown), None);
+    assert_eq!(src_record.headers().status_line().as_deref(), Some("WARC/1.1"));
+    assert!(src_record.record_id().is_some_and(|id| id.starts_with("<urn:")));
+    assert_eq!(src_record.record_type(), WarcRecordType::Unknown);
+    assert_eq!(src_record.content_length(), 0);
+    assert!(src_record.headers().contains_key("WARC-Type"));
+    assert!(src_record.headers().contains_key("WARC-Date"));
+    assert!(src_record.headers().contains_key("WARC-Record-ID"));
+    assert_eq!(src_record.headers().get("WARC-Record-ID"), src_record.record_id());
+    assert_eq!(src_record.headers().get("Content-Length").as_deref(), Some("0"));
+    src_record.headers_mut().set("X-Multiline-Header", "Hello\r\nWorld");
+    assert_eq!(src_record.headers().get("X-Multiline-Header").as_deref(), Some("Hello World"));
+
+    src_record.set_bytes_payload(new_record_bytes_content.to_vec());
+    let content_len = new_record_bytes_content.len().to_string();
+    assert_eq!(src_record.content_length(), new_record_bytes_content.len() as u64);
+    assert_eq!(src_record.headers().get("Content-Length").as_deref(), Some(content_len.as_str()));
+
+    src_record.set_is_http(true);
+    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http"));
+    src_record.set_record_type(WarcRecordType::Request);
+    src_record.set_is_http(true);
+    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=request"));
+    src_record.set_record_type(WarcRecordType::Response);
+    src_record.set_is_http(true);
+    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=response"));
+
+    let payload_start = new_record_bytes_content
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|i| i + 4)
+        .unwrap();
+    let payload_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(&new_record_bytes_content[payload_start..])));
+    src_record
+        .headers_mut()
+        .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
+
+    let mut stream = Vec::new();
+    src_record.write_with_checksum(&mut stream)?;
+
+    let mut it = ArchiveIterator::new(io::Cursor::new(stream)).with_parse_http(false);
+    let rec = it.next().unwrap()?;
+    {
+        let mut rec = rec.borrow_mut();
+        assert_eq!(rec.headers().status_line(), src_record.headers().status_line());
+        assert_eq!(rec.headers().get("X-Multiline-Header").as_deref(), Some("Hello World"));
+        assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=response"));
+        assert_eq!(rec.headers(), src_record.headers());
+        assert_eq!(rec.record_id(), src_record.record_id());
+        assert_eq!(rec.record_type(), src_record.record_type());
+        assert!(
+            rec.verify_block_digest(false)
+                .map_err(|e| io::Error::other(e.to_string()))?
+        );
+
+        assert!(rec.is_http());
+        rec.parse_http()?;
+        let http_headers = rec.http_headers().unwrap();
+        assert_eq!(http_headers.status_code(), Some(200));
+        assert_eq!(http_headers.reason_phrase().as_deref(), Some("OK"));
+        assert_eq!(rec.http_content_type().as_deref(), Some("text/html"));
+        assert_eq!(rec.http_charset().as_deref(), Some("utf-8"));
+        assert_eq!(http_headers.get("X-Multiline-Header").as_deref(), Some("Hello World"));
+        assert!(
+            rec.verify_payload_digest(false)
+                .map_err(|e| io::Error::other(e.to_string()))?
+        );
+    }
+
+    assert!(it.next().is_none());
 
     Ok(())
 }
