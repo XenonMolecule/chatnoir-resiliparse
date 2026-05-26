@@ -20,6 +20,9 @@ _legacy_shims = importlib.import_module(".legacy._shims", __name__)
 import fastwarc.stream_io as stream_io  # noqa: F401
 import fastwarc.warc as warc  # noqa: F401
 
+# Re-export module attributes
+globals().update({attr: getattr(_native, attr) for attr in _native.__all__})
+
 # Patch legacy shims onto stream_io
 for name in _legacy_shims.__all__:
     setattr(stream_io, name, getattr(_legacy_shims, name))
