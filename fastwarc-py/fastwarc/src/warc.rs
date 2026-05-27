@@ -690,8 +690,15 @@ impl WarcRecordPy {
     pub fn __getstate__(&mut self) -> PyResult<(Vec<u8>, bool)> {
         let mut record = self.lock();
         let http_parsed = record.is_http_parsed();
+        let old_reader_pos = record.reader_mut().unwrap().stream_position()?;
+        if record.is_frozen() {
+            record.reader_mut().unwrap().rewind()?;
+        }
         let mut serialized = Vec::with_capacity(record.content_length() as usize + 400);
         record.write_with_block_size(&mut serialized, 16384)?;
+        if record.is_frozen() {
+            record.reader_mut().unwrap().seek(io::SeekFrom::Start(old_reader_pos))?;
+        }
         Ok((serialized, http_parsed))
     }
 

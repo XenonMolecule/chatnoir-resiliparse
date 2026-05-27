@@ -814,7 +814,6 @@ def test_create_new_warc_record():
     assert src_record.headers.status_line == 'WARC/1.1'
     assert src_record.record_id.startswith('<urn:')
     assert src_record.record_type == unknown
-    print(len(new_record_bytes_content))
     assert src_record.content_length == 0
     assert 'WARC-Type' in src_record.headers
     assert 'WARC-Date' in src_record.headers

@@ -18,7 +18,7 @@ use self::zstd::{ZstdReaderPy, ZstdWriterPy};
 use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyNone, PyString};
+use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyString};
 use std::any::Any;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 

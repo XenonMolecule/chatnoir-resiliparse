@@ -1002,10 +1002,11 @@ impl WarcRecord {
     /// * `payload` - Body as bytes
     pub fn from_bytes(payload: Vec<u8>) -> Result<Self, io::Error> {
         let mut record = WarcRecord::from_reader(io::Cursor::new(payload))?;
-        let Some(ReaderType::Original(reader)) = record.reader.take() else {
-            panic!("Invalid internal reader state.");
+        record.freeze()?;
+        let Some(ReaderType::Frozen((frozen, _orig))) = record.reader.take() else {
+            unreachable!("Invalid internal reader state: Reader not frozen");
         };
-        record.reader = Some(ReaderType::Frozen((reader, None)));
+        record.reader = Some(ReaderType::Frozen((frozen, None)));
         Ok(record)
     }
 

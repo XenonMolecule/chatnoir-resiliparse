@@ -24,6 +24,11 @@ import fastwarc
 from fastwarc.stream_io import *
 from fastwarc.warc import *
 
+
+def get_fixtures_path():
+    return Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures"
+
+
 HTTP_BODY = b"Hello"
 
 
@@ -157,14 +162,61 @@ def test_record_and_header_pickle():
 
     # Pickle entire record
     record_roundtrip = pickle.loads(pickle.dumps(record))
+    assert record_roundtrip == record
     assert record_roundtrip is not record
     assert record_roundtrip.is_frozen
     assert record_roundtrip.record_id == record.record_id
     assert record_roundtrip.content_length == record.content_length
     assert record_roundtrip.headers is not record.headers
     assert record_roundtrip.headers == record.headers
-    record.reader.seek(0)
     assert record_roundtrip.reader.read() == record.reader.read()
+
+    # Pickle keeps reader position on original record (if frozen)
+    assert record.reader.seek(13, 0) == 13
+    record_roundtrip = pickle.loads(pickle.dumps(record))
+    assert record_roundtrip == record
+    assert record.reader.tell() == 13
+    assert record_roundtrip.reader.tell() == 0
+
+
+def test_warc_record_equality():
+    rec1 = next(ArchiveIterator(get_fixtures_path() / 'warcfile.warc',
+                                parse_http=False, record_types=WarcRecordType.response))
+    rec1.freeze()
+    rec2 = next(ArchiveIterator(get_fixtures_path() / 'warcfile.warc',
+                                parse_http=False, record_types=WarcRecordType.response))
+    rec2.freeze()
+    assert rec1 is rec1
+    assert rec1 is not rec2
+    assert rec1 == rec2
+    assert rec2 == rec1
+
+    pickled1 = pickle.loads(pickle.dumps(rec1))
+    pickled2 = pickle.loads(pickle.dumps(rec2))
+
+    assert pickled1 == pickled2
+    assert rec1 is not pickled1
+    assert rec1 == pickled1
+    assert rec1 is not pickled2
+    assert rec1 == pickled2
+    assert rec2 is not pickled1
+    assert rec2 == pickled1
+    assert rec2 is not pickled2
+    assert rec2 == pickled2
+
+    # Mutating records changes equality checks
+    rec1.parse_http()
+    assert rec1 != rec2
+    rec2.parse_http()
+    assert rec1 == rec2
+
+    unfrozen = next(ArchiveIterator(get_fixtures_path() / 'warcfile.warc',
+                                    parse_http=False, record_types=WarcRecordType.response))
+    # Unfrozen records are not reflexive
+    assert unfrozen is unfrozen
+    assert unfrozen != unfrozen
+    assert unfrozen != rec1
+    assert unfrozen != rec2
 
 
 def test_archive_iterator_accepts_pathlike_and_filters(tmp_path: Path):
