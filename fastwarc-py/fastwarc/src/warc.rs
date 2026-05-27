@@ -25,7 +25,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyBytes, PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyIterator, PyString, PyTimeAccess,
-    PyTuple,
+    PyTuple, PyType,
 };
 use std::io::{self, Read, Seek};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -683,6 +683,30 @@ impl WarcRecordPy {
         Self::from_record(WarcRecord::new())
     }
 
+    #[classmethod]
+    pub fn from_bytes(_cls: &Bound<'_, PyType>, payload: Vec<u8>) -> PyResult<Self> {
+        Ok(Self::from_record(WarcRecord::from_bytes(payload)?))
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (reader, quirks_mode=false))]
+    pub fn from_reader(
+        _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        reader: Py<PyAny>,
+        quirks_mode: bool,
+    ) -> PyResult<Self> {
+        // noinspection DuplicatedCode
+        let reader = wrap_reader_stream(
+            py,
+            reader,
+            None,
+            |reader| -> io::Result<Box<dyn WarcRead + Send>> { Ok(Box::new(reader)) },
+            |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader())),
+        )?;
+        Ok(Self::from_record(WarcRecord::from_reader_quirks(reader, quirks_mode)?))
+    }
+
     pub fn __getnewargs__<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         PyTuple::empty(py)
     }
@@ -1261,6 +1285,7 @@ impl ArchiveIteratorPy {
             };
             iterator = ArchiveIteratorThreadSafe::from_path_with_options(path, opts)?;
         } else {
+            // noinspection DuplicatedCode
             let reader = wrap_reader_stream(
                 py,
                 stream,

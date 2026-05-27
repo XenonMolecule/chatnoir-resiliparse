@@ -268,6 +268,28 @@ def test_record_and_header_pickle():
     assert pickled_fixture_record.reader.read() == frozen_remaining
 
 
+@pytest.mark.parametrize(
+    ("loader", "record_urn", "body", "frozen"),
+    [
+        (lambda payload: WarcRecord.from_bytes(payload), b"uuid:from-bytes", b"From bytes", True),
+        (lambda payload: WarcRecord.from_reader(io.BytesIO(payload)), b"uuid:from-reader", b"From reader",
+         False),
+    ],
+)
+def test_warc_record_from_bytes_or_reader(loader, record_urn: bytes, body: bytes, frozen: bool):
+    record = _make_http_record(record_urn=record_urn, body=body)
+    serialized = _serialize_record(record)
+
+    parsed = loader(serialized)
+
+    assert parsed.is_frozen is frozen
+    assert parsed.record_type == response
+    assert parsed.record_id == f"<urn:{record_urn.decode()}>"
+    assert parsed.is_http is True
+    assert record.is_http_parsed is False
+    assert parsed.reader.read() == _http_payload(body)
+
+
 def test_warc_record_set_record_id():
     record = _make_http_record(record_urn=b"uuid:before")
     assert record.record_id == "<urn:uuid:before>"
