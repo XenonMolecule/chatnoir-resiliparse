@@ -83,13 +83,12 @@ impl WarcReaderPy {
 
     // noinspection DuplicatedCode
     pub fn __exit__(
-        &self,
-        py: Python<'_>,
+        slf: Bound<'_, Self>,
         _exc_type: Option<Py<PyAny>>,
         _exc_val: Option<Py<PyAny>>,
         _exc_tb: Option<Py<PyAny>>,
     ) -> PyResult<()> {
-        self.close(py)?;
+        slf.call_method0("close")?;
         Ok(())
     }
 
@@ -152,19 +151,18 @@ impl WarcWriterPy {
 
     // noinspection DuplicatedCode
     pub fn __exit__(
-        &self,
-        py: Python<'_>,
+        slf: Bound<'_, Self>,
         _exc_type: Option<Py<PyAny>>,
         _exc_val: Option<Py<PyAny>>,
         _exc_tb: Option<Py<PyAny>>,
     ) -> PyResult<()> {
-        self.close(py)?;
+        slf.call_method0("close")?;
         Ok(())
     }
 
     /// Finish the current compression member or frame, if supported.
     pub fn finish(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
+        Ok(py.None())
     }
 }
 
