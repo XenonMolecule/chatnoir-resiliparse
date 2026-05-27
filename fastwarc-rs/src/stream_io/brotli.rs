@@ -87,7 +87,7 @@ impl<T: ReadSeek> BrotliReader<T> {
     }
 }
 
-impl_stream_from_path!(BrotliReader, BrotliReaderOptions);
+impl_stream_from_path!(BrotliReader, BrotliReaderOptions, open);
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for BrotliReader<T> {
@@ -242,7 +242,7 @@ impl<T: Write + 'static> BrotliWriter<T> {
     }
 }
 
-impl_stream_from_path!(BrotliWriter, BrotliWriterOptions);
+impl_stream_from_path!(BrotliWriter, BrotliWriterOptions, create);
 
 impl<T: Write + 'static> Write for BrotliWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

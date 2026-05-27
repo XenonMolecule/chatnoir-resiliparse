@@ -124,7 +124,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
     }
 }
 
-impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions);
+impl_stream_from_path!(Lz4Reader, Lz4ReaderOptions, open);
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for Lz4Reader<T> {
@@ -273,7 +273,7 @@ impl<T: Write + 'static> Lz4Writer<T> {
     }
 }
 
-impl_stream_from_path!(Lz4Writer, Lz4WriterOptions);
+impl_stream_from_path!(Lz4Writer, Lz4WriterOptions, create);
 
 impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
     impl_to_any_methods!();

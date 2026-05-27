@@ -35,7 +35,7 @@ pub mod zstd;
 /// Helper macro for implementing `from_path()` and `from_path_with_options()`
 /// constructors for Readers and Writers.
 macro_rules! impl_stream_from_path {
-    ($StreamType:ident, $OptionsType:ident) => {
+    ($StreamType:ident, $OptionsType:ident, $open_method:ident) => {
         impl $StreamType<std::fs::File> {
             #[doc = concat!("Create a [`", stringify!($StreamType), "`] from a file path.")]
             #[doc = ""]
@@ -56,7 +56,7 @@ macro_rules! impl_stream_from_path {
                 path: impl AsRef<std::path::Path>,
                 options: $OptionsType,
             ) -> io::Result<Self> {
-                Ok(Self::with_options(std::fs::File::open(path)?, options))
+                Ok(Self::with_options(std::fs::File::$open_method(path)?, options))
             }
         }
     };

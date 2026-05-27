@@ -244,7 +244,7 @@ impl<T: ReadSeek> ZstdReader<T> {
     }
 }
 
-impl_stream_from_path!(ZstdReader, ZstdReaderOptions);
+impl_stream_from_path!(ZstdReader, ZstdReaderOptions, open);
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for ZstdReader<T> {
@@ -503,7 +503,7 @@ impl<T: Write + 'static> ZstdWriter<T> {
     }
 }
 
-impl_stream_from_path!(ZstdWriter, ZstdWriterOptions);
+impl_stream_from_path!(ZstdWriter, ZstdWriterOptions, create);
 
 impl<T: Write + 'static> WarcWrite for ZstdWriter<T> {
     impl_to_any_methods!();

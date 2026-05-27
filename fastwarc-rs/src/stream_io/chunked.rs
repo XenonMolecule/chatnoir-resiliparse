@@ -94,7 +94,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
     }
 }
 
-impl_stream_from_path!(ChunkedReader, ChunkedReaderOptions);
+impl_stream_from_path!(ChunkedReader, ChunkedReaderOptions, open);
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for ChunkedReader<T> {
@@ -313,7 +313,7 @@ impl<T: Write + 'static> ChunkedWriter<T> {
     }
 }
 
-impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions);
+impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions, create);
 
 impl<T: Write + 'static> WarcWrite for ChunkedWriter<T> {
     impl_to_any_methods!();

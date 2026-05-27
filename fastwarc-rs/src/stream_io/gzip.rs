@@ -165,7 +165,7 @@ impl<T: ReadSeek> GzipReader<T> {
     }
 }
 
-impl_stream_from_path!(GzipReader, GzipReaderOptions);
+impl_stream_from_path!(GzipReader, GzipReaderOptions, open);
 
 // noinspection DuplicatedCode
 impl<T: ReadSeek> io::Read for GzipReader<T> {
@@ -480,7 +480,7 @@ impl<T: Write + 'static> GzipWriter<T> {
     }
 }
 
-impl_stream_from_path!(GzipWriter, GzipWriterOptions);
+impl_stream_from_path!(GzipWriter, GzipWriterOptions, create);
 
 impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
     impl_to_any_methods!();
