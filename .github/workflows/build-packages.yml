@@ -126,7 +126,7 @@ jobs:
           package-dir: fastwarc-py
           output-dir: wheelhouse
         env:
-          CIBW_TEST_COMMAND: python -m pytest --capture=sys --verbose {project}/tests/fastwarc
+          CIBW_TEST_COMMAND: python -m pytest --capture=sys --verbose {project}/fastwarc-py/fastwarc-pytest
 
       - name: Build Resiliparse
         uses: pypa/cibuildwheel@v3.4
@@ -216,7 +216,7 @@ jobs:
       - name: Run Tests
         run: |
           export LD_PRELOAD="$(ldconfig -p | grep libasan | head -n1 | awk '{print $4}')"
-          python${PYTHON_VERSION} -m pytest --capture=sys --verbose tests/
+          python${PYTHON_VERSION} -m pytest --capture=sys --verbose tests fastwarc-py/fastwarc-pytest
 
   build-coverage:
     runs-on: ubuntu-latest
@@ -257,7 +257,11 @@ jobs:
           cargo test --package fastwarc
           
           # Run Python tests
-          python${PYTHON_VERSION} -m pytest --cov --cov-report xml:pytest-coverage.xml --junitxml=pytest-report.junit.xml tests/
+          python${PYTHON_VERSION} -m pytest --cov \
+            --cov-report xml:pytest-coverage.xml \
+            --junitxml=pytest-report.junit.xml \
+            tests \
+            fastwarc-py/fastwarc-pytest
           
           # Generate Rust coverage report
           cargo llvm-cov report --lcov --output-path cargo-coverage.info
