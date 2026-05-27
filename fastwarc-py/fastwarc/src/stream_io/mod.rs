@@ -565,7 +565,7 @@ where
     let use_fsspec = path.split_once("://").is_some()
         && fsspec_args
             .as_ref()
-            .is_none_or(|a| a.bind(py).is(PyBool::new(py, false)));
+            .is_none_or(|a| !a.bind(py).is(PyBool::new(py, false)));
     if use_fsspec {
         match py.import("fsspec") {
             Ok(fsspec) => {

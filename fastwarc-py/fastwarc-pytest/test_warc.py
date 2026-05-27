@@ -190,3 +190,36 @@ def test_archive_iterator_accepts_pathlike_and_filters(tmp_path: Path):
         next(iterator)
 
     assert seen_ids == ["<urn:uuid:first>"]
+
+
+def test_archive_iterator_accepts_fsspec_url():
+    pytest.importorskip("fsspec")
+
+    fixture = Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures" / "warcfile.warc.zst"
+    iterator = ArchiveIterator(
+        fixture.resolve().as_uri(),
+        parse_http=False,
+        record_types=response,
+    )
+
+    record = next(iterator)
+    assert record.record_type == response
+    assert record.record_id is not None
+    assert record.verify_block_digest()
+
+
+def test_archive_iterator_accepts_fsspec_url_with_args_dict():
+    pytest.importorskip("fsspec")
+
+    fixture = Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures" / "warcfile.warc.zst"
+    iterator = ArchiveIterator(
+        fixture.resolve().as_uri(),
+        parse_http=False,
+        record_types=response,
+        fsspec_args={},
+    )
+
+    record = next(iterator)
+    assert record.record_type == response
+    assert record.record_id is not None
+    assert record.verify_block_digest()

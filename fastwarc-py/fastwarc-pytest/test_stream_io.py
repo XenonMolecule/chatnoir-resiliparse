@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import io
+import builtins
+from pathlib import Path
+import sys
 import pytest
 from fastwarc.stream_io import *
 
@@ -167,7 +170,7 @@ class _ForwardingWriter:
         (Lz4Reader, Lz4Writer),
     ],
 )
-def test_native_stream_adapter_roundtrip(reader_cls, writer_cls):
+def test_native_stream_adapter(reader_cls, writer_cls):
     payload = b"native adapter payload\n" * 8
     raw = io.BytesIO()
 
@@ -209,7 +212,7 @@ def test_forwarding_stream_adapter_paths(return_bytearray):
         assert reader.read() == payload
 
 
-def test_stream_io_fsspec_memory_roundtrip():
+def test_stream_io_fsspec_memory_write():
     pytest.importorskip("fsspec")
 
     url = "memory://fastwarc-pytest-stream.gz"
@@ -222,3 +225,52 @@ def test_stream_io_fsspec_memory_roundtrip():
 
     with GzipReader(url) as reader:
         assert reader.read() == payload
+
+
+def test_stream_io_fsspec_with_args_dict(tmp_path: Path):
+    pytest.importorskip("fsspec")
+
+    payload = b"fsspec args payload"
+    nested_path = tmp_path / "nested" / "stream.gz"
+    url = nested_path.resolve().as_uri()
+
+    with GzipWriter(url, fsspec_args={"auto_mkdir": True}) as writer:
+        assert writer.write(payload) == len(payload)
+        writer.finish()
+
+    assert nested_path.exists()
+    with GzipReader(url, fsspec_args={"auto_mkdir": True}) as reader:
+        assert reader.read() == payload
+
+
+def test_stream_io_fsspec_read_from_file():
+    pytest.importorskip("fsspec")
+
+    fixture = Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures" / "warcfile.warc.zst"
+    url = fixture.resolve().as_uri()
+    assert url.startswith("file://")
+
+    with ZstdReader(url) as reader:
+        prefix = reader.read(5)
+        assert prefix == b"WARC/"
+        assert reader.read()
+
+
+def test_stream_io_fsspec_false_to_disable():
+    with pytest.raises(OSError):
+        GzipReader("memory://fastwarc-pytest-missing.gz", fsspec_args=False)
+
+
+def test_stream_io_fsspec_import_error_is_propagated(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "fsspec":
+            raise RuntimeError("boom")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "fsspec", raising=False)
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        GzipReader("memory://fastwarc-pytest-import-error.gz")
