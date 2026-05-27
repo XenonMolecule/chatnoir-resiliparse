@@ -20,6 +20,13 @@ import pytest
 from fastwarc.stream_io import *
 
 
+def get_fixtures_path():
+    return Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures"
+
+
+TQBF = b"The quick brown fox jumps over the lazy dog."
+
+
 # noinspection PyNoneFunctionAssignment
 def test_stream_reader_writer_base_classes():
     reader = WarcReader()
@@ -264,7 +271,7 @@ def test_stream_io_fsspec_with_args_dict(tmp_path: Path):
 def test_stream_io_fsspec_read_from_file():
     pytest.importorskip("fsspec")
 
-    fixture = Path(__file__).resolve().parents[2] / "fastwarc-rs" / "tests" / "fixtures" / "warcfile.warc.zst"
+    fixture = get_fixtures_path() / "warcfile.warc.zst"
     url = fixture.resolve().as_uri()
     assert url.startswith("file://")
 
@@ -292,3 +299,34 @@ def test_stream_io_fsspec_import_error_is_propagated(monkeypatch):
 
     with pytest.raises(RuntimeError, match="boom"):
         GzipReader("memory://fastwarc-pytest-import-error.gz")
+
+
+@pytest.mark.parametrize(
+    ("dict_train_data", "train_dictionary",),
+    [
+        (None, lambda _: None),
+        (TQBF * 20,
+         lambda r: zstd_train_dictionary_from_continuous(r, [len(TQBF)] * 20, 100000)),
+        ([TQBF] * 20,
+         lambda r: zstd_train_dictionary_from_samples(r, 100000)),
+        (get_fixtures_path() / "tqbf.txt",
+         lambda r: zstd_train_dictionary_from_files([str(r)] * 8, 100000)),
+    ],
+)
+def test_zstd_dictionary_roundtrip(dict_train_data, train_dictionary):
+    raw_bytes = TQBF * 200
+
+    out = io.BytesIO()
+    d = train_dictionary(dict_train_data)
+    with ZstdWriter(out, dictionary=d) as w:
+        w.write(raw_bytes)
+    out.seek(0)
+
+    # Test dictionary frame loading
+    r = ZstdReader(out)
+    assert r.read() == raw_bytes
+
+    out.seek(0)
+    # Test explicit dictionary
+    r = ZstdReader(out, dictionary=d)
+    assert r.read() == raw_bytes
