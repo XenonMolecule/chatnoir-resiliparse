@@ -28,7 +28,8 @@ all = [
     "fastwarc[fsspec]"
 ]
 fsspec = [
-    "fsspec"
+    "fsspec",
+    "s3fs",
 ]
 test = [
     "fastwarc[all]",
