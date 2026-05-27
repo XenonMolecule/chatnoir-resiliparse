@@ -519,6 +519,45 @@ def test_pickle_warc_record():
         assert pickled.reader.read()
 
 
+def test_warc_record_equality():
+    rec1 = next(ArchiveIterator(FileStream(os.path.join(DATA_DIR, 'warcfile.warc')),
+                                parse_http=False, record_types=WarcRecordType.response))
+    rec1.freeze()
+    rec2 = next(ArchiveIterator(FileStream(os.path.join(DATA_DIR, 'warcfile.warc')),
+                                parse_http=False, record_types=WarcRecordType.response))
+    rec2.freeze()
+    assert rec1 is rec1
+    assert rec1 is not rec2
+    assert rec1 == rec2
+    assert rec2 == rec1
+
+    pickled1 = pickle.loads(pickle.dumps(rec1))
+    pickled2 = pickle.loads(pickle.dumps(rec2))
+    assert pickled1 == pickled2
+    assert rec1 is not pickled1
+    assert rec1 == pickled1
+    assert rec1 is not pickled2
+    assert rec1 == pickled2
+    assert rec2 is not pickled1
+    assert rec2 == pickled1
+    assert rec2 is not pickled2
+    assert rec2 == pickled2
+
+    # Mutating records changes equality checks
+    rec1.parse_http()
+    assert rec1 != rec2
+    rec2.parse_http()
+    assert rec1 == rec2
+
+    unfrozen = next(ArchiveIterator(FileStream(os.path.join(DATA_DIR, 'warcfile.warc')),
+                                    parse_http=False, record_types=WarcRecordType.response))
+    # Unfrozen records are not reflexive
+    assert unfrozen is unfrozen
+    assert unfrozen != unfrozen
+    assert unfrozen != rec1
+    assert unfrozen != rec2
+
+
 def test_record_writer():
     file = os.path.join(DATA_DIR, 'warcfile.warc')
     buf = io.BytesIO()

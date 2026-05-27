@@ -97,6 +97,11 @@ impl<T> RawReaderAdapter<T> {
     pub fn into_inner(self) -> T {
         self.inner
     }
+
+    /// Borrow the wrapped reader.
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
 }
 
 impl<T> BufRead for RawReaderAdapter<T>
@@ -390,6 +395,11 @@ impl LimitedBufReader {
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> Box<dyn WarcRead> {
         self.inner
+    }
+
+    /// Borrow the wrapped reader as [`Any`] for type inspection.
+    pub fn inner_as_any(&self) -> &dyn Any {
+        self.inner.as_any()
     }
 
     /// Read until a linefeed (LF) is found or `max_line_len` is reached.

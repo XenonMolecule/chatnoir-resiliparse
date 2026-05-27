@@ -675,6 +675,43 @@ fn record_init_from_bytes() -> io::Result<()> {
 }
 
 #[test]
+fn record_equality_requires_frozen_identical_contents() -> io::Result<()> {
+    let record_bytes = warc_record_data("response", "<urn:uuid:eq>", None, b"ABC");
+
+    let left = WarcRecord::from_bytes(record_bytes.clone())?;
+    let right = WarcRecord::from_bytes(record_bytes)?;
+    assert_eq!(left, right);
+
+    let different_payload = WarcRecord::from_bytes(warc_record_data("response", "<urn:uuid:eq>", None, b"ABD"))?;
+    assert_ne!(left, different_payload);
+
+    let unfrozen =
+        WarcRecord::from_reader(io::Cursor::new(warc_record_data("response", "<urn:uuid:eq>", None, b"ABC")))?;
+    assert_ne!(left, unfrozen);
+
+    // Test partial reflexivity
+    assert_eq!(left, left);
+    assert_eq!(right, right);
+    assert_ne!(unfrozen, unfrozen);
+
+    let mut http_left = WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:eq-http>", "Hello"))?;
+    let mut http_right = WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:eq-http>", "Hello"))?;
+    assert_eq!(http_left, http_right);
+
+    http_left.parse_http()?;
+    assert_ne!(http_left, http_right);
+
+    http_right.parse_http()?;
+    assert_eq!(http_left, http_right);
+
+    let mut http_different = WarcRecord::from_bytes(http_response_warc_data("<urn:uuid:eq-http>", "World"))?;
+    http_different.parse_http()?;
+    assert_ne!(http_left, http_different);
+
+    Ok(())
+}
+
+#[test]
 fn record_init_headers_http() -> io::Result<()> {
     let mut record = WarcRecord::new();
     record.init_headers(Some(WarcRecordType::AnyType), Some(b"uuid:494749ad-b14a-4f22-b143-0bab4347884b"));

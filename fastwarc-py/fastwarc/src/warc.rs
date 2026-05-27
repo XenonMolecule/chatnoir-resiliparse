@@ -716,6 +716,23 @@ impl WarcRecordPy {
         )
     }
 
+    fn __eq__(&self, other: Bound<'_, PyAny>) -> bool {
+        let Ok(other) = other.cast::<WarcRecordPy>() else {
+            return false;
+        };
+        if Arc::ptr_eq(&self.inner, &other.borrow().inner) {
+            return self.lock().is_frozen();
+        }
+        let left = self.lock();
+        let other_ref = other.borrow();
+        let right = other_ref.lock();
+        *left == *right
+    }
+
+    fn __ne__(&self, other: Bound<'_, PyAny>) -> bool {
+        !self.__eq__(other)
+    }
+
     pub fn __str__(&self) -> String {
         self.inner.with_mut(|r| r.to_string())
     }

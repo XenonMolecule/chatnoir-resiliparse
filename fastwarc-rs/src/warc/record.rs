@@ -880,6 +880,23 @@ impl Debug for WarcRecord {
     }
 }
 
+impl PartialEq for WarcRecord {
+    fn eq(&self, other: &Self) -> bool {
+        if !self.is_frozen() || !other.is_frozen() {
+            return false;
+        }
+
+        self.record_type == other.record_type
+            && self.headers == other.headers
+            && self.content_length == other.content_length
+            && self.is_http == other.is_http
+            && self.http_parsed == other.http_parsed
+            && self.http_charset == other.http_charset
+            && self.http_headers == other.http_headers
+            && self.frozen_payload_bytes() == other.frozen_payload_bytes()
+    }
+}
+
 /// Inner reader accessor that doesn't borrow self.
 macro_rules! get_reader_mut {
     ($self:ident) => {{
@@ -948,7 +965,7 @@ impl WarcRecord {
     ///
     /// WARC record parsed from the stream.
     pub fn from_reader_quirks(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Self> {
-        match Self::_from_reader_internal(reader, quirks_mode)? {
+        match Self::from_reader_internal(reader, quirks_mode)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
         }
@@ -967,7 +984,7 @@ impl WarcRecord {
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn _from_reader_internal(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Option<Self>> {
+    fn from_reader_internal(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Option<Self>> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
         record.quirks_mode = quirks_mode;
@@ -985,9 +1002,10 @@ impl WarcRecord {
     /// * `payload` - Body as bytes
     pub fn from_bytes(payload: Vec<u8>) -> Result<Self, io::Error> {
         let mut record = WarcRecord::from_reader(io::Cursor::new(payload))?;
-        if let Some(ReaderType::Original(r)) = record.reader.take() {
-            record.reader = Some(ReaderType::Frozen((r, None)));
-        }
+        let Some(ReaderType::Original(reader)) = record.reader.take() else {
+            panic!("Invalid internal reader state.");
+        };
+        record.reader = Some(ReaderType::Frozen((reader, None)));
         Ok(record)
     }
 
@@ -1042,6 +1060,18 @@ impl WarcRecord {
         )));
         self.headers
             .set_bytes(b"Content-Length", self.content_length.to_string().as_bytes());
+    }
+
+    /// Get the raw payload bytes content of a frozen record.
+    /// Returns `None` if the record is not frozen.
+    pub fn frozen_payload_bytes(&self) -> Option<&[u8]> {
+        let ReaderType::Frozen((reader, _)) = self.reader.as_ref()? else {
+            return None;
+        };
+        let raw = reader
+            .inner_as_any()
+            .downcast_ref::<crate::stream_io::RawReaderAdapter<io::Cursor<Vec<u8>>>>()?;
+        Some(raw.get_ref().get_ref().as_slice())
     }
 
     /// Detach an attached buffered reader and hand ownership back to the caller.
@@ -1524,10 +1554,10 @@ impl WarcRecord {
         let mut is_frozen = false;
         let wrapped = match self.reader.take() {
             Some(ReaderType::Original(r)) => Ok(r),
-            Some(ReaderType::Frozen(r)) => {
-                frozen_orig = r.1;
+            Some(ReaderType::Frozen((reader, orig))) => {
+                frozen_orig = orig;
                 is_frozen = true;
-                Ok(r.0)
+                Ok(reader)
             }
             Some(ReaderType::Wrapped(r)) => Ok(r),
             None => Err(io::Error::other("Record has no reader set")),
@@ -1862,7 +1892,7 @@ impl Iterator for WarcRecord {
             return Some(Err(e));
         }
         let reader = self.detach_reader()?;
-        Self::_from_reader_internal(reader, self.quirks_mode).transpose()
+        Self::from_reader_internal(reader, self.quirks_mode).transpose()
     }
 }
 
