@@ -18,7 +18,7 @@ use self::zstd::{ZstdReaderPy, ZstdWriterPy};
 use fastwarc::stream_io::traits::{WarcRead, WarcWrite};
 use pyo3::exceptions::{PyModuleNotFoundError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyString};
+use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyNone, PyString};
 use std::any::Any;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
@@ -74,7 +74,7 @@ impl WarcReaderPy {
 
     /// Close the stream.
     pub fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
+        Ok(py.None())
     }
 
     pub fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
@@ -137,12 +137,12 @@ impl WarcWriterPy {
 
     /// Flush buffered output.
     pub fn flush(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
+        Ok(py.None())
     }
 
     /// Close the stream.
     pub fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
+        Ok(py.None())
     }
 
     pub fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
