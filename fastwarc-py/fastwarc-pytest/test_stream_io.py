@@ -53,11 +53,11 @@ def test_stream_reader_writer_base_classes():
 @pytest.mark.parametrize(
     ("reader_cls", "writer_cls", "reader_supports_frame_position"),
     [
-        (GzipReader, GzipWriter, True),
-        (BrotliReader, BrotliWriter, False),
-        (Lz4Reader, Lz4Writer, True),
-        (ZstdReader, ZstdWriter, True),
-        (ChunkedReader, ChunkedWriter, False),
+        pytest.param(GzipReader, GzipWriter, True, id="gzip"),
+        pytest.param(BrotliReader, BrotliWriter, False, id="brotli"),
+        pytest.param(Lz4Reader, Lz4Writer, True, id="lz4"),
+        pytest.param(ZstdReader, ZstdWriter, True, id="zstd"),
+        pytest.param(ChunkedReader, ChunkedWriter, False, id="chunked"),
     ],
 )
 def test_stream_reader_writer(reader_cls, writer_cls, reader_supports_frame_position):
@@ -190,9 +190,9 @@ class _ForwardingWriter:
 @pytest.mark.parametrize(
     ("reader_cls", "writer_cls"),
     [
-        (GzipReader, GzipWriter),
-        (ZstdReader, ZstdWriter),
-        (Lz4Reader, Lz4Writer),
+        pytest.param(GzipReader, GzipWriter, id="gzip"),
+        pytest.param(ZstdReader, ZstdWriter, id="zstd"),
+        pytest.param(Lz4Reader, Lz4Writer, id="lz4"),
     ],
 )
 def test_native_stream_adapter(reader_cls, writer_cls):
@@ -304,13 +304,22 @@ def test_stream_io_fsspec_import_error_is_propagated(monkeypatch):
 @pytest.mark.parametrize(
     ("dict_train_data", "train_dictionary",),
     [
-        (None, lambda _: None),
-        (TQBF * 20,
-         lambda r: zstd_train_dictionary_from_continuous(r, [len(TQBF)] * 20, 100000)),
-        ([TQBF] * 20,
-         lambda r: zstd_train_dictionary_from_samples(r, 100000)),
-        (get_fixtures_path() / "tqbf.txt",
-         lambda r: zstd_train_dictionary_from_files([str(r)] * 8, 100000)),
+        pytest.param(None, lambda _: None, id="no-dictionary"),
+        pytest.param(
+            TQBF * 20,
+            lambda r: zstd_train_dictionary_from_continuous(r, [len(TQBF)] * 20, 100000),
+            id="continuous",
+        ),
+        pytest.param(
+            [TQBF] * 20,
+            lambda r: zstd_train_dictionary_from_samples(r, 100000),
+            id="samples",
+        ),
+        pytest.param(
+            get_fixtures_path() / "tqbf.txt",
+            lambda r: zstd_train_dictionary_from_files([str(r)] * 8, 100000),
+            id="files",
+        ),
     ],
 )
 def test_zstd_dictionary_roundtrip(dict_train_data, train_dictionary):
