@@ -286,3 +286,44 @@ def test_archive_iterator_accepts_fsspec_url_with_args_dict():
     assert record.record_type == response
     assert record.record_id is not None
     assert record.verify_block_digest()
+
+
+@pytest.mark.parametrize(
+    ("func_filter", "parse_http", "expected_count", "validator"),
+    [
+        pytest.param(is_warc_10, False, 50, None, id="is-warc-10"),
+        pytest.param(is_warc_11, False, 0, None, id="is-warc-11"),
+        pytest.param(has_block_digest, False, 16, lambda rec: rec.verify_block_digest(), id="has-block-digest"),
+        pytest.param(has_payload_digest, True, 16, lambda rec: rec.verify_payload_digest(), id="has-payload-digest"),
+        pytest.param(
+            is_http,
+            False,
+            16 * 2 + 1,
+            lambda rec: rec.is_http and rec.record_type in [request, response],
+            id="is-http",
+        ),
+        pytest.param(
+            is_concurrent,
+            False,
+            16 * 2,
+            lambda rec: 'WARC-Concurrent-To' in rec.headers,
+            id="is-concurrent",
+        ),
+        pytest.param(
+            lambda rec: rec.record_type in [request, response],
+            False,
+            16 * 2 + 1,
+            lambda rec: rec.record_type in [request, response],
+            id="lambda",
+        ),
+    ],
+)
+def test_record_func_filters(func_filter, parse_http, expected_count, validator):
+    file = get_fixtures_path() / 'warcfile.warc'
+
+    count = 0
+    for rec in ArchiveIterator(file, parse_http=parse_http, func_filter=func_filter):
+        if validator is not None:
+            assert validator(rec)
+        count += 1
+    assert count == expected_count
