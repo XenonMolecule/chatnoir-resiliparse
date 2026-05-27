@@ -111,7 +111,7 @@ impl WarcReaderPy {
     /// Return the start offset of the current compression frame or member, if supported.
     ///
     pub fn frame_start_position(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(py.NotImplemented())
+        Ok(py.None())
     }
 }
 

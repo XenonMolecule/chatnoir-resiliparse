@@ -24,6 +24,7 @@ from fastwarc.stream_io import *
         (BrotliWriter, BrotliReader, False),
         (Lz4Writer, Lz4Reader, True),
         (ZstdWriter, ZstdReader, True),
+        (ChunkedWriter, ChunkedReader, False),
     ],
 )
 def test_stream_reader_writer(writer_cls, reader_cls, reader_supports_frame_position):
