@@ -82,6 +82,53 @@ def test_warc_record_type_binary_operators():
     assert ~response == (~4 & 0xFFFF)
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("warcinfo", 2),
+        ("response", 4),
+        ("resource", 8),
+        ("request", 16),
+        ("metadata", 32),
+        ("revisit", 64),
+        ("conversion", 128),
+        ("continuation", 256),
+        ("unknown", 512),
+        ("any_type", 65535),
+        ("no_type", 0),
+    ],
+)
+def test_warc_record_type_conversions(name: str, value: int):
+    record_type = getattr(WarcRecordType, name)
+
+    assert record_type == value
+    assert getattr(fastwarc.warc, name) == record_type
+    assert int(record_type) == value
+
+
+@pytest.mark.parametrize(
+    "record_type",
+    [
+        warcinfo,
+        response,
+        resource,
+        request,
+        metadata,
+        revisit,
+        conversion,
+        continuation,
+        unknown,
+        any_type,
+        no_type,
+    ],
+)
+def test_warc_record_type_conversion_rust_internal(record_type: WarcRecordType):
+    # Covers conversion between Python enum and Rust-internal enum types
+    record = WarcRecord()
+    record.record_type = record_type
+    assert record.record_type == record_type
+
+
 def test_header_map_binding_surface():
     headers = HeaderMap("latin1")
     assert headers.is_empty()
@@ -95,9 +142,15 @@ def test_header_map_binding_surface():
     assert headers.values_bytes() == ()
     assert headers.items() == ()
     assert headers != HeaderMap("utf-8")
-    assert "<no status line>" in repr(headers)
 
-    headers.status_line = "HTTP/1.1 204 No Content"
+    assert "<no status line>" in repr(headers)
+    headers.status_line_bytes = b"HTTP/1.1 204 No Content"
+    assert headers.status_line == "HTTP/1.1 204 No Content"
+    assert headers.status_line_bytes == b"HTTP/1.1 204 No Content"
+    headers.status_line = "HTTP/1.1 200 OK"
+    assert headers.status_line == "HTTP/1.1 200 OK"
+    assert headers.status_line_bytes == b"HTTP/1.1 200 OK"
+
     headers.set("X-Test", "abc")
     headers.append("Set-Cookie", "a=1")
     headers.append_bytes(b"Set-Cookie", b"b=2")
@@ -118,7 +171,7 @@ def test_header_map_binding_surface():
         ("X-Bytes", "xyz"),
     )
     assert headers != HeaderMap("latin1")
-    assert "HTTP/1.1 204 No Content" in repr(headers)
+    assert "HTTP/1.1 200 OK" in repr(headers)
 
     assert "X-Test" in headers
     assert "X-Bytes" in headers
