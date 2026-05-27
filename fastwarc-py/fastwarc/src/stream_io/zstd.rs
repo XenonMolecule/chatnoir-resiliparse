@@ -155,17 +155,19 @@ pub struct ZstdWriterPy {
 #[pymethods]
 impl ZstdWriterPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=8192, fsspec_args=None, dictionary=None, compress_dictionary_frame=false))]
+    #[pyo3(signature = (inner, buffer_size=8192, compression_level=3, fsspec_args=None, dictionary=None, compress_dictionary_frame=false))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
         buffer_size: usize,
+        compression_level: u8,
         fsspec_args: Option<Py<PyAny>>,
         dictionary: Option<Vec<u8>>,
         compress_dictionary_frame: bool,
     ) -> PyResult<PyClassInitializer<Self>> {
         let options = zstd::ZstdWriterOptions {
             capacity: buffer_size,
+            level: compression_level as i32,
             compress_dictionary_frame,
             ..zstd::ZstdWriterOptions::default()
         };
