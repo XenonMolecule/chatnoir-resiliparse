@@ -57,11 +57,15 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+*-coverage.xml
+*.info
 *.cover
 *.py,cover
+*.junit.xml
 .hypothesis/
 .pytest_cache/
 pytestdebug.log
+*.profraw
 
 # Translations
 *.mo
@@ -173,3 +177,6 @@ wikidumps/
 # third-party dependencies
 vcpkg/
 vcpkg_installed/
+
+# agents
+.codex
