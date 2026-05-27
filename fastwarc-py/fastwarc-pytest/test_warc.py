@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import datetime as dt
+import gzip
 import hashlib
 import io
 import pickle
@@ -68,6 +69,81 @@ def test_package_reexports_and_legacy_shims():
     assert LZ4Stream is LZ4Stream
     assert "FileStream" in fastwarc.__all__
     assert "GZipStream" in fastwarc.stream_io.__all__
+
+
+def test_warc_record_type_binary_operators():
+    assert int(response) == 4
+    assert response | request == 20
+    assert 1 | response == 5
+    assert response & request == 0
+    assert 7 & response == 4
+    assert response ^ request == 20
+    assert 1 ^ response == 5
+    assert ~response == (~4 & 0xFFFF)
+
+
+def test_header_map_binding_surface():
+    headers = HeaderMap("latin1")
+    assert headers.is_empty()
+    assert len(headers) == 0
+    assert headers.to_tuples() == ()
+    assert headers.astuples() == ()
+    assert headers.asdict() == {}
+    assert headers.keys() == ()
+    assert headers.keys_bytes() == ()
+    assert headers.values() == ()
+    assert headers.values_bytes() == ()
+    assert headers.items() == ()
+    assert headers != HeaderMap("utf-8")
+    assert "<no status line>" in repr(headers)
+
+    headers.status_line = "HTTP/1.1 204 No Content"
+    headers.set("X-Test", "abc")
+    headers.append("Set-Cookie", "a=1")
+    headers.append_bytes(b"Set-Cookie", b"b=2")
+    headers.set_bytes(b"X-Bytes", b"xyz")
+
+    assert not headers.is_empty()
+    assert len(headers) == 4
+    assert headers.to_tuples() == headers.astuples()
+    assert headers.asdict()["X-Test"] == "abc"
+    assert headers.keys() == ("X-Test", "Set-Cookie", "Set-Cookie", "X-Bytes")
+    assert headers.keys_bytes() == (b"X-Test", b"Set-Cookie", b"Set-Cookie", b"X-Bytes")
+    assert headers.values() == ("abc", "a=1", "b=2", "xyz")
+    assert headers.values_bytes() == (b"abc", b"a=1", b"b=2", b"xyz")
+    assert headers.items() == (
+        ("X-Test", "abc"),
+        ("Set-Cookie", "a=1"),
+        ("Set-Cookie", "b=2"),
+        ("X-Bytes", "xyz"),
+    )
+    assert headers != HeaderMap("latin1")
+    assert "HTTP/1.1 204 No Content" in repr(headers)
+
+    assert "X-Test" in headers
+    assert "X-Bytes" in headers
+    assert b"X-Test" in headers.keys_bytes()
+    assert b"X-Bytes" in headers.keys_bytes()
+    headers.remove("X-Test")
+    headers.remove_bytes(b"X-Bytes")
+    assert "X-Test" not in headers
+    assert "X-Bytes" not in headers
+    assert b"X-Test" not in headers.keys_bytes()
+    assert b"X-Bytes" not in headers.keys_bytes()
+
+    headers.clear()
+    assert headers.is_empty()
+    assert len(headers) == 0
+    assert headers.status_line is None
+
+
+def test_http_headers_absent_on_non_http_record():
+    record = WarcRecord()
+    record.init_headers(unknown, b"urn:uuid:no-http")
+    record.set_bytes_content(b"payload")
+    assert record.http_headers is None
+    record.parse_http(strict_mode=False)
+    assert record.http_headers is None
 
 
 def test_header_write_parse_roundtrip():
@@ -130,6 +206,7 @@ def test_warc_record_write():
     rec.parse_http(strict_mode=False)
     assert rec.http_content_type == "text/plain"
     assert rec.http_charset == "utf-8"
+    assert rec.http_headers is not None
     assert rec.http_date == dt.datetime(1994, 11, 15, 8, 12, 31, tzinfo=dt.timezone.utc)
     assert rec.http_last_modified == dt.datetime(1994, 11, 15, 12, 45, 26, tzinfo=dt.timezone.utc)
     assert rec.verify_payload_digest() is True
@@ -141,6 +218,7 @@ def test_warc_record_write():
     assert reader.seek(0) == 0
     assert reader.read(2) == HTTP_BODY[:2]
     assert reader.consume() == len(HTTP_BODY) - 2
+    assert rec.consume() == 0
 
     restored = pickle.loads(pickle.dumps(rec))
     assert restored.record_id == rec.record_id
@@ -188,6 +266,75 @@ def test_record_and_header_pickle():
     pickled_fixture_record = pickle.loads(pickle.dumps(fixture_record))
     assert pickled_fixture_record.reader.tell() == 0
     assert pickled_fixture_record.reader.read() == frozen_remaining
+
+
+def test_warc_record_set_record_id():
+    record = _make_http_record(record_urn=b"uuid:before")
+    assert record.record_id == "<urn:uuid:before>"
+    record.record_id = "<urn:uuid:after>"
+    assert record.record_id == "<urn:uuid:after>"
+
+    # Roundtrip serialize and read
+    buf = io.BytesIO()
+    record.write(buf)
+    new_rec = WarcRecord()
+    new_rec.set_bytes_payload(buf.getvalue())
+    new_rec.parse_warc_headers()
+    assert new_rec.record_id == "<urn:uuid:after>"
+
+
+def test_warc_record_parse_warc_headers():
+    record_bytes = (get_fixtures_path() / "warcfile.warc").read_bytes()
+    record = WarcRecord()
+    record.set_bytes_payload(record_bytes)
+
+    bytes_read = record.parse_warc_headers()
+    assert bytes_read > 0
+    assert record.headers.status_line == "WARC/1.0"
+    assert record.record_type == warcinfo
+    assert record.record_id is not None
+    assert record.content_length > 0
+    assert record.reader.tell() == 0
+
+    # Parsing without reader errors out
+    with pytest.raises(OSError, match="No reader set"):
+        WarcRecord().parse_warc_headers()
+
+
+def test_warc_record_auto_decode_content_and_transfer():
+    payload = b"decoded payload"
+
+    content_record = WarcRecord()
+    content_record.init_headers(unknown, b"urn:uuid:content-decode")
+    content_record.record_type = response
+    content_record.is_http = True
+    gz_payload = gzip.compress(payload)
+    content_record.set_bytes_content(
+        b"HTTP/1.1 200 OK\r\n"
+        b"Content-Type: text/plain\r\n"
+        b"Content-Encoding: gzip\r\n"
+        + f"Content-Length: {len(gz_payload)}\r\n".encode()
+        + b"\r\n"
+        + gz_payload
+    )
+    content_record.parse_http(auto_decode="content", strict_mode=False)
+    assert content_record.reader.read() == payload
+
+    transfer_record = WarcRecord()
+    transfer_record.init_headers(unknown, b"urn:uuid:transfer-decode")
+    transfer_record.record_type = response
+    transfer_record.is_http = True
+    chunked_payload = b"%X\r\n%s\r\n0\r\n\r\n" % (len(payload), payload)
+    transfer_record.set_bytes_content(
+        b"HTTP/1.1 200 OK\r\n"
+        b"Content-Type: text/plain\r\n"
+        b"Transfer-Encoding: chunked\r\n"
+        + f"Content-Length: {len(chunked_payload)}\r\n".encode()
+        + b"\r\n"
+        + chunked_payload
+    )
+    transfer_record.parse_http(auto_decode="transfer", strict_mode=False)
+    assert transfer_record.reader.read() == payload
 
 
 def test_warc_record_equality():
