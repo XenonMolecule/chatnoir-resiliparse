@@ -114,6 +114,24 @@ def test_stream_io_context_manager():
         assert reader.read() == payload
 
 
+def test_stream_reader_seek_with_whence():
+    payload = b"alpha\nbeta\ngamma"
+    raw = io.BytesIO()
+
+    with GzipWriter(raw) as writer:
+        assert writer.write(payload) == len(payload)
+        writer.finish()
+
+    with GzipReader(io.BytesIO(raw.getvalue())) as reader:
+        assert reader.seek(6, 0) == 6
+        assert reader.seek(2, 1) == 8
+        assert reader.read(2) == b"ta"
+        with pytest.raises(OSError) as e:
+            assert reader.seek(-5, 2)
+        assert 'Seeking from end not supported' == e.value.args[0]
+        assert reader.read() == b"\ngamma"
+
+
 class _ForwardingReader:
     """
     Wrapper type for BytesIO that triggers the PythonReaderAdapter paths
