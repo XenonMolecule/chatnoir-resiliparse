@@ -178,6 +178,17 @@ def test_record_and_header_pickle():
     assert record.reader.tell() == 13
     assert record_roundtrip.reader.tell() == 0
 
+    fixture_record = next(ArchiveIterator(get_fixtures_path() / 'warcfile.warc',
+                                          parse_http=False, record_types=WarcRecordType.response))
+    assert fixture_record.reader.read(13)
+    fixture_record.freeze()
+    frozen_remaining = fixture_record.reader.read()
+    assert fixture_record.reader.seek(0) == 0
+
+    pickled_fixture_record = pickle.loads(pickle.dumps(fixture_record))
+    assert pickled_fixture_record.reader.tell() == 0
+    assert pickled_fixture_record.reader.read() == frozen_remaining
+
 
 def test_warc_record_equality():
     rec1 = next(ArchiveIterator(get_fixtures_path() / 'warcfile.warc',

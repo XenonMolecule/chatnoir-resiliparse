@@ -1038,6 +1038,35 @@ fn record_consume_and_freeze_stream_payload() -> io::Result<()> {
 }
 
 #[test]
+fn record_freeze_preserves_payload_from_current_seek_offset() -> io::Result<()> {
+    let file = get_fixture_path("warcfile.warc");
+    let record = ArchiveIterator::from_path(&file)?
+        .with_parse_http(false)
+        .find_map(|rec| {
+            let rec = rec.ok()?;
+            let is_response = rec.borrow().record_type() == WarcRecordType::Response;
+            is_response.then_some(rec)
+        })
+        .unwrap();
+
+    let mut record = record.borrow_mut();
+    let mut skipped = [0u8; 13];
+    record.reader_mut().unwrap().read_exact(&mut skipped)?;
+    let mut expected_remaining = Vec::new();
+    record.reader_mut().unwrap().read_to_end(&mut expected_remaining)?;
+    record.reader_mut().unwrap().seek(io::SeekFrom::Start(13))?;
+    record.freeze()?;
+    assert!(record.is_frozen());
+    assert_eq!(record.reader_mut().unwrap().stream_position()?, 0);
+
+    let mut frozen_remaining = Vec::new();
+    record.reader_mut().unwrap().read_to_end(&mut frozen_remaining)?;
+    assert_eq!(frozen_remaining, expected_remaining);
+
+    Ok(())
+}
+
+#[test]
 fn record_encoded_http_payload() -> io::Result<()> {
     let payload_raw = b"ABCDEF".repeat(2000);
 
