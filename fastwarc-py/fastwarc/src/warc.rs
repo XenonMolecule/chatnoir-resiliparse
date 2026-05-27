@@ -233,7 +233,7 @@ impl HeaderMapPy {
         self.with_headers(|headers| {
             let mut buf = Vec::with_capacity(headers.len() * 40);
             headers.write(&mut buf)?;
-            Ok((PyBytes::new(py, buf.as_ref()), self.status_line(py).is_some()))
+            Ok((PyBytes::new(py, buf.as_ref()), headers.status_line().is_some()))
         })
     }
 

@@ -494,6 +494,7 @@ def test_pickle_warc_header_map():
 def test_pickle_warc_record():
     for rec in ArchiveIterator(FileStream(os.path.join(DATA_DIR, 'warcfile.warc')),
                                parse_http=False, record_types=WarcRecordType.response):
+        assert pickle.loads(pickle.dumps(rec.headers)) == rec.headers
         pickled = pickle.loads(pickle.dumps(rec))
 
         assert pickled.headers == rec.headers
@@ -505,6 +506,7 @@ def test_pickle_warc_record():
 
     for rec in ArchiveIterator(FileStream(os.path.join(DATA_DIR, 'warcfile.warc')),
                                parse_http=True, record_types=WarcRecordType.response):
+        assert pickle.loads(pickle.dumps(rec.headers)) == rec.headers
         pickled = pickle.loads(pickle.dumps(rec))
 
         assert pickled.headers == rec.headers

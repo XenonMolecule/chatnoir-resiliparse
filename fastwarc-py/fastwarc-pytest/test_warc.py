@@ -152,14 +152,16 @@ def test_record_and_header_pickle():
     record.set_bytes_content(_http_payload())
     assert record.is_frozen
 
-    # TODO: Fix deadlock
-    # assert pickle.loads(pickle.dumps(record.headers)) == record.headers
+    # Pickle headers
+    assert pickle.loads(pickle.dumps(record.headers)) == record.headers
 
+    # Pickle entire record
     record_roundtrip = pickle.loads(pickle.dumps(record))
     assert record_roundtrip is not record
     assert record_roundtrip.is_frozen
     assert record_roundtrip.record_id == record.record_id
     assert record_roundtrip.content_length == record.content_length
+    assert record_roundtrip.headers is not record.headers
     assert record_roundtrip.headers == record.headers
     record.reader.seek(0)
     assert record_roundtrip.reader.read() == record.reader.read()
