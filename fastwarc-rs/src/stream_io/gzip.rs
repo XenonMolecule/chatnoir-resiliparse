@@ -268,7 +268,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             // Member end or EOF
             if matches!(status, zlib_rs::Status::StreamEnd) {
                 self.deflate = Inflate::new(true, self.window_bits);
-                self.next_member_pos = self.inner.stream_position()?;
+                self.next_member_pos = self.inner_pos;
                 break;
             }
 
