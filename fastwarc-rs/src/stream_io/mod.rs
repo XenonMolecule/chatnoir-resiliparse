@@ -88,6 +88,7 @@ pub(super) use impl_to_any_methods;
 /// Wrapper type for arbitrary [`BufReadSeek`] readers that implements [`WarcRead`].
 pub struct RawReaderAdapter<T> {
     inner: T,
+    pos: u64,
 }
 
 impl<T> RawReaderAdapter<T> {
@@ -113,6 +114,7 @@ where
     }
 
     fn consume(&mut self, amount: usize) {
+        self.pos += amount as u64;
         self.inner.consume(amount);
     }
 }
@@ -121,8 +123,11 @@ impl<T> Read for RawReaderAdapter<T>
 where
     T: BufReadSeek,
 {
+    // noinspection DuplicatedCode
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+        let n = self.fill_buf()?.read(buf)?;
+        self.consume(n);
+        Ok(n)
     }
 }
 
@@ -131,7 +136,15 @@ where
     T: BufReadSeek,
 {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        self.inner.seek(pos)
+        if pos == io::SeekFrom::Current(0) {
+            return Ok(self.pos);
+        }
+        self.pos = self.inner.seek(pos)?;
+        Ok(self.pos)
+    }
+
+    fn stream_position(&mut self) -> io::Result<u64> {
+        Ok(self.pos)
     }
 }
 
@@ -146,11 +159,11 @@ where
     impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        self.inner.seek(pos)
+        self.seek(pos)
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        self.inner.stream_position()
+        self.stream_position()
     }
 }
 
@@ -185,8 +198,9 @@ impl<T> IntoWarcReader for BufReader<T>
 where
     T: Read + Seek + Send + 'static,
 {
-    fn into_warc_reader(self) -> Box<dyn WarcRead> {
-        Box::new(RawReaderAdapter { inner: self })
+    fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
+        let pos = self.stream_position().unwrap_or(0);
+        Box::new(RawReaderAdapter { inner: self, pos })
     }
 }
 
@@ -196,7 +210,8 @@ where
     io::Cursor<T>: Read,
 {
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
-        Box::new(RawReaderAdapter { inner: self })
+        let pos = self.position();
+        Box::new(RawReaderAdapter { inner: self, pos })
     }
 }
 

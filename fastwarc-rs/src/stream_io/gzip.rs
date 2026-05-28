@@ -27,6 +27,7 @@ pub struct GzipReader<T: ReadSeek> {
     inner: BufReader<T>,
     deflate: Inflate,
     stream_pos: u64,
+    inner_pos: u64,
     member_pos: u64,
     next_member_pos: u64,
     buf: Vec<u8>,
@@ -121,6 +122,7 @@ impl<T: ReadSeek> GzipReader<T> {
             inner: BufReader::with_capacity(options.capacity, inner),
             deflate: Inflate::new(options.expect_header, window_bits),
             stream_pos: 0,
+            inner_pos,
             member_pos: inner_pos,
             next_member_pos: inner_pos,
             buf: vec![0; options.capacity * decomp_ratio as usize],
@@ -203,17 +205,21 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
     impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        if pos == SeekFrom::Current(0) {
+            return Ok(self.inner_pos);
+        }
         self.deflate = Inflate::new(true, self.window_bits);
         self.buf_pos = 0;
         self.buf_len = 0;
         let new_pos = self.inner.seek(pos)?;
+        self.inner_pos = new_pos;
         self.next_member_pos = new_pos;
         self.stream_pos = 0;
         Ok(new_pos)
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        self.inner.stream_position()
+        Ok(self.inner_pos)
     }
 
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
@@ -256,6 +262,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             let in_delta = self.deflate.total_in() - total_in;
             let out_delta = self.deflate.total_out() - total_out;
             self.inner.consume(in_delta as usize);
+            self.inner_pos += in_delta;
             self.buf_len += out_delta as usize;
 
             // Member end or EOF
@@ -280,9 +287,8 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
     }
 
     fn consume(&mut self, amount: usize) {
-        let old_buf_os = self.buf_pos;
-        self.buf_pos = self.buf.len().min(self.buf_pos + amount);
-        self.stream_pos += (self.buf_pos - old_buf_os) as u64;
+        self.buf_pos += amount;
+        self.stream_pos += amount as u64;
     }
 }
 
