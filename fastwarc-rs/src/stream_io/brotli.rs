@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use brotli::{CompressorWriter, Decompressor};
 use std::any::Any;
@@ -157,7 +157,7 @@ impl<T: ReadSeek> BufRead for BrotliReader<T> {
 // ===========================================================
 
 /// Writer for Brotli-compressed streams.
-pub struct BrotliWriter<T: Write + 'static> {
+pub struct BrotliWriter<T: _Write> {
     inner: Option<CompressorWriter<T>>,
 }
 
@@ -183,11 +183,11 @@ impl Default for BrotliWriterOptions {
     }
 }
 
-impl<T: Write + 'static> WarcWrite for BrotliWriter<T> {
+impl<T: _Write> WarcWrite for BrotliWriter<T> {
     impl_to_any_methods!();
 }
 
-impl<T: Write + 'static> BrotliWriter<T> {
+impl<T: _Write> BrotliWriter<T> {
     /// Create a new [`BrotliWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -244,7 +244,7 @@ impl<T: Write + 'static> BrotliWriter<T> {
 
 impl_stream_from_path!(BrotliWriter, BrotliWriterOptions, create);
 
-impl<T: Write + 'static> Write for BrotliWriter<T> {
+impl<T: _Write> io::Write for BrotliWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.as_mut().unwrap().write(buf)
     }
@@ -256,7 +256,7 @@ impl<T: Write + 'static> Write for BrotliWriter<T> {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> Drop for BrotliWriter<T> {
+impl<T: _Write> Drop for BrotliWriter<T> {
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.flush().ok();

@@ -205,9 +205,11 @@ pub(crate) struct PyReaderAdapter {
 }
 
 macro_rules! native_inner_call_path {
-    ($self:ident, $inner:ident, $py:ident, $closure:expr) => {{
+    ($self:ident, $DynTrait:ident, $inner:ident, $py:ident, $closure:expr) => {{
         let inner = &$inner.bind($py).borrow().inner;
-        $closure($self, inner.lock().unwrap().as_mut().unwrap())
+        let mut guard = inner.lock().unwrap();
+        let inner: &mut dyn $DynTrait = guard.as_mut().unwrap().as_mut();
+        $closure($self, inner)
     }};
 }
 
@@ -246,13 +248,13 @@ impl PyReaderAdapter {
         Python::attach(|py| -> io::Result<R> {
             match self.inner.clone() {
                 PyReaderType::GzipReader(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcRead, inner, py, native_call_closure)
                 }
                 PyReaderType::ZstdReader(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcRead, inner, py, native_call_closure)
                 }
                 PyReaderType::Lz4Reader(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcRead, inner, py, native_call_closure)
                 }
                 PyReaderType::Other(inner) => Ok(forward_call_closure(self, inner.bind(py))?),
             }
@@ -465,13 +467,13 @@ impl PyWriterAdapter {
         Python::attach(|py| -> io::Result<R> {
             match self.inner.clone() {
                 PyWriterType::GzipWriter(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcWrite, inner, py, native_call_closure)
                 }
                 PyWriterType::ZstdWriter(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcWrite, inner, py, native_call_closure)
                 }
                 PyWriterType::Lz4Writer(inner) => {
-                    native_inner_call_path!(self, inner, py, native_call_closure)
+                    native_inner_call_path!(self, WarcWrite, inner, py, native_call_closure)
                 }
                 PyWriterType::Other(inner) => Ok(forward_call_closure(self, inner.bind(py))?),
             }

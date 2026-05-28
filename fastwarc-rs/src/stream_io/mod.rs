@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{BufReadSeek, IntoWarcReader, IntoWarcWriter, WarcRead, WarcWrite};
+use crate::stream_io::traits::{BufReadSeek, IntoWarcReader, IntoWarcWriter, WarcRead, WarcWrite, Write as _Write};
 use std::any::Any;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -158,70 +158,82 @@ impl<T> IntoWarcReader for T
 where
     T: WarcRead,
 {
-    type Reader = T;
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        Box::new(self)
+    }
+}
 
-    fn into_warc_reader(self) -> Self::Reader {
+impl IntoWarcReader for Box<dyn WarcRead> {
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        self
+    }
+}
+
+impl IntoWarcReader for Box<dyn WarcRead + Send> {
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        self
+    }
+}
+
+impl IntoWarcReader for Box<dyn WarcRead + Send + Sync> {
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
         self
     }
 }
 
 impl<T> IntoWarcReader for BufReader<T>
 where
-    T: Send + 'static + Read + Seek,
+    T: Read + Seek + Send + 'static,
 {
-    type Reader = RawReaderAdapter<BufReader<T>>;
-
-    fn into_warc_reader(self) -> Self::Reader {
-        RawReaderAdapter { inner: self }
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        Box::new(RawReaderAdapter { inner: self })
     }
 }
 
 impl<T> IntoWarcReader for io::Cursor<T>
 where
-    T: Send + 'static + AsRef<[u8]>,
+    T: Send + AsRef<[u8]> + 'static,
     io::Cursor<T>: Read,
 {
-    type Reader = RawReaderAdapter<io::Cursor<T>>;
-
-    fn into_warc_reader(self) -> Self::Reader {
-        RawReaderAdapter { inner: self }
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        Box::new(RawReaderAdapter { inner: self })
     }
 }
 
 // Forwarding implementation for Box<dyn WarcRead>
-impl<T> WarcRead for Box<T>
-where
-    T: WarcRead + ?Sized,
-{
-    fn as_any(&self) -> &dyn Any {
-        (**self).as_any()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        (**self).as_any_mut()
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        let inner: Box<T> = *self;
-        inner.into_any()
-    }
-
-    fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        (**self).inner_seek(pos)
-    }
-
-    fn inner_stream_position(&mut self) -> io::Result<u64> {
-        (**self).inner_stream_position()
-    }
-
-    fn is_stream_decoder(&self) -> bool {
-        (**self).is_stream_decoder()
-    }
-
-    fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
-        (**self).frame_start_position()
-    }
-}
+// impl<T> WarcRead for Box<T>
+// where
+//     T: WarcRead + ?Sized,
+// {
+//     fn as_any(&self) -> &dyn Any {
+//         (**self).as_any()
+//     }
+//
+//     fn as_any_mut(&mut self) -> &mut dyn Any {
+//         (**self).as_any_mut()
+//     }
+//
+//     fn into_any(self: Box<Self>) -> Box<dyn Any> {
+//         let inner: Box<T> = *self;
+//         inner.into_any()
+//     }
+//
+//     fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+//         (**self).inner_seek(pos)
+//     }
+//
+//     fn inner_stream_position(&mut self) -> io::Result<u64> {
+//         (**self).inner_stream_position()
+//     }
+//
+//     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
+//         (**self).frame_start_position()
+//     }
+//
+//     fn is_stream_decoder(&self) -> bool {
+//         (**self).is_stream_decoder()
+//     }
+// }
 
 // ===========================================================
 // RawWriterAdapter
@@ -232,10 +244,7 @@ pub struct RawWriterAdapter<T> {
     inner: T,
 }
 
-impl<T> RawWriterAdapter<T>
-where
-    T: Write + 'static,
-{
+impl<T: _Write> RawWriterAdapter<T> {
     /// Unwrap this [`RawWriterAdapter`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
@@ -244,10 +253,7 @@ where
     }
 }
 
-impl<T> Write for RawWriterAdapter<T>
-where
-    T: Write + 'static,
-{
+impl<T: _Write> Write for RawWriterAdapter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
@@ -257,35 +263,32 @@ where
     }
 }
 
-impl<T> WarcWrite for RawWriterAdapter<T>
-where
-    T: Write + 'static,
-{
+impl<T: _Write> WarcWrite for RawWriterAdapter<T> {
     impl_to_any_methods!();
 }
 
 // Forwarding implementation for Box<dyn WarcRead>
-impl<T> WarcWrite for Box<T>
-where
-    T: WarcWrite + ?Sized,
-{
-    fn as_any(&self) -> &dyn Any {
-        (**self).as_any()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        (**self).as_any_mut()
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        let inner: Box<T> = *self;
-        inner.into_any()
-    }
-
-    fn finish(&mut self) -> io::Result<()> {
-        (**self).finish()
-    }
-}
+// impl<T> WarcWrite for Box<T>
+// where
+//     T: WarcWrite + ?Sized,
+// {
+//     fn as_any(&self) -> &dyn Any {
+//         (**self).as_any()
+//     }
+//
+//     fn as_any_mut(&mut self) -> &mut dyn Any {
+//         (**self).as_any_mut()
+//     }
+//
+//     fn into_any(self: Box<Self>) -> Box<dyn Any> {
+//         let inner: Box<T> = *self;
+//         inner.into_any()
+//     }
+//
+//     fn finish(&mut self) -> io::Result<()> {
+//         (**self).finish()
+//     }
+// }
 
 // ===========================================================
 // IntoWarcWriter implementations
@@ -295,33 +298,45 @@ impl<T> IntoWarcWriter for T
 where
     T: WarcWrite,
 {
-    type Writer = T;
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        Box::new(self)
+    }
+}
 
-    fn into_warc_writer(self) -> Self::Writer {
+impl IntoWarcWriter for Box<dyn WarcWrite> {
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        self
+    }
+}
+
+impl IntoWarcWriter for Box<dyn WarcWrite + Send> {
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        self
+    }
+}
+
+impl IntoWarcWriter for Box<dyn WarcWrite + Send + Sync> {
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         self
     }
 }
 
 impl<T> IntoWarcWriter for io::BufWriter<T>
 where
-    T: Send + 'static + Write,
+    T: _Write,
 {
-    type Writer = RawWriterAdapter<io::BufWriter<T>>;
-
-    fn into_warc_writer(self) -> Self::Writer {
-        RawWriterAdapter { inner: self }
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        Box::new(RawWriterAdapter { inner: self })
     }
 }
 
 impl<T> IntoWarcWriter for io::Cursor<T>
 where
-    T: Send + 'static + AsMut<[u8]>,
-    io::Cursor<T>: Write,
+    T: AsMut<[u8]> + Send + 'static,
+    io::Cursor<T>: _Write,
 {
-    type Writer = RawWriterAdapter<io::Cursor<T>>;
-
-    fn into_warc_writer(self) -> Self::Writer {
-        RawWriterAdapter { inner: self }
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        Box::new(RawWriterAdapter { inner: self })
     }
 }
 
@@ -354,7 +369,7 @@ impl LimitedBufReader {
         let mut reader = reader.into_warc_reader();
         let pos = reader.stream_position().unwrap_or(0);
         Self {
-            inner: Box::new(reader),
+            inner: reader,
             limit: limit.unwrap_or(u64::MAX),
             pos,
         }

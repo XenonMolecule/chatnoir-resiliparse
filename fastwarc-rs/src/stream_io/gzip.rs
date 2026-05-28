@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
@@ -291,7 +291,7 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
 // ===========================================================
 
 /// Writer for Gzip-compressed streams.
-pub struct GzipWriter<T: Write + 'static> {
+pub struct GzipWriter<T: _Write> {
     inner: Option<T>,
     deflate: Deflate,
     member_started: bool,
@@ -334,7 +334,7 @@ impl Default for GzipWriterOptions {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> GzipWriter<T> {
+impl<T: _Write> GzipWriter<T> {
     /// Create a new [`GzipWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -482,7 +482,7 @@ impl<T: Write + 'static> GzipWriter<T> {
 
 impl_stream_from_path!(GzipWriter, GzipWriterOptions, create);
 
-impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
+impl<T: _Write> WarcWrite for GzipWriter<T> {
     impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
@@ -495,7 +495,7 @@ impl<T: Write + 'static> WarcWrite for GzipWriter<T> {
     }
 }
 
-impl<T: Write + 'static> Write for GzipWriter<T> {
+impl<T: _Write> io::Write for GzipWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.write_with_flush_opt(buf, DeflateFlush::NoFlush)
     }
@@ -511,7 +511,7 @@ impl<T: Write + 'static> Write for GzipWriter<T> {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> Drop for GzipWriter<T> {
+impl<T: _Write> Drop for GzipWriter<T> {
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

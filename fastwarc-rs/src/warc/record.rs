@@ -1020,13 +1020,9 @@ impl WarcRecord {
     ///
     /// # Arguments
     ///
-    /// * `reader` - Shared pointer to a buffered reader instance
-    pub fn attach_reader<T>(&mut self, reader: T)
-    where
-        T: IntoWarcReader,
-    {
-        let mut reader = Box::new(reader.into_warc_reader());
-
+    /// * `reader` - stream reader instance
+    pub fn attach_reader(&mut self, reader: impl IntoWarcReader) {
+        let mut reader = reader.into_warc_reader();
         // Initialize stream position from inner stream
         if self.stream_pos == 0 {
             self.stream_pos = reader.inner_stream_position().unwrap();
@@ -1097,7 +1093,8 @@ impl WarcRecord {
                     }};
                 }
                 // Unwrap content decoders. The first one in the chain is always a `LimitedBufReader`.
-                let mut reader_any = Box::new(reader)
+                let mut reader_any = reader
+                    .into_warc_reader()
                     .into_any()
                     .downcast::<LimitedBufReader>()
                     .unwrap()
@@ -1124,7 +1121,7 @@ impl WarcRecord {
             ReaderType::Frozen((frozen, orig)) => {
                 self.reader = Some(ReaderType::Frozen((frozen, None)));
                 orig.map(|r| {
-                    Box::new(r)
+                    r.into_warc_reader()
                         .into_any()
                         .downcast::<LimitedBufReader>()
                         .unwrap()
@@ -1563,7 +1560,7 @@ impl WarcRecord {
             Some(ReaderType::Wrapped(r)) => Ok(r),
             None => Err(io::Error::other("Record has no reader set")),
         }?;
-        let mut wrapped: Box<dyn WarcRead> = Box::new(wrapped);
+        let mut wrapped = wrapped.into_warc_reader();
 
         let encoding_it = encoding_str
             .split(|c| *c == b',')
@@ -1571,19 +1568,20 @@ impl WarcRecord {
             .rev();
         for enc in encoding_it {
             match enc.as_slice() {
-                b"gzip" => wrapped = Box::new(gzip::GzipReader::new(wrapped)),
+                b"gzip" => wrapped = gzip::GzipReader::new(wrapped).into_warc_reader(),
                 b"deflate" => {
-                    wrapped = Box::new(gzip::GzipReader::with_options(
+                    wrapped = gzip::GzipReader::with_options(
                         wrapped,
                         gzip::GzipReaderOptions {
                             window_bits: gzip::MAX_WBITS,
                             ..gzip::GzipReaderOptions::default()
                         },
-                    ))
+                    )
+                    .into_warc_reader()
                 }
-                b"br" => wrapped = Box::new(brotli::BrotliReader::new(wrapped)),
-                b"zstd" => wrapped = Box::new(zstd::ZstdReader::new(wrapped)),
-                b"chunked" if transfer => wrapped = Box::new(chunked::ChunkedReader::new(wrapped)),
+                b"br" => wrapped = brotli::BrotliReader::new(wrapped).into_warc_reader(),
+                b"zstd" => wrapped = zstd::ZstdReader::new(wrapped).into_warc_reader(),
+                b"chunked" if transfer => wrapped = chunked::ChunkedReader::new(wrapped).into_warc_reader(),
                 b"identity" | b"" => (),
                 _ => {
                     return Err(io::Error::other(format!(

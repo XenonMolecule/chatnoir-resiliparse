@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
@@ -323,7 +323,7 @@ impl<T: ReadSeek> BufRead for ZstdReader<T> {
 // ===========================================================
 
 /// Writer for Zstd-compressed streams.
-pub struct ZstdWriter<T: Write + 'static> {
+pub struct ZstdWriter<T: _Write> {
     inner: Option<Encoder<'static, BufWriter<T>>>,
     options: ZstdWriterOptions,
     frame_started: bool,
@@ -372,7 +372,7 @@ impl Default for ZstdWriterOptions {
     }
 }
 
-impl<T: Write + 'static> ZstdWriter<T> {
+impl<T: _Write> ZstdWriter<T> {
     /// Create a new [`ZstdWriter`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -505,7 +505,7 @@ impl<T: Write + 'static> ZstdWriter<T> {
 
 impl_stream_from_path!(ZstdWriter, ZstdWriterOptions, create);
 
-impl<T: Write + 'static> WarcWrite for ZstdWriter<T> {
+impl<T: _Write> WarcWrite for ZstdWriter<T> {
     impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
@@ -519,7 +519,7 @@ impl<T: Write + 'static> WarcWrite for ZstdWriter<T> {
     }
 }
 
-impl<T: Write + 'static> Write for ZstdWriter<T> {
+impl<T: _Write> io::Write for ZstdWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !self.stream_started && self.dict.is_some() {
             self.write_dict_frame()?;
@@ -536,7 +536,7 @@ impl<T: Write + 'static> Write for ZstdWriter<T> {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> Drop for ZstdWriter<T> {
+impl<T: _Write> Drop for ZstdWriter<T> {
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

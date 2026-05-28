@@ -19,11 +19,14 @@ use std::io;
 // Global trait definitions
 // ===========================================================
 
-pub trait ReadSeek: io::Read + io::Seek + Send + 'static {}
-impl<T: io::Read + io::Seek + Send + ?Sized + 'static> ReadSeek for T {}
+pub trait ReadSeek: io::Read + io::Seek + 'static {}
+impl<T: io::Read + io::Seek + ?Sized + 'static> ReadSeek for T {}
 
-pub trait BufReadSeek: io::BufRead + io::Seek + Send + 'static {}
-impl<T: io::BufRead + io::Seek + Send + ?Sized + 'static> BufReadSeek for T {}
+pub trait BufReadSeek: ReadSeek + io::BufRead {}
+impl<T: ReadSeek + io::BufRead> BufReadSeek for T {}
+
+pub trait Write: io::Write + 'static {}
+impl<T: io::Write + ?Sized + 'static> Write for T {}
 
 // ===========================================================
 // General Reader / Writer trait
@@ -83,7 +86,7 @@ pub trait WarcRead: BufReadSeek + Any {
 
 /// Trait for [`io::Write`] stream implementations that writes (potentially coded)
 /// data to a WARC stream. A [`WarcWrite`] stream may wrap another inner stream.
-pub trait WarcWrite: io::Write + Any + 'static {
+pub trait WarcWrite: Write + Any {
     /// Get an [`Any`] reference to this [`WarcRead`].
     fn as_any(&self) -> &dyn Any;
 
@@ -110,16 +113,12 @@ pub trait WarcWrite: io::Write + Any + 'static {
     }
 }
 
-/// Conversion trait for arbitrary [`io::Read`] types into [`WarcRead`].
+/// Conversion trait for arbitrary [`io::Read`] types into `Box<dyn WarcRead>`.
 pub trait IntoWarcReader {
-    type Reader: WarcRead;
-
-    fn into_warc_reader(self) -> Self::Reader;
+    fn into_warc_reader(self) -> Box<dyn WarcRead>;
 }
 
-/// Conversion trait for arbitrary [`io::Write`] types into [`WarcWrite`].
+/// Conversion trait for arbitrary [`io::Write`] types into `Box<dyn WarcWrite>`.
 pub trait IntoWarcWriter {
-    type Writer: WarcWrite;
-
-    fn into_warc_writer(self) -> Self::Writer;
+    fn into_warc_writer(self) -> Box<dyn WarcWrite>;
 }

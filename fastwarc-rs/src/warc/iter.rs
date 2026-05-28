@@ -172,6 +172,7 @@ where
             options,
         }
     }
+
     /// Create an archive iterator from a WARC file path.
     ///
     /// If the file name ends in `.warc.gz`, `.warc.zst`, or `.warc.lz4`, the correct
@@ -202,10 +203,10 @@ where
         let reader = BufReader::new(std::fs::File::open(&path)?);
         if options.stream_detect {
             let reader: Box<dyn WarcRead> = match path.as_ref().extension().and_then(|e| e.to_str()) {
-                Some("gz") => Box::new(GzipReader::new(reader)),
-                Some("zst") => Box::new(ZstdReader::new(reader)),
-                Some("lz4") => Box::new(Lz4Reader::new(reader)),
-                _ => Box::new(reader.into_warc_reader()),
+                Some("gz") => GzipReader::new(reader).into_warc_reader(),
+                Some("zst") => ZstdReader::new(reader).into_warc_reader(),
+                Some("lz4") => Lz4Reader::new(reader).into_warc_reader(),
+                _ => reader.into_warc_reader(),
             };
             options.stream_detect = false;
             return Ok(Self::with_options(reader, options));
@@ -316,11 +317,11 @@ where
                 return Err(io::Error::other("Inconsistent reader state."));
             };
             let reader = match magic_bytes.as_deref() {
-                Some(b) if &b[..3] == b"\x1F\x8B\x08" => LimitedBufReader::new(Box::new(GzipReader::new(reader)), None),
+                Some(b) if &b[..3] == b"\x1F\x8B\x08" => LimitedBufReader::new(GzipReader::new(reader), None),
                 Some(b"\x28\xB5\x2F\xFD") | Some(b"\x5D\x2A\x4D\x18") => {
-                    LimitedBufReader::new(Box::new(ZstdReader::new(reader)), None)
+                    LimitedBufReader::new(ZstdReader::new(reader), None)
                 }
-                Some(b"\x04\x22\x4D\x18") => LimitedBufReader::new(Box::new(Lz4Reader::new(reader)), None),
+                Some(b"\x04\x22\x4D\x18") => LimitedBufReader::new(Lz4Reader::new(reader), None),
                 _ => reader,
             };
             r.reader = Some(ReaderType::Original(reader));

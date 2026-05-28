@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
@@ -201,7 +201,7 @@ impl<T: ReadSeek> BufRead for Lz4Reader<T> {
 // ===========================================================
 
 /// Writer for LZ4-compressed streams.
-pub struct Lz4Writer<T: Write + 'static> {
+pub struct Lz4Writer<T: _Write> {
     inner: Option<FrameEncoder<BufWriter<T>>>,
     frame_started: bool,
 }
@@ -222,7 +222,7 @@ impl Default for Lz4WriterOptions {
     }
 }
 
-impl<T: Write + 'static> Lz4Writer<T> {
+impl<T: _Write> Lz4Writer<T> {
     /// Create a new [`Lz4Writer`].
     ///
     /// Maintains a small write buffer to temporarily store compressed data before flushing them
@@ -275,7 +275,7 @@ impl<T: Write + 'static> Lz4Writer<T> {
 
 impl_stream_from_path!(Lz4Writer, Lz4WriterOptions, create);
 
-impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
+impl<T: _Write> WarcWrite for Lz4Writer<T> {
     impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
@@ -289,7 +289,7 @@ impl<T: Write + 'static> WarcWrite for Lz4Writer<T> {
     }
 }
 
-impl<T: Write + 'static> Write for Lz4Writer<T> {
+impl<T: _Write> io::Write for Lz4Writer<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.frame_started = true;
         self.inner.as_mut().unwrap().write(buf)
@@ -304,7 +304,7 @@ impl<T: Write + 'static> Write for Lz4Writer<T> {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> Drop for Lz4Writer<T> {
+impl<T: _Write> Drop for Lz4Writer<T> {
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

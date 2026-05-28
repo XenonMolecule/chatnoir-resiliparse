@@ -724,7 +724,7 @@ fn archive_iterator_zstd_dict() -> io::Result<()> {
     assert_eq!(::zstd::decode_all(encoded.clone()).unwrap_err().to_string(), "Dictionary mismatch");
 
     // ZstdReader should load dictionary frame automatically and keep it for all iterations.
-    let reader = Box::new(zstd::ZstdReader::new(encoded));
+    let reader = zstd::ZstdReader::new(encoded);
     let mut count = 0;
     for (i, rec) in ArchiveIterator::new(reader).enumerate() {
         let rec = rec?;

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite};
+use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -224,7 +224,7 @@ impl<T: ReadSeek> BufRead for ChunkedReader<T> {
 // ===========================================================
 
 /// Writer for chunked HTTP streams.
-pub struct ChunkedWriter<T: Write + 'static> {
+pub struct ChunkedWriter<T: _Write> {
     inner: Option<T>,
     chunk_buffer: Vec<u8>,
     min_chunk_size: usize,
@@ -248,7 +248,7 @@ impl Default for ChunkedWriterOptions {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> ChunkedWriter<T> {
+impl<T: _Write> ChunkedWriter<T> {
     /// Create a new [`ChunkedWriter`].
     ///
     /// Maintains a small write buffer to temporarily accumulate data in a chunk before flushing it
@@ -300,7 +300,7 @@ impl<T: Write + 'static> ChunkedWriter<T> {
     }
 }
 
-impl<T: Write + 'static> ChunkedWriter<T> {
+impl<T: _Write> ChunkedWriter<T> {
     fn write_chunk_buffer(&mut self) -> io::Result<usize> {
         let inner = self.inner.as_mut().unwrap();
         let header = format!("{:x}\r\n", self.chunk_buffer.len()).into_bytes();
@@ -315,7 +315,7 @@ impl<T: Write + 'static> ChunkedWriter<T> {
 
 impl_stream_from_path!(ChunkedWriter, ChunkedWriterOptions, create);
 
-impl<T: Write + 'static> WarcWrite for ChunkedWriter<T> {
+impl<T: _Write> WarcWrite for ChunkedWriter<T> {
     impl_to_any_methods!();
 
     fn finish(&mut self) -> io::Result<()> {
@@ -329,7 +329,7 @@ impl<T: Write + 'static> WarcWrite for ChunkedWriter<T> {
     }
 }
 
-impl<T: Write + 'static> Write for ChunkedWriter<T> {
+impl<T: _Write> io::Write for ChunkedWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.stream_started = true;
         self.chunk_buffer.extend_from_slice(buf);
@@ -345,7 +345,7 @@ impl<T: Write + 'static> Write for ChunkedWriter<T> {
 }
 
 // noinspection DuplicatedCode
-impl<T: Write + 'static> Drop for ChunkedWriter<T> {
+impl<T: _Write> Drop for ChunkedWriter<T> {
     fn drop(&mut self) {
         if self.inner.is_some() {
             self.finish().ok();

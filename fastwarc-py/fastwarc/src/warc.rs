@@ -143,7 +143,7 @@ impl WarcRecordTypePy {
 /// Dict-like type representing a WARC or HTTP header block.
 ///
 /// :param encoding: header source encoding
-#[pyclass(name = "HeaderMap", module = "fastwarc.warc")]
+#[pyclass(name = "HeaderMap", module = "fastwarc.warc", unsendable)]
 pub struct HeaderMapPy {
     inner: HeaderMapBacking,
 }
@@ -571,7 +571,7 @@ impl HeaderMapPy {
 /// This object is tied to the lifetime of its parent :class:`WarcRecord`. If the
 /// record belongs to an active :class:`ArchiveIterator`, the reader becomes stale
 /// once iteration advances unless the record has been frozen with :meth:`WarcRecord.freeze`.
-#[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy)]
+#[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy, unsendable)]
 pub struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,
 }
@@ -659,7 +659,7 @@ impl WarcRecordPayloadReaderPy {
 ///
 /// WARC records are pickleable. Pickling preserves the current record state,
 /// including parsed HTTP headers if they have already been parsed.
-#[pyclass(name = "WarcRecord", subclass, module = "fastwarc.warc")]
+#[pyclass(name = "WarcRecord", subclass, module = "fastwarc.warc", unsendable)]
 pub struct WarcRecordPy {
     inner: Arc<Mutex<WarcRecord>>,
 }
@@ -688,6 +688,7 @@ impl WarcRecordPy {
         Ok(Self::from_record(WarcRecord::from_bytes(payload)?))
     }
 
+    // noinspection DuplicatedCode
     #[classmethod]
     #[pyo3(signature = (reader, quirks_mode=false))]
     pub fn from_reader(
@@ -696,13 +697,12 @@ impl WarcRecordPy {
         reader: Py<PyAny>,
         quirks_mode: bool,
     ) -> PyResult<Self> {
-        // noinspection DuplicatedCode
         let reader = wrap_reader_stream(
             py,
             reader,
             None,
-            |reader| -> io::Result<Box<dyn WarcRead + Send>> { Ok(Box::new(reader)) },
-            |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader())),
+            |reader| -> io::Result<Box<dyn WarcRead>> { Ok(Box::new(reader)) },
+            |path| Ok(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader()),
         )?;
         Ok(Self::from_record(WarcRecord::from_reader_quirks(reader, quirks_mode)?))
     }
@@ -1215,7 +1215,7 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
-#[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
+#[pyclass(name = "ArchiveIterator", module = "fastwarc.warc", unsendable)]
 pub struct ArchiveIteratorPy {
     inner: ArchiveIteratorThreadSafe,
     record_types: u16,
@@ -1236,6 +1236,7 @@ fn auto_decode_str_to_enum(value: &str) -> PyResult<AutoDecode> {
 
 #[pymethods]
 impl ArchiveIteratorPy {
+    // noinspection DuplicatedCode
     #[allow(clippy::too_many_arguments)]
     #[new]
     #[pyo3(signature = (
@@ -1285,13 +1286,12 @@ impl ArchiveIteratorPy {
             };
             iterator = ArchiveIteratorThreadSafe::from_path_with_options(path, opts)?;
         } else {
-            // noinspection DuplicatedCode
             let reader = wrap_reader_stream(
                 py,
                 stream,
                 fsspec_args,
-                |reader| -> io::Result<Box<dyn WarcRead + Send>> { Ok(Box::new(reader)) },
-                |path| Ok(Box::new(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader())),
+                |reader| -> io::Result<Box<dyn WarcRead>> { Ok(Box::new(reader)) },
+                |path| Ok(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader()),
             )?;
             iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
         }
