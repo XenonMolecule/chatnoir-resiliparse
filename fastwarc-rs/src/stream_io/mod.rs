@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::traits::{BufReadSeek, IntoWarcReader, IntoWarcWriter, WarcRead, WarcWrite, Write as _Write};
+use crate::stream_io::traits::{
+    BufReadSeek, IntoWarcReader, IntoWarcWriter, ReadSeek, WarcRead, WarcWrite, Write as _Write,
+};
 use std::any::Any;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -196,11 +198,21 @@ impl IntoWarcReader for Box<dyn WarcRead + Send + Sync> {
 
 impl<T> IntoWarcReader for BufReader<T>
 where
-    T: Read + Seek + Send + 'static,
+    T: ReadSeek,
 {
     fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
         let pos = self.stream_position().unwrap_or(0);
         Box::new(RawReaderAdapter { inner: self, pos })
+    }
+}
+
+impl IntoWarcReader for std::fs::File {
+    fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
+        let pos = self.stream_position().unwrap_or(0);
+        Box::new(RawReaderAdapter {
+            inner: BufReader::new(self),
+            pos,
+        })
     }
 }
 
