@@ -11,7 +11,10 @@ fn main() {
     let mut total_count = 0usize;
     println!("Reading WARC file: {}", path);
 
-    for record in ArchiveIterator::new(BufReader::with_capacity(2usize.pow(16), std::fs::File::open(path).unwrap())) {
+    let file = std::fs::File::open(path).unwrap();
+    let reader = BufReader::with_capacity(1 << 20, file);
+
+    for record in ArchiveIterator::new(reader) {
         if record.is_err() {
             continue;
         }

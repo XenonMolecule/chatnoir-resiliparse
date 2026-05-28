@@ -63,7 +63,7 @@ impl Default for GzipReaderOptions {
         Self {
             window_bits: MAX_WBITS + 16,
             expect_header: true,
-            capacity: 4096,
+            capacity: 1 << 16,
         }
     }
 }
@@ -116,7 +116,7 @@ impl<T: ReadSeek> GzipReader<T> {
     /// * `options` - reader options
     pub fn with_options(mut inner: T, options: GzipReaderOptions) -> Self {
         let window_bits = options.window_bits;
-        let decomp_ratio = 2.0;
+        let decomp_ratio = 4.0;
         let inner_pos = inner.stream_position().unwrap_or(0);
         Self {
             inner: BufReader::with_capacity(options.capacity, inner),
@@ -153,7 +153,7 @@ impl<T: ReadSeek> GzipReader<T> {
     fn _update_buf_size(&mut self, read_len: usize, consumed: usize, produced: usize) {
         self.decomp_ratio = 0.9 * self.decomp_ratio + 0.1 * (produced as f32 / consumed as f32);
         let target_buf_size = ((read_len as f32 * self.decomp_ratio).ceil() as usize)
-            .clamp(2 * self.inner.capacity(), 1 << 16)
+            .clamp(2 * self.inner.capacity(), 1 << 18)
             .max(self.buf_len)
             .next_power_of_two();
 
