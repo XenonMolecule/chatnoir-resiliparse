@@ -234,10 +234,7 @@ impl_tracking_bufread_seek!(RawReaderAdapter<T>, BufReadSeek);
 // IntoWarcReader implementations
 // ===========================================================
 
-impl<T> IntoWarcReader for T
-where
-    T: WarcRead,
-{
+impl<T: WarcRead> IntoWarcReader for T {
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(self)
     }
@@ -262,19 +259,8 @@ impl IntoWarcReader for Box<dyn WarcRead + Send + Sync> {
 }
 
 impl<T: ReadSeek> IntoWarcReader for BufReader<T> {
-    fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
-        let pos = self.stream_position().unwrap_or(0);
-        Box::new(RawReaderAdapter { inner: self, pos })
-    }
-}
-
-impl IntoWarcReader for std::fs::File {
-    fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
-        let pos = self.stream_position().unwrap_or(0);
-        Box::new(RawReaderAdapter {
-            inner: BufReader::new(self),
-            pos,
-        })
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        Box::new(RawReaderAdapter::new(self))
     }
 }
 
@@ -284,8 +270,13 @@ where
     io::Cursor<T>: Read,
 {
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
-        let pos = self.position();
-        Box::new(RawReaderAdapter { inner: self, pos })
+        Box::new(RawReaderAdapter::new(self))
+    }
+}
+
+impl IntoWarcReader for std::fs::File {
+    fn into_warc_reader(self) -> Box<dyn WarcRead> {
+        Box::new(TrackingBufReader::new(self))
     }
 }
 
