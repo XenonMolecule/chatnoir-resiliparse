@@ -40,18 +40,37 @@ pub(crate) const DEFAULT_BUFFER_SIZE: usize = 64 << 10;
 /// Especially for linear WARC parsing, it is recommended to use a large buffer size (64-256 KiB)
 /// for at least the lowest layer in the reader stack. That's why the default buffer size of
 /// [`TrackingBufReader`] is much larger than the default of [`BufReader`].
+///
+/// Even though [`TrackingBufReader`] implements [`WarcRead`], it should not be used to wrap other
+/// [`WarcRead`] readers, as it does not actually forward [`WarcRead::inner_stream_position`] and
+/// [`WarcRead::inner_seek()`] to the wrapped stream.
 pub struct TrackingBufReader<T> {
     inner: BufReader<T>,
     pos: u64,
 }
 
 impl<T: Read + Seek> TrackingBufReader<T> {
-    /// Create a new [`CachedBufReader`] with a default buffer size of 64 KiB bytes.
+    /// Create a new [`TrackingBufReader`] with a default buffer size of 64 KiB bytes.
+    ///
+    /// This constructor will issue a single seek call to the inner stream to determine
+    /// its initial position. If the call fails, the position defaults to `0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - wrapped stream
     pub fn new(inner: T) -> Self {
         Self::with_capacity(DEFAULT_BUFFER_SIZE, inner)
     }
 
-    /// Create a new [`CachedBufReader`] with a chose buffer capacity.
+    /// Create a new [`TrackingBufReader`] with a chosen buffer capacity.
+    ///
+    /// This constructor will issue a single seek call to the inner stream to determine
+    /// its initial position. If the call fails, the position defaults to `0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `capacity` - buffer capacity
+    /// * `inner` - wrapped stream
     pub fn with_capacity(capacity: usize, mut inner: T) -> Self {
         let pos = inner.stream_position().unwrap_or(0);
         Self {
@@ -100,7 +119,14 @@ macro_rules! impl_tracking_bufread_seek {
 
         impl<T: $($TraitBounds)+> Seek for $Type {
             fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-                if pos == SeekFrom::Current(0) {
+                if let SeekFrom::Current(pos) = pos {
+                    if pos == 0 {
+                        return Ok(self.pos);
+                    } else if pos > 0 && (pos as usize) <= self.fill_buf()?.len() {
+                        self.consume(pos as usize);
+                        return Ok(self.pos);
+                    }
+                } else if pos == SeekFrom::Start(self.pos) {
                     return Ok(self.pos);
                 }
                 self.pos = self.inner.seek(pos)?;
@@ -156,7 +182,14 @@ pub struct RawReaderAdapter<T> {
 }
 
 impl<T: BufReadSeek> RawReaderAdapter<T> {
-    /// Create a new [`RawReaderAdapter`] from an existing buffered reader..
+    /// Create a new [`RawReaderAdapter`] from an existing buffered reader.
+    ///
+    /// This constructor will issue a single seek call to the inner stream to determine
+    /// its initial position. If the call fails, the position defaults to `0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - wrapped stream
     pub fn new(mut inner: T) -> Self {
         let pos = inner.stream_position().unwrap_or(0);
         Self { inner, pos }
