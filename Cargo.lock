@@ -262,6 +262,7 @@ dependencies = [
  "encoding",
  "lz4_flex",
  "md-5",
+ "memchr",
  "pretty_assertions",
  "sha1",
  "sha2",

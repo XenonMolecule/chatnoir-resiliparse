@@ -27,4 +27,5 @@ bindgen = "0.72"
 pyo3 = "0.28"
 pyo3-build-config = "0.28"
 pretty_assertions = "1.4"
+memchr = "2.7"
 time = { version = "0.3", features = ["formatting", "parsing", "macros"] }

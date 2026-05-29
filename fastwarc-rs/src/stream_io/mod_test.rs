@@ -113,13 +113,14 @@ fn limited_buf_read_seek_read_line() -> std::io::Result<()> {
     assert_eq!(line, b"abcd\n");
     assert_eq!(reader.stream_position()?, 5);
 
-    // Line with CRLF
+    // Append behavior matches BufRead::read_line: return only newly read bytes.
     line.clear();
+    line.extend_from_slice(b"prefix");
     assert_eq!(reader.read_line(&mut line, 64)?, 8);
-    assert_eq!(line, b"efghij\r\n");
+    assert_eq!(line, b"prefixefghij\r\n");
     assert_eq!(reader.stream_position()?, 13);
 
-    // Empty line
+    // Line with CRLF
     line.clear();
     assert_eq!(reader.read_line(&mut line, 64)?, 1);
     assert_eq!(line, b"\n");

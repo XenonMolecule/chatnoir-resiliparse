@@ -16,6 +16,7 @@ use crate::stream_io::impl_to_any_methods;
 use crate::stream_io::traits::{
     BufReadSeek, IntoWarcReader, IntoWarcWriter, ReadSeek, WarcRead, WarcWrite, Write as _Write,
 };
+use memchr::memchr;
 use std::any::Any;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -431,7 +432,7 @@ impl LimitedBufReader {
     }
 
     /// Get the current limit.
-    pub fn limit(&mut self) -> u64 {
+    pub fn limit(&self) -> u64 {
         self.limit
     }
 
@@ -469,25 +470,28 @@ impl LimitedBufReader {
     /// # Returns
     ///
     /// Number of bytes read
-    pub fn read_line(&mut self, buf: &mut Vec<u8>, mut max_line_len: usize) -> io::Result<usize> {
-        max_line_len = max_line_len.min(self.limit() as usize);
-        while buf.len() < max_line_len {
+    pub fn read_line(&mut self, buf: &mut Vec<u8>, max_line_len: usize) -> io::Result<usize> {
+        let start_len = buf.len();
+        let max_line_len = max_line_len.min(self.limit() as usize);
+        buf.reserve(max_line_len);
+
+        while buf.len() - start_len < max_line_len {
             let chunk = self.fill_buf()?;
             if chunk.is_empty() {
                 break;
             }
-            let remaining = max_line_len - buf.len();
+            let remaining = max_line_len - (buf.len() - start_len);
             let limit = chunk.len().min(remaining);
 
-            if let Some(pos) = chunk[..limit].iter().position(|&b| b == b'\n') {
+            if let Some(pos) = memchr(b'\n', &chunk[..limit]) {
                 buf.extend_from_slice(&chunk[..=pos]);
                 self.consume(pos + 1);
-                return Ok(buf.len());
+                return Ok(buf.len() - start_len);
             }
             buf.extend_from_slice(&chunk[..limit]);
             self.consume(limit);
         }
-        Ok(buf.len())
+        Ok(buf.len() - start_len)
     }
 }
 
