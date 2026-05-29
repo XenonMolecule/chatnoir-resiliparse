@@ -20,84 +20,113 @@ use std::any::Any;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
+pub(crate) const DEFAULT_BUFFER_SIZE: usize = 64 << 10;
+
 // ===========================================================
-// RawReaderAdapter
+// Buffered reader.
 // ===========================================================
 
-/// Wrapper type for arbitrary [`BufReadSeek`] readers that implements [`WarcRead`].
-pub struct RawReaderAdapter<T> {
-    inner: T,
+/// A thin wrapper around [`BufReader`] that implements [`Read`] + [`Seek`], but
+/// caches its stream position to make calls to [`Seek::stream_position()`] and
+/// [`Seek::seek(SeekFrom::Current(0))`](Seek::seek()) cheap.
+///
+/// Caching the current reader position is important because WARC parsing relies on
+/// seeking to determine the current record start position, but forwarding that to a syscall
+/// for every record is prohibitively expensive.
+///
+/// The wrapped inner stream must also implement [`Seek`] but should not implement [`BufRead`]
+/// to avoid unnecessary double buffering. Use [`RawReaderAdapter`] instead in that case.
+///
+/// Especially for linear WARC parsing, it is recommended to use a large buffer size (64-256 KiB)
+/// for at least the lowest layer in the reader stack. That's why the default buffer size of
+/// [`TrackingBufReader`] is much larger than the default of [`BufReader`].
+pub struct TrackingBufReader<T> {
+    inner: BufReader<T>,
     pos: u64,
 }
 
-impl<T> RawReaderAdapter<T> {
-    /// Unwrap this [`RawReaderAdapter`], returning the underlying reader.
+impl<T: Read + Seek> TrackingBufReader<T> {
+    /// Create a new [`CachedBufReader`] with a default buffer size of 64 KiB bytes.
+    pub fn new(inner: T) -> Self {
+        Self::with_capacity(DEFAULT_BUFFER_SIZE, inner)
+    }
+
+    /// Create a new [`CachedBufReader`] with a chose buffer capacity.
+    pub fn with_capacity(capacity: usize, mut inner: T) -> Self {
+        let pos = inner.stream_position().unwrap_or(0);
+        Self {
+            inner: BufReader::with_capacity(capacity, inner),
+            pos,
+        }
+    }
+
+    /// Get a reference to the inner reader.
+    pub fn get_ref(&self) -> &T {
+        self.inner.get_ref()
+    }
+
+    /// Get a mutable reference to the inner reader.
+    pub fn get_mut(&mut self) -> &mut T {
+        self.inner.get_mut()
+    }
+
+    /// Unwrap this [`TrackingBufReader`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     pub fn into_inner(self) -> T {
-        self.inner
+        self.inner.into_inner()
     }
 
-    /// Borrow the wrapped reader.
-    pub fn get_ref(&self) -> &T {
-        &self.inner
-    }
-}
-
-impl<T> BufRead for RawReaderAdapter<T>
-where
-    T: BufReadSeek,
-{
-    fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner.fill_buf()
+    /// Return a reference to the internally buffered data.
+    pub fn buffer(&self) -> &[u8] {
+        self.inner.buffer()
     }
 
-    fn consume(&mut self, amount: usize) {
-        self.pos += amount as u64;
-        self.inner.consume(amount);
+    /// Return the number of bytes the internal buffer can hold at once
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
     }
 }
 
-impl<T> Read for RawReaderAdapter<T>
-where
-    T: BufReadSeek,
-{
-    // noinspection DuplicatedCode
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = self.fill_buf()?.read(buf)?;
-        self.consume(n);
-        Ok(n)
-    }
-}
-
-impl<T> Seek for RawReaderAdapter<T>
-where
-    T: BufReadSeek,
-{
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        if pos == io::SeekFrom::Current(0) {
-            return Ok(self.pos);
+macro_rules! impl_tracking_bufread_seek {
+    ($Type:ty, $($TraitBounds:tt)+) => {
+        impl<T: $($TraitBounds)+> Read for $Type {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                let n = self.fill_buf()?.read(buf)?;
+                self.consume(n);
+                Ok(n)
+            }
         }
-        self.pos = self.inner.seek(pos)?;
-        Ok(self.pos)
-    }
 
-    fn stream_position(&mut self) -> io::Result<u64> {
-        Ok(self.pos)
-    }
+        impl<T: $($TraitBounds)+> Seek for $Type {
+            fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+                if pos == SeekFrom::Current(0) {
+                    return Ok(self.pos);
+                }
+                self.pos = self.inner.seek(pos)?;
+                Ok(self.pos)
+            }
+        }
+
+        impl<T: $($TraitBounds)+> BufRead for $Type {
+            fn fill_buf(&mut self) -> io::Result<&[u8]> {
+                self.inner.fill_buf()
+            }
+
+            fn consume(&mut self, amount: usize) {
+                self.inner.consume(amount);
+                self.pos += amount as u64;
+            }
+        }
+    };
 }
 
-// ===========================================================
-// IntoWarcReader implementations
-// ===========================================================
+impl_tracking_bufread_seek!(TrackingBufReader<T>, Read + Seek);
 
-impl<T> WarcRead for RawReaderAdapter<T>
-where
-    T: BufReadSeek,
-{
+impl<T: ReadSeek> WarcRead for TrackingBufReader<T> {
     impl_to_any_methods!();
 
-    fn inner_seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.seek(pos)
     }
 
@@ -105,6 +134,72 @@ where
         self.stream_position()
     }
 }
+
+// ===========================================================
+// RawReaderAdapter
+// ===========================================================
+
+/// Wrapper type for arbitrary [`BufReadSeek`] readers that implements [`WarcRead`].
+/// Like [`TrackingBufReader`], this reader implementation caches its current stream
+/// position to make calls to [`Seek::stream_position()`] and
+/// [`Seek::seek(SeekFrom::Current(0))`](Seek::seek()) cheap.
+///
+/// Use this type over [`TrackingBufReader`] if the wrapped reader alrady implements
+/// [`BufReadSeek`] to avoid unnecessary double buffering.
+///
+/// Especially for linear WARC parsing, it is recommended to use a large buffer size
+/// (64-256 KiB) for at least the lowest layer in the reader stack. Consider constructing
+/// the inner stream accordingly before wrapping it.
+pub struct RawReaderAdapter<T> {
+    inner: T,
+    pos: u64,
+}
+
+impl<T: BufReadSeek> RawReaderAdapter<T> {
+    /// Create a new [`RawReaderAdapter`] from an existing buffered reader..
+    pub fn new(mut inner: T) -> Self {
+        let pos = inner.stream_position().unwrap_or(0);
+        Self { inner, pos }
+    }
+
+    /// Get a reference to the inner reader.
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Get a mutable reference to the inner reader.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    /// Unwrap this [`RawReaderAdapter`], returning the underlying reader.
+    ///
+    /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> WarcRead for RawReaderAdapter<T>
+where
+    T: BufReadSeek,
+{
+    impl_to_any_methods!();
+
+    fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.seek(pos)
+    }
+
+    fn inner_stream_position(&mut self) -> io::Result<u64> {
+        self.stream_position()
+    }
+}
+
+impl_tracking_bufread_seek!(RawReaderAdapter<T>, BufReadSeek);
+
+// ===========================================================
+// IntoWarcReader implementations
+// ===========================================================
 
 impl<T> IntoWarcReader for T
 where
@@ -133,10 +228,7 @@ impl IntoWarcReader for Box<dyn WarcRead + Send + Sync> {
     }
 }
 
-impl<T> IntoWarcReader for BufReader<T>
-where
-    T: ReadSeek,
-{
+impl<T: ReadSeek> IntoWarcReader for BufReader<T> {
     fn into_warc_reader(mut self) -> Box<dyn WarcRead> {
         let pos = self.stream_position().unwrap_or(0);
         Box::new(RawReaderAdapter { inner: self, pos })
@@ -174,6 +266,16 @@ pub struct RawWriterAdapter<T> {
 }
 
 impl<T: _Write> RawWriterAdapter<T> {
+    /// Get a reference to the inner writer.
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Get a mutable reference to the inner writer.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
     /// Unwrap this [`RawWriterAdapter`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
@@ -200,10 +302,7 @@ impl<T: _Write> WarcWrite for RawWriterAdapter<T> {
 // IntoWarcWriter implementations
 // ===========================================================
 
-impl<T> IntoWarcWriter for T
-where
-    T: WarcWrite,
-{
+impl<T: WarcWrite> IntoWarcWriter for T {
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(self)
     }
@@ -227,10 +326,7 @@ impl IntoWarcWriter for Box<dyn WarcWrite + Send + Sync> {
     }
 }
 
-impl<T> IntoWarcWriter for io::BufWriter<T>
-where
-    T: _Write,
-{
+impl<T: _Write> IntoWarcWriter for io::BufWriter<T> {
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(RawWriterAdapter { inner: self })
     }
@@ -405,15 +501,15 @@ impl Read for LimitedBufReader {
 }
 
 impl Seek for LimitedBufReader {
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        if pos == io::SeekFrom::Current(0) {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        if pos == SeekFrom::Current(0) {
             return Ok(self.pos);
         }
 
         let mut new_pos = match pos {
-            io::SeekFrom::Start(p) => p as i128,
-            io::SeekFrom::End(p) => self.limit as i128 + p as i128,
-            io::SeekFrom::Current(p) => self.pos as i128 + p as i128,
+            SeekFrom::Start(p) => p as i128,
+            SeekFrom::End(p) => self.limit as i128 + p as i128,
+            SeekFrom::Current(p) => self.pos as i128 + p as i128,
         };
 
         if new_pos < 0 || new_pos > i64::MAX as i128 {
@@ -422,8 +518,7 @@ impl Seek for LimitedBufReader {
             new_pos = self.limit as i128;
         }
 
-        self.inner
-            .seek(io::SeekFrom::Current(new_pos as i64 - self.pos as i64))?;
+        self.inner.seek(SeekFrom::Current(new_pos as i64 - self.pos as i64))?;
         self.pos = new_pos as u64;
         Ok(self.pos)
     }
