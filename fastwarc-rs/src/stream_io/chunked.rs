@@ -36,7 +36,7 @@ pub struct ChunkedReader<T: ReadSeek> {
 ///
 /// # Options
 ///
-/// * `capacity` - sets the internal buffer size.
+/// * `capacity` - sets the internal buffer size (default: 4 KiB).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ChunkedReaderOptions {
     pub capacity: usize,
@@ -44,7 +44,7 @@ pub struct ChunkedReaderOptions {
 
 impl Default for ChunkedReaderOptions {
     fn default() -> Self {
-        Self { capacity: 1024 }
+        Self { capacity: 4096 }
     }
 }
 
@@ -53,7 +53,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
     ///
     /// Allocates an internal buffer holding chunks of the chunked inner stream.
     ///
-    /// The default buffer size is 1024 bytes. For custom buffer sizes, use [`Self::with_capacity()`].
+    /// The default buffer size is 4 KiB. For custom buffer sizes, use [`Self::with_capacity()`].
     pub fn new(inner: T) -> Self {
         Self::with_options(inner, ChunkedReaderOptions::default())
     }
@@ -244,7 +244,7 @@ pub struct ChunkedWriterOptions {
 
 impl Default for ChunkedWriterOptions {
     fn default() -> Self {
-        Self { min_chunk_size: 512 }
+        Self { min_chunk_size: 1024 }
     }
 }
 
@@ -253,7 +253,7 @@ impl<T: _Write> ChunkedWriter<T> {
     /// Create a new [`ChunkedWriter`].
     ///
     /// Maintains a small write buffer to temporarily accumulate data in a chunk before flushing it
-    /// to the underlying stream. The default minimum chunk size is 512 bytes. Use [`Self::with_chunk_size()`]
+    /// to the underlying stream. The default minimum chunk size is 1024 bytes. Use [`Self::with_chunk_size()`]
     /// for custom buffer sizes.
     ///
     /// # Arguments
@@ -266,7 +266,7 @@ impl<T: _Write> ChunkedWriter<T> {
     /// Create a new [`ChunkedWriter`] a custom write buffer size.
     ///
     /// Maintains a small write buffer to temporarily accumulate data in a chunk before flushing it
-    /// to the underlying stream. The default minimum chunk size is 512 bytes.
+    /// to the underlying stream. The default minimum chunk size is 1024 bytes.
     ///
     /// # Arguments
     ///

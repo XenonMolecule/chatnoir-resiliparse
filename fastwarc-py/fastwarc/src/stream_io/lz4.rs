@@ -25,7 +25,7 @@ use std::sync::Mutex;
 /// LZ4 reader.
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
-/// :param buffer_size: decompression buffer size
+/// :param buffer_size: input buffer size
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 #[pyclass(name = "Lz4Reader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct Lz4ReaderPy {
@@ -36,7 +36,7 @@ pub struct Lz4ReaderPy {
 #[pymethods]
 impl Lz4ReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None))]
+    #[pyo3(signature = (inner, buffer_size=64 << 10, fsspec_args=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,

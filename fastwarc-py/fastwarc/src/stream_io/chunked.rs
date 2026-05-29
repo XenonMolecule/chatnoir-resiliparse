@@ -25,7 +25,7 @@ use std::sync::Mutex;
 /// HTTP chunked-transfer reader.
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
-/// :param buffer_size: decode buffer size
+/// :param buffer_size: input buffer size
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 #[pyclass(name = "ChunkedReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
 pub struct ChunkedReaderPy {
@@ -36,7 +36,7 @@ pub struct ChunkedReaderPy {
 #[pymethods]
 impl ChunkedReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=1024, fsspec_args=None))]
+    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
@@ -100,7 +100,7 @@ pub struct ChunkedWriterPy {
 #[pymethods]
 impl ChunkedWriterPy {
     #[new]
-    #[pyo3(signature = (inner, min_chunk_size=512, fsspec_args=None,))]
+    #[pyo3(signature = (inner, min_chunk_size=1024, fsspec_args=None,))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,

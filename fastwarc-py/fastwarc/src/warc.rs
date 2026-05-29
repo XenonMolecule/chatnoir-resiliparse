@@ -15,7 +15,7 @@
 use crate::stream_io::{
     PyReaderAdapter, PyWriterAdapter, WarcReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
 };
-use fastwarc::stream_io::bufread::LimitedBufReader;
+use fastwarc::stream_io::bufread::{LimitedBufReader, TrackingBufReader};
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
 use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
 use fastwarc::warc::record::DigestError::StreamError;
@@ -1213,6 +1213,8 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param quirks_mode: enable lenient parsing for malformed records
 /// :param auto_decode: automatically decode HTTP payload encodings
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
+/// :param default_buffer_size: default buffer size to use for reading from files
+///                             (has no effect if ``stream`` is not a path-like object)
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc", unsendable)]
@@ -1250,6 +1252,7 @@ impl ArchiveIteratorPy {
         quirks_mode=false,
         auto_decode="none",
         stream_detect=true,
+        buffer_size=64 << 10,
         fsspec_args=None,
         *,
         strict_mode=true
@@ -1266,6 +1269,7 @@ impl ArchiveIteratorPy {
         quirks_mode: bool,
         auto_decode: &str,
         stream_detect: bool,
+        buffer_size: usize,
         fsspec_args: Option<Py<PyAny>>,
         strict_mode: bool,
     ) -> PyResult<Self> {
@@ -1291,7 +1295,7 @@ impl ArchiveIteratorPy {
                 stream,
                 fsspec_args,
                 |reader| -> io::Result<Box<dyn WarcRead>> { Ok(Box::new(reader)) },
-                |path| Ok(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader()),
+                |path| Ok(TrackingBufReader::with_capacity(buffer_size, std::fs::File::open(path)?).into_warc_reader()),
             )?;
             iterator = ArchiveIteratorThreadSafe::new(reader).with_stream_detect(stream_detect);
         }

@@ -25,7 +25,7 @@ use std::sync::Mutex;
 /// Gzip reader.
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
-/// :param buffer_size: decompression buffer size
+/// :param buffer_size: input buffer size
 /// :param zlib: use zlib-wrapped deflate instead of gzip framing
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 #[pyclass(name = "GzipReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
@@ -37,7 +37,7 @@ pub struct GzipReaderPy {
 #[pymethods]
 impl GzipReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096, zlib=false, fsspec_args=None))]
+    #[pyo3(signature = (inner, buffer_size=64 << 10, zlib=false, fsspec_args=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,

@@ -25,7 +25,7 @@ use std::sync::Mutex;
 /// Zstandard reader.
 ///
 /// :param inner: raw input stream, file-like object, file name, or URL
-/// :param buffer_size: decompression buffer size
+/// :param buffer_size: input buffer size
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param dictionary: optional decompression dictionary
 #[pyclass(name = "ZstdReader", module = "fastwarc.stream_io", extends = WarcReaderPy, subclass)]
@@ -33,54 +33,11 @@ pub struct ZstdReaderPy {
     pub(crate) inner: Mutex<Option<Box<dyn WarcRead + Send>>>,
 }
 
-/// Train a Zstandard dictionary from a stream of samples.
-///
-/// :param sample_data: continuous stream of sample bytes
-/// :param sample_sizes: sample boundaries
-/// :param max_size: maximum dictionary size
-/// :returns: dictionary as bytes
-#[pyfunction]
-pub fn zstd_train_dictionary_from_continuous(
-    sample_data: &[u8],
-    sample_sizes: Vec<usize>,
-    max_size: usize,
-) -> PyResult<Vec<u8>> {
-    Ok(zstd::train_dictionary_from_continuous(sample_data, sample_sizes.as_slice(), max_size)?)
-}
-
-/// Train a Zstandard dictionary from a set of files.
-///
-/// :param filenames: input file names
-/// :param max_size: maximum dictionary size
-/// :returns: dictionary as bytes
-#[pyfunction]
-pub fn zstd_train_dictionary_from_files(filenames: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
-    let it = filenames
-        .iter()
-        .map(|f| Ok(std::path::PathBuf::from(f.cast::<PyString>()?.to_str()?)))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(zstd::train_dictionary_from_files(it, max_size)?)
-}
-
-/// Train a Zstandard dictionary from a set of samples.
-///
-/// :param sample_data: list of byte samples
-/// :param max_size: maximum dictionary size
-/// :returns: dictionary as bytes
-#[pyfunction]
-pub fn zstd_train_dictionary_from_samples(samples: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
-    let it = samples
-        .iter()
-        .map(|f| Ok(f.cast_into::<PyBytes>()?.as_bytes().to_vec()))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(zstd::train_dictionary_from_samples(&it, max_size)?)
-}
-
 // noinspection DuplicatedCode
 #[pymethods]
 impl ZstdReaderPy {
     #[new]
-    #[pyo3(signature = (inner, buffer_size=4096, fsspec_args=None, dictionary=None))]
+    #[pyo3(signature = (inner, buffer_size=64 << 10, fsspec_args=None, dictionary=None))]
     pub fn __new__(
         py: Python<'_>,
         inner: Py<PyAny>,
@@ -203,4 +160,47 @@ impl ZstdWriterPy {
     pub fn close(&self) -> PyResult<()> {
         impl_writer_close!(self)
     }
+}
+
+/// Train a Zstandard dictionary from a stream of samples.
+///
+/// :param sample_data: continuous stream of sample bytes
+/// :param sample_sizes: sample boundaries
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_continuous(
+    sample_data: &[u8],
+    sample_sizes: Vec<usize>,
+    max_size: usize,
+) -> PyResult<Vec<u8>> {
+    Ok(zstd::train_dictionary_from_continuous(sample_data, sample_sizes.as_slice(), max_size)?)
+}
+
+/// Train a Zstandard dictionary from a set of files.
+///
+/// :param filenames: input file names
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_files(filenames: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
+    let it = filenames
+        .iter()
+        .map(|f| Ok(std::path::PathBuf::from(f.cast::<PyString>()?.to_str()?)))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(zstd::train_dictionary_from_files(it, max_size)?)
+}
+
+/// Train a Zstandard dictionary from a set of samples.
+///
+/// :param sample_data: list of byte samples
+/// :param max_size: maximum dictionary size
+/// :returns: dictionary as bytes
+#[pyfunction]
+pub fn zstd_train_dictionary_from_samples(samples: Bound<'_, PyList>, max_size: usize) -> PyResult<Vec<u8>> {
+    let it = samples
+        .iter()
+        .map(|f| Ok(f.cast_into::<PyBytes>()?.as_bytes().to_vec()))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(zstd::train_dictionary_from_samples(&it, max_size)?)
 }

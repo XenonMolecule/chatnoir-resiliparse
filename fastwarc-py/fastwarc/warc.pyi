@@ -333,6 +333,7 @@ class ArchiveIterator(Iterable[WarcRecord]):
             quirks_mode: bool = False,
             auto_decode: Literal['none', 'content', 'transfer', 'all'] = 'none',
             stream_detect: bool = True,
+            buffer_size: int = 64 << 10,
             fsspec_args=None,
             *,
             strict_mode: bool = True

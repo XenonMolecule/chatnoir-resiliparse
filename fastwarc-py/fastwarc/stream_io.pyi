@@ -128,18 +128,19 @@ _WriterInput = WarcWriter | BinaryIO | _GenericWriter | PathLike[str] | str
 
 @disjoint_base
 class GzipReader(WarcReader):
-    def __new__(cls, inner: _ReaderInput, buffer_size: int = 4096, zlib: bool = False, fsspec_args=None) -> Self: ...
+    def __new__(cls, inner: _ReaderInput, buffer_size: int = 64 << 10, zlib: bool = False,
+                fsspec_args=None) -> Self: ...
 
 
 @disjoint_base
 class GzipWriter(WarcWriter):
-    def __new__(cls, inner: _WriterInput, compression_level: int = 9, buffer_size=8192, zlib=False,
+    def __new__(cls, inner: _WriterInput, compression_level: int = 9, buffer_size: int = 8192, zlib=False,
                 fsspec_args=None) -> Self: ...
 
 
 @disjoint_base
 class ZstdReader(WarcReader):
-    def __new__(cls, inner: _ReaderInput, buffer_size: int = 4096, fsspec_args=None,
+    def __new__(cls, inner: _ReaderInput, buffer_size: int = 64 << 10, fsspec_args=None,
                 dictionary: bytes | None = None) -> Self: ...
 
 
@@ -151,7 +152,7 @@ class ZstdWriter(WarcWriter):
 
 @disjoint_base
 class Lz4Reader(WarcReader):
-    def __new__(cls, inner: _ReaderInput, buffer_size: int = 4096, fsspec_args=None) -> Self: ...
+    def __new__(cls, inner: _ReaderInput, buffer_size: int = 64 << 10, fsspec_args=None) -> Self: ...
 
 
 @disjoint_base
@@ -161,7 +162,7 @@ class Lz4Writer(WarcWriter):
 
 @disjoint_base
 class BrotliReader(WarcReader):
-    def __new__(cls, inner: _ReaderInput, buffer_size: int = 4096, fsspec_args=None) -> Self: ...
+    def __new__(cls, inner: _ReaderInput, buffer_size: int = 64 << 10, fsspec_args=None) -> Self: ...
 
 
 @disjoint_base
@@ -171,12 +172,12 @@ class BrotliWriter(WarcWriter):
 
 @disjoint_base
 class ChunkedReader(WarcReader):
-    def __new__(cls, inner: _ReaderInput, buffer_size: int = 1024, fsspec_args=None) -> Self: ...
+    def __new__(cls, inner: _ReaderInput, buffer_size: int = 4096, fsspec_args=None) -> Self: ...
 
 
 @disjoint_base
 class ChunkedWriter(WarcWriter):
-    def __new__(cls, inner: _WriterInput, min_chunk_size: int = 512, fsspec_args=None) -> Self: ...
+    def __new__(cls, inner: _WriterInput, min_chunk_size: int = 1024, fsspec_args=None) -> Self: ...
 
 
 def zstd_train_dictionary_from_continuous(sample_data: bytes, sample_sizes: list[int], max_size: int) -> bytes: ...
