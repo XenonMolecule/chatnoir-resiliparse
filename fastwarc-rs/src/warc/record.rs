@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stream_io::bufread::{LimitedBufReader, RawReaderAdapter};
 use crate::stream_io::traits::{BufReadSeek, IntoWarcReader, WarcRead};
-use crate::stream_io::{LimitedBufReader, brotli, chunked, gzip, zstd};
+use crate::stream_io::{brotli, chunked, gzip, zstd};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -336,7 +337,7 @@ impl HeaderMap {
         let mut bytes_consumed = 0;
         let mut line = Vec::with_capacity(128);
         let mut expect_first_line = has_status_line;
-        const MAX_LINE_LEN: usize = 8192;
+        const MAX_LINE_LEN: usize = 8192 * 10;
 
         loop {
             line.clear();
@@ -1067,7 +1068,7 @@ impl WarcRecord {
         };
         let raw = reader
             .inner_as_any()
-            .downcast_ref::<crate::stream_io::RawReaderAdapter<io::Cursor<Vec<u8>>>>()?;
+            .downcast_ref::<RawReaderAdapter<io::Cursor<Vec<u8>>>>()?;
         Some(raw.get_ref().get_ref().as_slice())
     }
 

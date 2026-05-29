@@ -215,7 +215,7 @@ macro_rules! native_inner_call_path {
 
 impl PyReaderAdapter {
     pub fn new(inner: Py<PyAny>) -> PyResult<Self> {
-        Self::with_capacity(inner, 8192)
+        Self::with_capacity(inner, 1 << 16)
     }
 
     pub fn with_capacity(inner: Py<PyAny>, capacity: usize) -> PyResult<Self> {

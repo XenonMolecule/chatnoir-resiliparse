@@ -15,7 +15,7 @@
 use crate::stream_io::{
     PyReaderAdapter, PyWriterAdapter, WarcReaderPy, path_like_to_string, python_whence_to_seekfrom, wrap_reader_stream,
 };
-use fastwarc::stream_io::LimitedBufReader;
+use fastwarc::stream_io::bufread::LimitedBufReader;
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
 use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
 use fastwarc::warc::record::DigestError::StreamError;

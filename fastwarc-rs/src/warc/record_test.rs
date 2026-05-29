@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::LimitedBufReader;
+use crate::stream_io::bufread::LimitedBufReader;
 use crate::warc::iter::{ArchiveIterator, SharedWarcRecord};
 use crate::warc::mod_test::*;
 use data_encoding::{BASE32, HEXLOWER};

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use super::*;
-use crate::stream_io::traits::WarcWrite;
+use crate::stream_io::bufread::LimitedBufReader;
+use crate::stream_io::traits::{WarcRead, WarcWrite};
 use std::cell::RefCell;
 use std::io;
 use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};

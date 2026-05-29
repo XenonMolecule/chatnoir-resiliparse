@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stream_io::LimitedBufReader;
+use crate::stream_io::bufread::LimitedBufReader;
 use crate::stream_io::gzip::GzipReader;
 use crate::stream_io::lz4::Lz4Reader;
 use crate::stream_io::traits::{IntoWarcReader, WarcRead};
