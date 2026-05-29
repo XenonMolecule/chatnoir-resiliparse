@@ -282,7 +282,16 @@ impl WarcRead for PyReaderAdapter {
     }
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.seek(pos)
+        self.native_call_or_forward(
+            |slf, inner| {
+                let new_pos = inner.inner_seek(pos)?;
+                slf.pos = Some(inner.stream_position()?);
+                slf.buf_pos = 0;
+                slf.buf_len = 0;
+                Ok(new_pos)
+            },
+            |slf, _| Ok(slf.seek(pos)?),
+        )
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
@@ -297,13 +306,9 @@ impl WarcRead for PyReaderAdapter {
 }
 
 impl Read for PyReaderAdapter {
+    // noinspection DuplicatedCode
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let in_buf = self.fill_buf()?;
-        if in_buf.is_empty() {
-            return Ok(0);
-        }
-        let n = in_buf.len().min(buf.len());
-        buf[..n].copy_from_slice(&in_buf[..n]);
+        let n = self.fill_buf()?.read(buf)?;
         self.consume(n);
         Ok(n)
     }
