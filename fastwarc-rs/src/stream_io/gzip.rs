@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stream_io::bufread::{DEFAULT_BUFFER_SIZE, TrackingBufReader};
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, Seek, SeekFrom, Write};
 use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
 
 // ===========================================================
@@ -23,11 +24,15 @@ use zlib_rs::{Deflate, DeflateFlush, Inflate, InflateFlush};
 // ===========================================================
 
 /// Reader for Gzip-compressed streams.
+///
+/// Allocates an internal buffer holding chunks of the inner stream.
+/// A second, (potentially larger) buffer is allocated for the decompressed data.
+/// Initially, the decompressed buffer will be twice the size as the uncompressed
+/// buffer, but its size can change based on demand (up to 10x the input buffer size).
 pub struct GzipReader<T: ReadSeek> {
-    inner: BufReader<T>,
+    inner: TrackingBufReader<T>,
     deflate: Inflate,
     stream_pos: u64,
-    inner_pos: u64,
     member_pos: u64,
     next_member_pos: u64,
     buf: Vec<u8>,
@@ -43,7 +48,7 @@ pub const MAX_WBITS: u8 = 15;
 ///
 /// # Options
 ///
-/// * `capacity` - sets the internal buffer size.
+/// * `capacity` - sets the internal buffer size (default: 64 KiB).
 /// * `window_bits` - history buffer size, behavior compatible with zlib:
 ///   Values between `9..15` are for zlib streams. Values above `15` ([`MAX_WBITS`])
 ///   enable gzip header decoding:
@@ -63,7 +68,7 @@ impl Default for GzipReaderOptions {
         Self {
             window_bits: MAX_WBITS + 16,
             expect_header: true,
-            capacity: 1 << 16,
+            capacity: DEFAULT_BUFFER_SIZE,
         }
     }
 }
@@ -71,23 +76,13 @@ impl Default for GzipReaderOptions {
 impl<T: ReadSeek> GzipReader<T> {
     /// Create a new [`GzipReader`].
     ///
-    /// Allocates an internal buffer holding chunks of the inner stream.
-    /// A second, larger buffer is allocated for the decompressed data.
-    /// Initially, the decompressed buffer will be twice the size of the
-    /// uncompressed buffer, but its size can change based on demand.
-    ///
-    /// The default buffer size is 4096 bytes. For custom buffer sizes, use
-    /// [`Self::with_capacity()`].
+    /// The default buffer size is 64 KIB. For custom buffer sizes, use
+    /// [`Self::with_capacity()`] or [`Self::with_options()`].
     pub fn new(inner: T) -> Self {
         Self::with_options(inner, GzipReaderOptions::default())
     }
 
     /// Create a new [`GzipReader`] with a given buffer capacity.
-    ///
-    /// Allocates an internal buffer holding chunks of the inner stream.
-    /// A second, larger buffer is allocated for the decompressed data.
-    /// Initially, the decompressed buffer will be twice the size of the
-    /// uncompressed buffer, but its size can change based on demand.
     ///
     /// # Arguments
     ///
@@ -105,31 +100,24 @@ impl<T: ReadSeek> GzipReader<T> {
 
     /// Create a new [`GzipReader`] with the supplied options.
     ///
-    /// Allocates an internal buffer holding chunks of the inner stream.
-    /// A second, larger buffer is allocated for the decompressed data.
-    /// Initially, the decompressed buffer will be twice the size of the
-    /// uncompressed buffer, but its size can change based on demand.
-    ///
     /// # Arguments
     ///
     /// * `inner` - input (inner) stream to read from
     /// * `options` - reader options
     pub fn with_options(mut inner: T, options: GzipReaderOptions) -> Self {
         let window_bits = options.window_bits;
-        let decomp_ratio = 4.0;
         let inner_pos = inner.stream_position().unwrap_or(0);
         Self {
-            inner: BufReader::with_capacity(options.capacity, inner),
+            inner: TrackingBufReader::with_capacity(options.capacity, inner),
             deflate: Inflate::new(options.expect_header, window_bits),
             stream_pos: 0,
-            inner_pos,
             member_pos: inner_pos,
             next_member_pos: inner_pos,
-            buf: vec![0; options.capacity * decomp_ratio as usize],
+            buf: vec![0; 2 * options.capacity],
             buf_pos: 0,
             buf_len: 0,
             window_bits,
-            decomp_ratio,
+            decomp_ratio: 1.0,
         }
     }
 
@@ -143,25 +131,20 @@ impl<T: ReadSeek> GzipReader<T> {
     /// Dynamically update the output buffer size using a moving average of the
     /// output to input size.
     ///
-    /// TODO: Benchmark the parameters!
-    ///
     /// # Arguments
     ///
-    /// * `buf_len` - length of the uncompressed input buffer
+    /// * `read_len` - length of the uncompressed input buffer
     /// * `consumed` - number of bytes consumed from the input buffer
     /// * `produced` - number of bytes produced on the output buffer
     fn _update_buf_size(&mut self, read_len: usize, consumed: usize, produced: usize) {
         self.decomp_ratio = 0.9 * self.decomp_ratio + 0.1 * (produced as f32 / consumed as f32);
         let target_buf_size = ((read_len as f32 * self.decomp_ratio).ceil() as usize)
-            .clamp(2 * self.inner.capacity(), 1 << 18)
+            .clamp(self.inner.capacity(), 10 * self.inner.capacity())
             .max(self.buf_len)
             .next_power_of_two();
-
         if target_buf_size > self.buf.len() {
-            // println!("Increasing output buffer to {}", target_buf_size);
             self.buf.resize(target_buf_size, 0);
-        } else if target_buf_size * 2 < self.buf.len() {
-            // println!("Shrinking output buffer to {}", target_buf_size);
+        } else if target_buf_size * 4 < self.buf.len() {
             self.buf.truncate(target_buf_size);
         }
     }
@@ -206,20 +189,19 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
-            return Ok(self.inner_pos);
+            return self.inner_stream_position();
         }
         self.deflate = Inflate::new(true, self.window_bits);
         self.buf_pos = 0;
         self.buf_len = 0;
         let new_pos = self.inner.seek(pos)?;
-        self.inner_pos = new_pos;
         self.next_member_pos = new_pos;
         self.stream_pos = 0;
         Ok(new_pos)
     }
 
     fn inner_stream_position(&mut self) -> io::Result<u64> {
-        Ok(self.inner_pos)
+        self.inner.inner_stream_position()
     }
 
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
@@ -262,13 +244,12 @@ impl<T: ReadSeek> BufRead for GzipReader<T> {
             let in_delta = self.deflate.total_in() - total_in;
             let out_delta = self.deflate.total_out() - total_out;
             self.inner.consume(in_delta as usize);
-            self.inner_pos += in_delta;
             self.buf_len += out_delta as usize;
 
             // Member end or EOF
             if matches!(status, zlib_rs::Status::StreamEnd) {
                 self.deflate = Inflate::new(true, self.window_bits);
-                self.next_member_pos = self.inner_pos;
+                self.next_member_pos = self.inner.stream_position()?;
                 break;
             }
 

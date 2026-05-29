@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stream_io::bufread::{DEFAULT_BUFFER_SIZE, TrackingBufReader};
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufWriter, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Lz4Reader
@@ -24,16 +25,16 @@ use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 
 /// Reader for LZ4-compressed streams.
 pub struct Lz4Reader<T: ReadSeek> {
-    inner: Option<FrameDecoder<BufReader<T>>>,
+    inner: Option<FrameDecoder<TrackingBufReader<T>>>,
     stream_pos: u64,
-    frame_start_pos: Option<u64>,
+    frame_start_pos: u64,
 }
 
 /// Options for constructing a new [`Lz4Reader`].
 ///
 /// # Options
 ///
-/// * `capacity` - sets the internal buffer size.
+/// * `capacity` - sets the internal buffer size (default: 64 KiB).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Lz4ReaderOptions {
     pub capacity: usize,
@@ -41,7 +42,9 @@ pub struct Lz4ReaderOptions {
 
 impl Default for Lz4ReaderOptions {
     fn default() -> Self {
-        Self { capacity: 4096 }
+        Self {
+            capacity: DEFAULT_BUFFER_SIZE,
+        }
     }
 }
 
@@ -74,10 +77,12 @@ impl<T: ReadSeek> Lz4Reader<T> {
     /// * `inner` - input (inner) stream to read from
     /// * `options` - reader options
     pub fn with_options(inner: T, options: Lz4ReaderOptions) -> Self {
+        let mut reader = TrackingBufReader::with_capacity(options.capacity, inner);
+        let frame_start_pos = reader.stream_position().unwrap_or(0);
         Self {
-            inner: Some(FrameDecoder::new(BufReader::with_capacity(options.capacity, inner))),
+            inner: Some(FrameDecoder::new(reader)),
             stream_pos: 0,
-            frame_start_pos: None,
+            frame_start_pos,
         }
     }
 
@@ -88,20 +93,11 @@ impl<T: ReadSeek> Lz4Reader<T> {
         self.inner.unwrap().into_inner().into_inner()
     }
 
-    /// Internal: Lazily load the frame start position from the inner stream (needs to be run as early as possible!)
-    fn ensure_frame_start_pos(&mut self) -> io::Result<u64> {
-        if self.frame_start_pos.is_none() {
-            self.frame_start_pos = Some(self.inner.as_mut().unwrap().get_mut().stream_position()?);
-        }
-        Ok(self.frame_start_pos.unwrap())
-    }
-
     /// Internal: Helper for syncing decoder state with LZ4 frame boundaries.
     /// This needs to be called in `fill_buf()` to not terminate early and in
     /// `stream_position()` to not get incorrect values (usually off by the four
     /// bytes at the end of a frame).
     fn sync_next_frame(&mut self) -> io::Result<()> {
-        self.ensure_frame_start_pos()?;
         if self.stream_pos == 0 {
             return Ok(());
         }
@@ -117,7 +113,7 @@ impl<T: ReadSeek> Lz4Reader<T> {
             let old_pos = self.stream_pos;
             let new_pos = self.inner_seek(SeekFrom::Current(0))?;
             self.stream_pos = old_pos;
-            self.frame_start_pos = Some(new_pos);
+            self.frame_start_pos = new_pos;
         }
 
         Ok(())
@@ -165,7 +161,7 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
         let mut inner = self.inner.take().unwrap().into_inner();
         let new_pos = inner.seek(pos)?;
         self.inner = Some(FrameDecoder::new(inner));
-        self.frame_start_pos = Some(new_pos);
+        self.frame_start_pos = new_pos;
         self.stream_pos = 0;
         Ok(new_pos)
     }
@@ -176,7 +172,7 @@ impl<T: ReadSeek> WarcRead for Lz4Reader<T> {
     }
 
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
-        Ok(self.frame_start_pos)
+        Ok(Some(self.frame_start_pos))
     }
 
     fn is_stream_decoder(&self) -> bool {

@@ -135,12 +135,12 @@ fn gzip_reader_update_buf_size_grows_and_shrinks_buffer() {
     let initial_len = reader.buf.len();
 
     // A very high output-to-input ratio should force the decompressed buffer to grow.
-    reader._update_buf_size(128, 1, 64);
+    reader._update_buf_size(128, 1, 128);
     let grown_len = reader.buf.len();
     assert!(grown_len > initial_len);
 
     // Repeated low-ratio updates should decay the moving average enough to shrink again.
-    for _ in 0..16 {
+    for _ in 0..128 {
         reader._update_buf_size(128, 128, 128);
         if reader.buf.len() < grown_len {
             break;

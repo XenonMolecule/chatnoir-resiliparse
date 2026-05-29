@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stream_io::bufread::TrackingBufReader;
 use crate::stream_io::traits::{ReadSeek, WarcRead, WarcWrite, Write as _Write};
 use crate::stream_io::{impl_stream_from_path, impl_to_any_methods};
 use std::any::Any;
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
 // ===========================================================
 // Decoder for HTTP Transfer-Encoding: chunked
@@ -23,7 +24,7 @@ use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 
 /// Reader for chunked HTTP streams.
 pub struct ChunkedReader<T: ReadSeek> {
-    inner: Option<BufReader<T>>,
+    inner: Option<TrackingBufReader<T>>,
     out_buf: Vec<u8>,
     out_buf_pos: usize,
     stream_pos: u64,
@@ -77,7 +78,7 @@ impl<T: ReadSeek> ChunkedReader<T> {
     /// * `options` - reader options
     pub fn with_options(inner: T, options: ChunkedReaderOptions) -> Self {
         Self {
-            inner: Some(BufReader::with_capacity(options.capacity, inner)),
+            inner: Some(TrackingBufReader::with_capacity(options.capacity, inner)),
             out_buf: Vec::with_capacity(options.capacity),
             out_buf_pos: 0,
             stream_pos: 0,

@@ -14,7 +14,6 @@
 
 import getpass
 import importlib
-from enum import IntFlag
 from itertools import chain
 import json
 import os
@@ -25,13 +24,14 @@ import urllib.request
 import click
 from tqdm import tqdm
 
-from fastwarc.stream_io import *
+from fastwarc.stream_io import FileStream, StreamError, FastWARCError, PythonIOStreamAdapter
 from fastwarc.warc import ArchiveIterator, WarcRecordType
-from fastwarc.legacy.tools import CompressionAlg, detect_compression_algorithm, wrap_warc_stream, verify_digests
+from fastwarc.legacy.tools import CompressionAlg, detect_compression_algorithm, wrap_warc_stream, \
+    recompress_warc_interactive, verify_digests
 
 
 def exception_handler(exctype, value, _):
-    if exctype == OSError:
+    if exctype == FastWARCError:
         click.echo(str(value), err=True)
         sys.exit(1)
 
@@ -56,132 +56,46 @@ def _human_readable_bytes(byte_num):
         byte_num /= 1024
 
 
-class CompressionAlg(IntFlag):
-    UNCOMPRESSED = 0
-    GZIP = 1
-    ZSTD = 2
-    LZ4 = 3
-    AUTO = 65535
-
-
-def detect_compression_algorithm(infile):
-    """
-    Try to detect the used compression algorithm from the given filename.
-
-    :param infile: filename or file object
-    :return: compression algorithm
-    """
-
-    if os.fspath(infile):
-        infile = str(infile)
-    elif hasattr(infile, 'name'):
-        infile = infile.name
-    else:
-        raise ValueError('Invalid infile type.')
-
-    if type(infile) is str:
-        if infile.endswith('.gz'):
-            return CompressionAlg.GZIP
-        if infile.endswith('.zst'):
-            return CompressionAlg.ZSTD
-        if infile.endswith('.lz4'):
-            return CompressionAlg.LZ4
-        if infile.endswith('.warc'):
-            return CompressionAlg.UNCOMPRESSED
-
-    if not os.path.isfile(infile):
-        raise click.UsageError('Could not determine compression algorithm.')
-
-    with open(infile, 'rb') as infile:
-        magic_bytes = infile.read(5)
-
-    if magic_bytes[:3] == b'\x1F\x8B\x08':
-        return CompressionAlg.GZIP
-    elif magic_bytes[:4] == b'\x28\xB5\x2F\xFD' or magic_bytes[:4] == b'\x5D\x2A\x4D\x18':
-        return CompressionAlg.ZSTD
-    elif magic_bytes[:4] == b'\x04\x22\x4D\x18':
-        return CompressionAlg.LZ4
-    elif magic_bytes == b'WARC/':
-        return CompressionAlg.UNCOMPRESSED
-
-    raise click.FileError('No compression algorithm detected.')
-
-
-def get_compressor(filename, alg, level):
-    if alg == CompressionAlg.AUTO:
-        alg = detect_compression_algorithm(filename)
-    if alg == CompressionAlg.UNCOMPRESSED:
-        return open(filename, 'wb')
-    elif alg == CompressionAlg.GZIP:
-        return GzipWriter(filename, compression_level=level or 9)
-    elif alg == CompressionAlg.ZSTD:
-        return ZstdWriter(filename, compression_level=level or 3)
-    elif alg == CompressionAlg.LZ4:
-        return Lz4Writer(filename)  # compression_level currently unsupported
-    else:
-        raise ValueError(f'Unknown compression algorithm: {alg}')
-
-
-def get_decompressor(filename, decompress_alg):
-    if os.fspath(filename) and not decompress_alg:
-        # Use plain filename to avoid Python IO stack
-        return str(filename)
-
-    if decompress_alg:
-        alg = decompress_alg
-    else:
-        alg = detect_compression_algorithm(filename)
-    if alg == CompressionAlg.UNCOMPRESSED:
-        return open(filename, 'rb')
-    if alg == CompressionAlg.GZIP:
-        return GzipReader(filename)
-    if alg == CompressionAlg.ZSTD:
-        return ZstdReader(filename)
-    if alg == CompressionAlg.LZ4:
-        return Lz4Reader(filename)  # compression_level currently unsupported
-
-    raise ValueError(f'Unknown compression algorithm: {alg}')
-
-
 @main.command()
 @click.argument('infile', type=click.Path(dir_okay=False, exists=True))
 @click.argument('outfile', type=click.Path(dir_okay=False, exists=False))
-@click.option('-c', '--compress-alg', type=click.Choice(['uncompressed', 'gzip', 'zstd', 'lz4', 'auto']),
+@click.option('-c', '--compress-alg', type=click.Choice(['gzip', 'lz4', 'uncompressed', 'auto']),
               default='auto', show_default=True, help='Compression algorithm to use for output file')
-@click.option('-d', '--decompress-alg', type=click.Choice(['uncompressed', 'gzip', 'zstd', 'lz4', 'auto']),
+@click.option('-d', '--decompress-alg', type=click.Choice(['gzip', 'lz4', 'uncompressed', 'auto']),
               default='auto', show_default=True,
               help='Decompression algorithm for decoding input file (auto tries to detect based on file extension)')
-@click.option('-l', '--compress-level', type=int, default=None, help='Compression level')
+@click.option('-l', '--compress-level', type=int, default=None, help='Compression level (defaults to max)')
 @click.option('-q', '--quiet', is_flag=True, help='Do not print progress information')
 def recompress(infile, outfile, compress_alg, decompress_alg, compress_level, quiet):
     """
     Recompress a WARC file.
 
-    This command allows you to recompress a WARC file if it is uncompressed, not compressed
-    properly at the record-level, or if you want to recompress a Gzip WARC as Zstd or LZ4 or vice versa.
+    This command allows you to recompress a WARC file if it is uncompressed or not compressed
+    properly at the record-level if or you want to recompress a GZip WARC as LZ4 or vice versa.
     """
 
-    compress_alg = getattr(CompressionAlg, compress_alg.upper())
-    decompress_alg = getattr(CompressionAlg, decompress_alg.upper())
+    compress_alg = getattr(CompressionAlg, compress_alg)
+    decompress_alg = getattr(CompressionAlg, decompress_alg)
 
-    infile = get_decompressor(infile, decompress_alg if decompress_alg != CompressionAlg.AUTO else None)
-    outfile_name = outfile
-    outfile = get_compressor(outfile, compress_alg, compress_level)
+    comp_args = {}
+    if compress_level is None:
+        if compress_alg == CompressionAlg.gzip:
+            comp_args['compression_level'] = 9
+        elif compress_alg == CompressionAlg.lz4:
+            comp_args['compression_level'] = 12
 
+    bytes_written = 0
     num = 0
-    start = time.monotonic()
+    start = time.time()
     try:
-        with outfile as out:
-            for r in tqdm(ArchiveIterator(infile),
-                          desc='Recompressing WARC file', unit=' record(s)', leave=False,
-                          disable=quiet, mininterval=0.3):
-                num += 1
-                r.write(out)
-                if compress_alg != CompressionAlg.UNCOMPRESSED:
-                    out.finish()
+        for _, b in tqdm(recompress_warc_interactive(infile, outfile, decompress_alg, compress_alg, **comp_args),
+                         desc='Recompressing WARC file', unit=' record(s)', leave=False,
+                         disable=quiet, mininterval=0.2):
+            num += 1
+            bytes_written += b
 
-            if not quiet:
-                click.echo('Recompression completed.')
+        if not quiet:
+            click.echo('Recompression completed.')
     except KeyboardInterrupt:
         if not quiet:
             click.echo('Recompression aborted.')
@@ -189,8 +103,8 @@ def recompress(infile, outfile, compress_alg, decompress_alg, compress_level, qu
     finally:
         if not quiet and num > 0:
             click.echo(f'  - Records recompressed: {num}')
-            click.echo(f'  - Bytes written: {_human_readable_bytes(os.stat(outfile_name).st_size)}')
-            click.echo(f'  - Completed in: {time.monotonic() - start:.02f} seconds')
+            click.echo(f'  - Bytes written: {_human_readable_bytes(bytes_written)}')
+            click.echo(f'  - Completed in: {time.time() - start:.02f} seconds')
 
 
 @main.command()
@@ -525,8 +439,9 @@ def benchmark(input_url, decompress_alg, endpoint_url, aws_access_key, aws_secre
         return num, time.monotonic() - start, interrupted
 
     def _fastwarc_iterator(f):
-        s = _get_raw_stream_from_url(f, use_python_stream)
-        s = wrap_warc_stream(s, 'rb', decompress_alg)
+        # s = _get_raw_stream_from_url(f, use_python_stream)
+        # s = wrap_warc_stream(s, 'rb', decompress_alg)
+        s = '/home/roce3528/code-in-progress/code-research/web-search/chatnoir/chatnoir-resiliparse/tmpfs/CC-MAIN-20231005012006-20231005042006-00899.warc'
         return ArchiveIterator(s, rec_type_filter, parse_http=parse_http, verify_digests=verify_digests)
 
     n, t_fastwarc, interrupted = _bench(input_url, _fastwarc_iterator, 'FastWARC')

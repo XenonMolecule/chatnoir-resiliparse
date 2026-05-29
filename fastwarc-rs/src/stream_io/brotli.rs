@@ -32,7 +32,7 @@ pub struct BrotliReader<T: ReadSeek> {
 ///
 /// # Options
 ///
-/// * `capacity` - sets the internal buffer size.
+/// * `capacity` - sets the internal buffer size (default: 4 KiB).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct BrotliReaderOptions {
     pub capacity: usize,
