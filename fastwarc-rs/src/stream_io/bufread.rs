@@ -264,11 +264,7 @@ impl<T: ReadSeek> IntoWarcReader for BufReader<T> {
     }
 }
 
-impl<T> IntoWarcReader for io::Cursor<T>
-where
-    T: Send + AsRef<[u8]> + 'static,
-    io::Cursor<T>: Read,
-{
+impl<T: AsRef<[u8]> + 'static> IntoWarcReader for io::Cursor<T> {
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(RawReaderAdapter::new(self))
     }
@@ -290,6 +286,15 @@ pub struct RawWriterAdapter<T> {
 }
 
 impl<T: _Write> RawWriterAdapter<T> {
+    /// Create a new [`RawWriterAdapter`] from an existing writer.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - wrapped stream
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+
     /// Get a reference to the inner writer.
     pub fn get_ref(&self) -> &T {
         &self.inner
@@ -352,17 +357,23 @@ impl IntoWarcWriter for Box<dyn WarcWrite + Send + Sync> {
 
 impl<T: _Write> IntoWarcWriter for io::BufWriter<T> {
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
-        Box::new(RawWriterAdapter { inner: self })
+        Box::new(RawWriterAdapter::new(self))
     }
 }
 
 impl<T> IntoWarcWriter for io::Cursor<T>
 where
-    T: AsMut<[u8]> + Send + 'static,
-    io::Cursor<T>: _Write,
+    T: AsMut<[u8]> + 'static,
+    io::Cursor<T>: Write,
 {
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
-        Box::new(RawWriterAdapter { inner: self })
+        Box::new(RawWriterAdapter::new(self))
+    }
+}
+
+impl IntoWarcWriter for std::fs::File {
+    fn into_warc_writer(self) -> Box<dyn WarcWrite> {
+        Box::new(RawWriterAdapter::new(self))
     }
 }
 
