@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::stream_io::bufread::LimitedBufReader;
-use crate::stream_io::traits::{WarcRead, WarcWrite};
+use crate::stream_io::traits::{IntoWarcReader, WarcRead, WarcWrite};
 use std::cell::RefCell;
 use std::io;
 use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};
@@ -392,6 +392,29 @@ where
     assert_eq!(reader.frame_start_position()?.unwrap(), first_member.len() as u64);
     assert_eq!(reader.stream_position()?, second_plain.len() as u64);
     assert_eq!(reader.inner_stream_position()?, combined_len as u64);
+
+    Ok(())
+}
+
+pub fn test_nested_warc_read<C, R>(compress_fn: C, reader_new_fn: R) -> io::Result<()>
+where
+    C: Fn(&[u8]) -> io::Result<Vec<u8>>,
+    R: Fn(Box<dyn WarcRead>) -> Box<dyn WarcRead>,
+{
+    let payload = sample_data();
+    let compressed = compress_fn(&compress_fn(&payload)?)?;
+
+    let mut reader = reader_new_fn(reader_new_fn(Box::new(Cursor::new(compressed)).into_warc_reader()));
+    let mut out = vec![0; payload.len()];
+
+    reader.read_exact(&mut out[..7])?;
+    assert_eq!(out[..7], payload[..7]);
+    assert_eq!(reader.stream_position()?, 7);
+    // Nested decompressor, cannot seek backwards
+    assert_eq!(reader.seek(SeekFrom::Start(0)).unwrap_err().to_string(), "Backward seeking not supported");
+    assert_eq!(reader.seek(SeekFrom::Start(8))?, 8);
+    reader.read_exact(&mut out[8..])?;
+    assert_eq!(&out[8..], &payload[8..]);
 
     Ok(())
 }

@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::stream_io::mod_test::*;
+use crate::stream_io::traits::IntoWarcReader;
 use std::io::{Cursor, Read};
 use zlib_rs::{
     DeflateConfig, DeflateFlush, InflateConfig, ReturnCode, compress_bound, compress_slice, decompress_slice,
@@ -80,6 +81,11 @@ fn gzip_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 #[test]
 fn gzip_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
     test_reader_inner_seek_inner_stream_position_and_member_tracking(compress_member, GzipReader::new)
+}
+
+#[test]
+fn gzip_nested_warc_read() -> io::Result<()> {
+    test_nested_warc_read(compress_member, |r| GzipReader::new(r).into_warc_reader())
 }
 
 #[test]

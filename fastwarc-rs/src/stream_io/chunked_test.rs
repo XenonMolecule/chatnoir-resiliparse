@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::stream_io::mod_test::*;
+use crate::stream_io::traits::IntoWarcReader;
 use std::io::{Cursor, Read};
 
 // Fixed chunk size for testing.
@@ -99,6 +100,11 @@ fn chunked_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 #[test]
 fn brotli_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
     test_reader_inner_seek_inner_stream_position_and_member_tracking(chunk, ChunkedReader::new)
+}
+
+#[test]
+fn chunked_nested_warc_read() -> io::Result<()> {
+    test_nested_warc_read(chunk, |r| ChunkedReader::new(r).into_warc_reader())
 }
 
 #[test]

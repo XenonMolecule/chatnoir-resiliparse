@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::stream_io::mod_test::*;
+use crate::stream_io::traits::IntoWarcReader;
 
 fn compress(data: &[u8]) -> io::Result<Vec<u8>> {
     ::zstd::stream::encode_all(data, 3)
@@ -60,6 +61,11 @@ fn zstd_reader_reads_to_eof_after_external_compression() -> io::Result<()> {
 #[test]
 fn zstd_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Result<()> {
     test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, ZstdReader::new)
+}
+
+#[test]
+fn zstd_nested_warc_read() -> io::Result<()> {
+    test_nested_warc_read(compress, |r| ZstdReader::new(r).into_warc_reader())
 }
 
 #[test]

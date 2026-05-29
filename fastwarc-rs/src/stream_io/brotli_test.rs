@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::stream_io::mod_test::*;
+use crate::stream_io::traits::IntoWarcReader;
 use brotli::enc::BrotliEncoderParams;
 
 fn compress(mut data: &[u8]) -> io::Result<Vec<u8>> {
@@ -67,6 +68,10 @@ fn gzip_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Res
     test_reader_inner_seek_inner_stream_position_and_member_tracking(compress, BrotliReader::new)
 }
 
+#[test]
+fn brotli_nested_warc_read() -> io::Result<()> {
+    test_nested_warc_read(compress, |r| BrotliReader::new(r).into_warc_reader())
+}
 #[test]
 fn brotli_writer_new_write_and_into_inner_roundtrip() -> io::Result<()> {
     test_writer_new_write_and_into_inner_roundtrip(decompress, BrotliWriter::new, BrotliWriter::into_inner)

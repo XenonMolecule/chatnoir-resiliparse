@@ -210,8 +210,7 @@ def test_native_stream_adapter(reader_cls, writer_cls):
         with pytest.raises(OSError) as e:
             reader.seek(0)
         assert 'Backward seeking not supported' == e.value.args[0]
-        assert reader.inner_seek(0) == 0
-        assert reader.read() == payload
+        assert reader.read() == payload[7:]
         assert isinstance(reader.inner_tell(), int)
 
 

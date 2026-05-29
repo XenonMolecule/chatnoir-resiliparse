@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::stream_io::mod_test::*;
+use crate::stream_io::traits::IntoWarcReader;
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use std::io::Read;
 
@@ -85,6 +86,11 @@ fn lz4_reader_inner_seek_inner_stream_position_and_member_tracking() -> io::Resu
 #[test]
 fn lz4_frame_start_position_in_sync() -> io::Result<()> {
     test_frame_start_position_in_sync(compress_frame, Lz4Reader::new, 4)
+}
+
+#[test]
+fn lz4_nested_warc_read() -> io::Result<()> {
+    test_nested_warc_read(compress_frame, |r| Lz4Reader::new(r).into_warc_reader())
 }
 
 #[test]

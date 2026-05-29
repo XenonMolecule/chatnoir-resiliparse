@@ -154,6 +154,12 @@ impl<T: ReadSeek> WarcRead for TrackingBufReader<T> {
     impl_to_any_methods!();
 
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        // let inner_any = self.inner.get_mut() as &mut dyn Any;
+        // if let Some(inner) = inner_any.downcast_mut::<Box<dyn WarcRead>>() {
+        //     let new_pos = inner.inner_seek(pos)?;
+        //     self.pos = inner.stream_position()?;
+        //     return Ok(new_pos);
+        // }
         self.seek(pos)
     }
 
