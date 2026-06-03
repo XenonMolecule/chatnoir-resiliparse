@@ -104,7 +104,7 @@ impl<T: ReadSeek> ZstdReader<T> {
     fn with_dict_options_internal(inner: T, dict: Option<Vec<u8>>, options: Option<ZstdReaderOptions>) -> Self {
         let options = options.unwrap_or_default();
         let mut reader = TrackingBufReader::with_capacity(options.capacity, inner);
-        let frame_start_pos = reader.seek(SeekFrom::Current(0)).unwrap_or(0);
+        let frame_start_pos = reader.stream_position().unwrap_or(0);
         let decoder = if let Some(dict) = &dict {
             Decoder::with_dictionary(reader, dict)
         } else {
@@ -260,6 +260,7 @@ impl<T: ReadSeek> Seek for ZstdReader<T> {
     /// # Arguments
     ///
     /// `pos` - seek position
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
             return Ok(self.stream_pos);
@@ -268,6 +269,7 @@ impl<T: ReadSeek> Seek for ZstdReader<T> {
     }
 
     /// Returns the current seek position from the start of the decompressed output stream.
+    #[inline]
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.stream_pos)
     }
@@ -276,6 +278,7 @@ impl<T: ReadSeek> Seek for ZstdReader<T> {
 impl<T: ReadSeek> WarcRead for ZstdReader<T> {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let new_pos = self.reset_decoder(Some(pos))?;
         self.stream_pos = 0;
@@ -283,14 +286,17 @@ impl<T: ReadSeek> WarcRead for ZstdReader<T> {
         Ok(new_pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
 
+    #[inline]
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
         Ok(Some(self.frame_start_pos))
     }
 
+    #[inline]
     fn is_stream_decoder(&self) -> bool {
         true
     }

@@ -169,6 +169,7 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
     /// # Arguments
     ///
     /// `pos` - seek position
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
             return Ok(self.stream_pos);
@@ -177,6 +178,7 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
     }
 
     /// Returns the current seek position from the start of the decompressed output stream.
+    #[inline]
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.stream_pos)
     }
@@ -185,6 +187,7 @@ impl<T: ReadSeek> Seek for GzipReader<T> {
 impl<T: ReadSeek> WarcRead for GzipReader<T> {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
             return self.inner_stream_position();
@@ -198,14 +201,17 @@ impl<T: ReadSeek> WarcRead for GzipReader<T> {
         Ok(new_pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.inner_stream_position()
     }
 
+    #[inline]
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
         Ok(Some(self.member_pos))
     }
 
+    #[inline]
     fn is_stream_decoder(&self) -> bool {
         true
     }

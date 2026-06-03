@@ -107,12 +107,14 @@ impl<T: ReadSeek> Seek for BrotliReader<T> {
     /// # Arguments
     ///
     /// `pos` - seek position
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.stream_pos = super::_forward_seek(self, pos)?;
         Ok(self.stream_pos)
     }
 
     /// Returns the current seek position from the start of the decompressed output stream.
+    #[inline]
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.stream_pos)
     }
@@ -121,6 +123,7 @@ impl<T: ReadSeek> Seek for BrotliReader<T> {
 impl<T: ReadSeek> WarcRead for BrotliReader<T> {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let capacity = self.inner.as_ref().unwrap().capacity();
         let mut inner = self.inner.take().unwrap().into_inner().into_inner();
@@ -129,10 +132,12 @@ impl<T: ReadSeek> WarcRead for BrotliReader<T> {
         Ok(new_pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.as_mut().unwrap().get_mut().get_mut().stream_position()
     }
 
+    #[inline]
     fn is_stream_decoder(&self) -> bool {
         true
     }

@@ -153,16 +153,12 @@ impl_tracking_bufread_seek!(TrackingBufReader<T>, Read + Seek);
 impl<T: ReadSeek> WarcRead for TrackingBufReader<T> {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        // let inner_any = self.inner.get_mut() as &mut dyn Any;
-        // if let Some(inner) = inner_any.downcast_mut::<Box<dyn WarcRead>>() {
-        //     let new_pos = inner.inner_seek(pos)?;
-        //     self.pos = inner.stream_position()?;
-        //     return Ok(new_pos);
-        // }
         self.seek(pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.stream_position()
     }
@@ -226,10 +222,12 @@ where
 {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.seek(pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.stream_position()
     }
@@ -445,6 +443,7 @@ impl LimitedBufReader {
     /// Get the real (not the logical) stream position in the inner stream.
     /// This method is non-recursive. Use [`Self::inner_stream_position()`] if you need
     /// to reach through a decoding inner reader stack.
+    #[inline]
     pub fn real_stream_position(&mut self) -> io::Result<u64> {
         self.inner.stream_position()
     }
@@ -504,18 +503,22 @@ impl LimitedBufReader {
 impl WarcRead for LimitedBufReader {
     impl_to_any_methods!();
 
+    #[inline]
     fn inner_seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.inner.inner_seek(pos)
     }
 
+    #[inline]
     fn inner_stream_position(&mut self) -> io::Result<u64> {
         self.inner.inner_stream_position()
     }
 
+    #[inline]
     fn frame_start_position(&mut self) -> io::Result<Option<u64>> {
         self.inner.frame_start_position()
     }
 
+    #[inline]
     fn is_stream_decoder(&self) -> bool {
         self.inner.is_stream_decoder()
     }
@@ -568,6 +571,7 @@ impl Seek for LimitedBufReader {
         Ok(self.pos)
     }
 
+    #[inline]
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.pos)
     }
