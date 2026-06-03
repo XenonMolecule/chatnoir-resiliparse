@@ -567,4 +567,8 @@ impl Seek for LimitedBufReader {
         self.pos = new_pos as u64;
         Ok(self.pos)
     }
+
+    fn stream_position(&mut self) -> io::Result<u64> {
+        Ok(self.pos)
+    }
 }

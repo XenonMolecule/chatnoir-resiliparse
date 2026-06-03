@@ -1198,27 +1198,21 @@ impl WarcRecord {
     /// # Returns
     ///
     /// Number of bytes consumed.
-    pub fn consume_n(&mut self, mut n: usize) -> Result<usize, io::Error> {
-        let mut n_consumed = 0usize;
-        if n > 0
-            && let Some(r) = get_reader_mut!(self)
-        {
-            let pos = r.stream_position()? as usize;
-            if pos >= self.content_length as usize {
-                return Ok(0);
-            }
-            n = n.min(self.content_length as usize - pos);
-            while n > n_consumed {
-                let buf = r.fill_buf()?;
-                if buf.is_empty() {
-                    break;
-                }
-                let c = buf.len().min(n - n_consumed);
-                r.consume(c);
-                n_consumed += c;
-            }
+    pub fn consume_n(&mut self, n: usize) -> Result<usize, io::Error> {
+        if n == 0 {
+            return Ok(0);
         }
-        Ok(n_consumed)
+        if let Some(r) = get_reader_mut!(self) {
+            if let Ok(n) = i64::try_from(n) {
+                let initial = r.stream_position()?;
+                let new_pos = r.seek(io::SeekFrom::Current(n))?;
+                Ok((new_pos - initial) as usize)
+            } else {
+                Err(io::Error::new(io::ErrorKind::InvalidInput, "Consume offset too large"))
+            }
+        } else {
+            Err(io::Error::other("No reader set"))
+        }
     }
 
     /// Start parsing the WARC record header block. Requires a stream to be set.
