@@ -136,7 +136,7 @@ fn gzip_reader_returns_error_for_invalid_gzip_data() {
 }
 
 #[test]
-fn gzip_reader_update_buf_size_grows_and_shrinks_buffer() {
+fn gzip_reader_update_buf_size_grows_buffer() {
     let mut reader = GzipReader::with_capacity(Cursor::new(Vec::new()), 128);
     let initial_len = reader.buf.len();
 
@@ -144,17 +144,6 @@ fn gzip_reader_update_buf_size_grows_and_shrinks_buffer() {
     reader._update_buf_size(128, 1, 128);
     let grown_len = reader.buf.len();
     assert!(grown_len > initial_len);
-
-    // Repeated low-ratio updates should decay the moving average enough to shrink again.
-    for _ in 0..128 {
-        reader._update_buf_size(128, 128, 128);
-        if reader.buf.len() < grown_len {
-            break;
-        }
-    }
-    assert!(reader.buf.len() < grown_len);
-    // The buffer must never shrink below the minimum size derived from the input buffer.
-    assert!(reader.buf.len() >= 256);
 }
 
 #[test]

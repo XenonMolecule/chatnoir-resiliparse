@@ -144,8 +144,6 @@ impl<T: ReadSeek> GzipReader<T> {
             .next_power_of_two();
         if target_buf_size > self.buf.len() {
             self.buf.resize(target_buf_size, 0);
-        } else if target_buf_size * 4 < self.buf.len() {
-            self.buf.truncate(target_buf_size);
         }
     }
 }
