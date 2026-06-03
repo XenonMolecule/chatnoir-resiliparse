@@ -52,6 +52,8 @@ pub struct ArchiveIteratorImpl<R> {
 ///   required for some ClueWebs).
 /// * `stream_detect` - automatically detect the stream compression type. If enabled, automatically
 ///   detects the stream compression type based on the file extension or magic bytes.
+/// * `max_header_len` - maximum accepted WARC or HTTP header length. If a parsed header is longer than this,
+///   an error is returned (default: 32 KiB).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ArchiveIteratorOptions {
     pub stream_detect: bool,
@@ -59,6 +61,7 @@ pub struct ArchiveIteratorOptions {
     pub decode_http_payload: AutoDecode,
     pub verify_digests: bool,
     pub quirks_mode: bool,
+    pub max_header_len: usize,
 }
 
 impl Default for ArchiveIteratorOptions {
@@ -69,6 +72,7 @@ impl Default for ArchiveIteratorOptions {
             decode_http_payload: AutoDecode::None,
             verify_digests: false,
             quirks_mode: false,
+            max_header_len: 32 << 10,
         }
     }
 }
@@ -281,6 +285,17 @@ where
         self
     }
 
+    /// Set te maximum accepted length of parsed WARC or HTTP headers.
+    pub fn set_max_header_len(&mut self, max_header_len: usize) {
+        self.options.max_header_len = max_header_len;
+    }
+
+    /// Consuming setter: Set the maximum accepted length of parsed WARC or HTTP headers.
+    pub fn with_max_header_len(mut self, max_header_len: usize) -> Self {
+        self.set_max_header_len(max_header_len);
+        self
+    }
+
     /// Convert the iterator into a [`FilteredArchiveIterator`] for filtering records
     /// based on function predicates.
     ///
@@ -346,7 +361,7 @@ where
         self.stream_started = true;
 
         loop {
-            let next = self.cur.with_mut(WarcRecord::next)?;
+            let next = self.cur.with_mut(|r| r.next_impl(self.options.max_header_len))?;
             return match next {
                 Ok(n) => {
                     self.cur = S::new(n);
@@ -356,7 +371,8 @@ where
                         }
                         if self.options.parse_http
                             && record.is_http()
-                            && let Err(e) = record.parse_http_with_decode_opts(self.options.decode_http_payload)
+                            && let Err(e) = record
+                                .parse_http_with_opts(self.options.decode_http_payload, self.options.max_header_len)
                         {
                             return Err(e);
                         }

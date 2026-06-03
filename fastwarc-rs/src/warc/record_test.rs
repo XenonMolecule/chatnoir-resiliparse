@@ -554,7 +554,7 @@ fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
 
     let mut record = WarcRecord::new();
     record.attach_reader(io::Cursor::new(warc_data));
-    let bytes_read = record.parse_warc_headers_quirks(true)?;
+    let bytes_read = record.parse_warc_headers_with_opts(true, 8192)?;
     assert!(bytes_read > 0);
     assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
     assert_eq!(record.record_type(), WarcRecordType::Resource);
@@ -1073,7 +1073,7 @@ fn record_encoded_http_payload() -> io::Result<()> {
     let read_record = |payload_encoded: &[u8], tenc, cenc, dec_opts| -> io::Result<Vec<u8>> {
         let data = http_response_warc_data_encoded("<urn:uuid:abc>", payload_encoded, tenc, cenc);
         let mut rec = WarcRecord::from_reader(io::Cursor::new(data))?;
-        rec.parse_http_with_decode_opts(dec_opts)?;
+        rec.parse_http_with_decode(dec_opts)?;
         let mut buf = Vec::with_capacity(payload_raw.len());
         rec.reader_mut().unwrap().read_to_end(&mut buf)?;
         Ok(buf)
@@ -1169,7 +1169,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     rec.freeze()?;
 
     // Parse HTTP and decode content.
-    rec.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
+    rec.parse_http_with_decode(AutoDecode::TransferEncoding)?;
     let mut decoded = Vec::with_capacity(payload_raw.len());
     rec.reader_mut().unwrap().read_to_end(&mut decoded)?;
     assert_eq!(decoded, payload_raw);
@@ -1186,7 +1186,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
 
     // Create new record from stream and HTTP without content decoding.
     let mut rec = WarcRecord::from_reader(detached)?;
-    rec.parse_http_with_decode_opts(AutoDecode::None)?;
+    rec.parse_http_with_decode(AutoDecode::None)?;
 
     // Test that stream begins with Gzip magic bytes
     let mut magic_bytes = [0u8; 2];
@@ -1200,7 +1200,7 @@ fn record_encoded_http_payload_frozen_record() -> io::Result<()> {
     for r in ArchiveIterator::new(io::Cursor::new(record_data)).with_parse_http(false) {
         r?.with_mut(|r| -> io::Result<()> {
             r.freeze()?;
-            r.parse_http_with_decode_opts(AutoDecode::TransferEncoding)?;
+            r.parse_http_with_decode(AutoDecode::TransferEncoding)?;
             let mut buf = Vec::with_capacity(r.content_length() as usize);
             r.reader_mut().unwrap().read_to_end(&mut buf)?;
             assert_eq!(buf, payload_raw);

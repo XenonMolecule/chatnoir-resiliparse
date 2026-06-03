@@ -303,6 +303,7 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `s` - Byte sequence to decode
+    #[inline]
     fn _encode<'a>(&self, s: &'a str) -> Cow<'a, [u8]> {
         match &self.encoding {
             HeaderEncoding::Unicode => Cow::Borrowed(s.as_bytes()),
@@ -316,6 +317,7 @@ impl HeaderMap {
     /// # Arguments
     ///
     /// * `b` - Byte sequence to decode
+    #[inline]
     fn _decode<'a>(&self, b: &'a [u8]) -> Cow<'a, str> {
         match &self.encoding {
             HeaderEncoding::Unicode => String::from_utf8_lossy(b),
@@ -325,27 +327,52 @@ impl HeaderMap {
 
     /// Parse a WARC or HTTP header block from a stream and populate the header map.
     ///
+    /// The default maximum accepted header length is 32 KiB. If headers are longer, an error is returned.
+    /// Use [`Self::parse_with_max_len()`] to set a different maximum.
+    ///
     /// # Arguments
     ///
     /// * `reader` - Buffered reader
-    /// * `has_status_line` - Whether the first line is a status line or already a header
+    /// * `has_status_line` - Whether the first line is a status line or already a header.
     ///
     /// # Returns
     ///
     /// Number of bytes read from the reader or IO error
+    #[inline]
     pub fn parse(&mut self, reader: &mut dyn BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
+        self.parse_with_max_len(reader, has_status_line, 32 << 10)
+    }
+
+    /// Parse a WARC or HTTP header block from a stream and populate the header map.
+    ///
+    /// If a parsed header exceeds `max_header_len`, an error is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - Buffered reader
+    /// * `has_status_line` - Whether the first line is a status line or already a header.
+    /// * `max_header_len` - Maximum accepted header length in bytes.
+    ///
+    /// # Returns
+    ///
+    /// Number of bytes read from the reader or IO error
+    pub fn parse_with_max_len(
+        &mut self,
+        reader: &mut dyn BufReadSeek,
+        has_status_line: bool,
+        max_header_len: usize,
+    ) -> Result<usize, io::Error> {
         let mut bytes_consumed = 0;
         let mut line = Vec::with_capacity(128);
         let mut expect_first_line = has_status_line;
-        const MAX_LINE_LEN: usize = 8192 * 10;
 
         loop {
             line.clear();
-            let n = reader.take(MAX_LINE_LEN as u64).read_until(b'\n', &mut line)?;
+            let n = reader.take(max_header_len as u64).read_until(b'\n', &mut line)?;
             if n == 0 {
                 break;
-            } else if n == MAX_LINE_LEN && !line.ends_with(b"\n") {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Header line length out of range."));
+            } else if n == max_header_len && !line.ends_with(b"\n") {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header line length exceeded."));
             }
             bytes_consumed += n;
 
@@ -941,6 +968,9 @@ impl WarcRecord {
     /// This is the same as constructing a new empty record instance with [`Self::new()`]
     /// and then calling [`Self::attach_reader()`] and [`Self::parse_warc_headers()`].
     ///
+    /// Returns an error if a parsed header exceeds 32 KiB in size. Use
+    /// [`Self::from_reader_with_opts()`] if you need to set a larger limit.
+    ///
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance
@@ -949,24 +979,31 @@ impl WarcRecord {
     ///
     /// WARC record parsed from the stream.
     pub fn from_reader(reader: impl IntoWarcReader) -> io::Result<Self> {
-        Self::from_reader_quirks(reader, false)
+        Self::from_reader_with_opts(reader, false, 32 << 10)
     }
 
     /// Create a new WARC record instance from a buffered reader.
     ///
-    /// This constructor is equivalent to [`Self::from_reader()`], but allows enabling quirks mode.
-    /// Quirks mode enables more lenient parsing, which may be required for some ClueWebs.
+    /// This constructor is equivalent to [`Self::from_reader()`] but allows setting additional options.
+    ///
+    /// Quirks mode enables more lenient parsing, which may be required for some ClueWebs or other
+    /// non-standard WARCs.
     ///
     /// # Arguments
     ///
     /// * `reader` - buffered reader instance
     /// * `quirks_mode` - whether to enable lenient parsing ("quirks mode")
+    /// * `max_header_len` - maximum WARC header length (will return an error if exceeded, default: 32 KiB)
     ///
     /// # Returns
     ///
     /// WARC record parsed from the stream.
-    pub fn from_reader_quirks(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Self> {
-        match Self::from_reader_internal(reader, quirks_mode)? {
+    pub fn from_reader_with_opts(
+        reader: impl IntoWarcReader,
+        quirks_mode: bool,
+        max_header_len: usize,
+    ) -> io::Result<Self> {
+        match Self::from_reader_internal(reader, quirks_mode, max_header_len)? {
             Some(record) => Ok(record),
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No WARC record found")),
         }
@@ -981,15 +1018,20 @@ impl WarcRecord {
     ///
     /// * `reader` - Buffered reader instance
     /// * `quirks_mode` - whether to enable lenient parsing
+    /// * `max_header_len` - maximum WARC header length (will return an error if exceeded, default: 32 KiB)
     ///
     /// # Returns
     ///
     /// `OK(Some(record))` if record found. `OK(None)` if regular EOF reached. `Err` otherwise.
-    fn from_reader_internal(reader: impl IntoWarcReader, quirks_mode: bool) -> io::Result<Option<Self>> {
+    fn from_reader_internal(
+        reader: impl IntoWarcReader,
+        quirks_mode: bool,
+        max_header_len: usize,
+    ) -> io::Result<Option<Self>> {
         let mut record = WarcRecord::new();
         record.attach_reader(reader);
         record.quirks_mode = quirks_mode;
-        if record.parse_warc_headers_quirks(quirks_mode)? == 0 {
+        if record.parse_warc_headers_with_opts(quirks_mode, max_header_len)? == 0 {
             return Ok(None);
         }
         Ok(Some(record))
@@ -1002,7 +1044,7 @@ impl WarcRecord {
     ///
     /// * `payload` - Body as bytes
     pub fn from_bytes(payload: Vec<u8>) -> Result<Self, io::Error> {
-        let mut record = WarcRecord::from_reader(io::Cursor::new(payload))?;
+        let mut record = WarcRecord::from_reader_with_opts(io::Cursor::new(payload), false, usize::MAX)?;
         record.freeze()?;
         let Some(ReaderType::Frozen((frozen, _orig))) = record.reader.take() else {
             unreachable!("Invalid internal reader state: Reader not frozen");
@@ -1225,14 +1267,20 @@ impl WarcRecord {
     /// remaining `Content-Length` bytes. Detaching the reader will restore its
     /// original EOF limit.
     ///
+    /// Returns an error if a WARC header exceeds 32 KiB in size. Use
+    /// [`Self::parse_warc_headers_with_opts()`] if you need to set a larger limit.
+    ///
     /// # Returns
     ///
     /// Number of bytes read (zero if EOF reached).
     pub fn parse_warc_headers(&mut self) -> Result<usize, io::Error> {
-        self.parse_warc_headers_quirks(false)
+        self.parse_warc_headers_with_opts(false, 32 << 10)
     }
 
     /// Start parsing the WARC record header block. Requires a stream to be set.
+    ///
+    /// The parameters can be used to enable lenient parsing ("quirks mode") and to
+    /// set a custom header length limit.
     ///
     /// The parser will skip over any number of empty lines before the next valid
     /// `WARC/*` header line. If `quirks_mode == true`, any other invalid lines
@@ -1246,11 +1294,16 @@ impl WarcRecord {
     /// # Arguments
     ///
     /// * `quirks_mode` - Whether to skip non-empty lines before header start
+    /// * `max_header_len` - maximum allowed header length (will return an error if exceeded, default: 32 KiB)
     ///
     /// # Returns
     ///
     /// Number of bytes read (zero if EOF reached).
-    pub fn parse_warc_headers_quirks(&mut self, quirks_mode: bool) -> Result<usize, io::Error> {
+    pub fn parse_warc_headers_with_opts(
+        &mut self,
+        quirks_mode: bool,
+        max_header_len: usize,
+    ) -> Result<usize, io::Error> {
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
         let mut bytes_read = 0usize;
         let mut line = Vec::with_capacity(256);
@@ -1294,7 +1347,7 @@ impl WarcRecord {
             }
         }
 
-        bytes_read += self.headers.parse(reader, false)?;
+        bytes_read += self.headers.parse_with_max_len(reader, false, max_header_len)?;
 
         let mut parse_count = 0;
         for (k, v) in self.headers.items_bytes() {
@@ -1473,14 +1526,34 @@ impl WarcRecord {
     ///
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
-    /// If the HTTP payload is still transfer- or content-encoded, use [`Self::parse_http_with_decode_opts()`]
+    /// If the HTTP payload is still transfer- or content-encoded, use [`Self::parse_http_with_opts()`]
     /// to automatically wrap the payload reader in the required [`WarcReader(s)`](WarcReader).
     /// Usually, web archivers already decode the contents, so in most cases, this shouldn't be necessary.
+    ///
+    /// Returns an error if a header exceeds 32 KiB in size. Use [`Self::parse_http_with_opts()`] if you
+    /// need to set a larger limit.
     pub fn parse_http(&mut self) -> Result<(), io::Error> {
-        self.parse_http_with_decode_opts(AutoDecode::None)
+        self.parse_http_with_opts(AutoDecode::None, 32 << 10)
     }
 
-    /// Parse HTTP headers, advance the content reader, and wrap it in a decoder.
+    /// Parse HTTP headers and advance content reader. Transfer- or content-encoded payloads can be
+    /// automatically decoded based on the value of `auto_decode`.
+    ///
+    /// It is safe to call this method multiple times, even if the record is not an HTTP record.
+    ///
+    /// If `auto_decode` is not `None` and the HTTP payload is still transfer- or content-encoded,
+    /// the payload reader is wrapped automatically in the required [`WarcReader(s)`](WarcReader).
+    /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
+    /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
+    ///
+    /// Returns an error if a header exceeds 32 KiB in size. Use [`Self::parse_http_with_opts()`] if you
+    /// need to set a larger limit.
+    pub fn parse_http_with_decode(&mut self, auto_decode: AutoDecode) -> Result<(), io::Error> {
+        self.parse_http_with_opts(auto_decode, 32 << 10)
+    }
+
+    /// Parse HTTP headers, advance the content reader, and wrap it in a decoder. The parameters can
+    /// be used to enable auto-decoding of the payload and to set a custom header length limit.
     ///
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
@@ -1492,14 +1565,15 @@ impl WarcRecord {
     /// # Arguments
     ///
     /// * `auto_decode` - whether to auto-decode `Transfer-Encoding`, `Content-Encoding`, both, or none
-    pub fn parse_http_with_decode_opts(&mut self, auto_decode: AutoDecode) -> Result<(), io::Error> {
+    /// * `max_header_len` - maximum accepted header length (returns an error if exceeded)
+    pub fn parse_http_with_opts(&mut self, auto_decode: AutoDecode, max_header_len: usize) -> Result<(), io::Error> {
         if self.http_parsed || !self.is_http {
             return Ok(());
         }
 
         let mut http_headers = HeaderMap::new(HeaderEncoding::Latin1);
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
-        let bytes_consumed = http_headers.parse(reader, true)?;
+        let bytes_consumed = http_headers.parse_with_max_len(reader, true, max_header_len)?;
 
         // Parse charset if present
         if let Some(content_type) = http_headers.get("Content-Type").map(|c| c.to_ascii_lowercase()) {
@@ -1867,18 +1941,10 @@ impl WarcRecord {
 
         Ok(digest.finalize().to_vec() == expected_digest)
     }
-}
 
-impl Iterator for WarcRecord {
-    type Item = Result<Self, io::Error>;
-
-    /// Read the next record from the attached stream. Detaches the reader from the
-    /// current record instance.
-    ///
-    /// # Returns
-    ///
-    /// Next [`WarcRecord`] instance from the stream or `None`.
-    fn next(&mut self) -> Option<Self::Item> {
+    /// Internal next() implementation
+    #[inline]
+    pub(super) fn next_impl(&mut self, max_header_len: usize) -> Option<io::Result<Self>> {
         if !matches!(self.reader, Some(ReaderType::Frozen(_)))
             && self.content_length > 0
             && let Err(e) = self.consume()
@@ -1886,7 +1952,22 @@ impl Iterator for WarcRecord {
             return Some(Err(e));
         }
         let reader = self.detach_reader()?;
-        Self::from_reader_internal(reader, self.quirks_mode).transpose()
+        Self::from_reader_internal(reader, self.quirks_mode, max_header_len).transpose()
+    }
+}
+
+impl Iterator for WarcRecord {
+    type Item = io::Result<Self>;
+
+    /// Read the next record from the attached stream. Detaches the reader from the
+    /// current record instance.
+    ///
+    /// # Returns
+    ///
+    /// Next [`WarcRecord`] instance from the stream or `None`.
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl(32 << 10)
     }
 }
 

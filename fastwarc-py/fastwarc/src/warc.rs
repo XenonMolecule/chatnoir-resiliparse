@@ -704,7 +704,7 @@ impl WarcRecordPy {
             |reader| -> io::Result<Box<dyn WarcRead>> { Ok(Box::new(reader)) },
             |path| Ok(io::BufReader::new(std::fs::File::open(path)?).into_warc_reader()),
         )?;
-        Ok(Self::from_record(WarcRecord::from_reader_quirks(reader, quirks_mode)?))
+        Ok(Self::from_record(WarcRecord::from_reader_with_opts(reader, quirks_mode, 32 << 10)?))
     }
 
     pub fn __getnewargs__<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
@@ -1060,11 +1060,12 @@ impl WarcRecordPy {
     /// Parse the WARC header block from the attached stream.
     ///
     /// :param quirks_mode: enable lenient parsing
+    /// :param max_header_len: maximum allowed header length (throws an error if exceeded)
     /// :return: number of bytes read
-    #[pyo3(signature = (quirks_mode=false))]
-    pub fn parse_warc_headers(&mut self, quirks_mode: bool) -> PyResult<usize> {
+    #[pyo3(signature = (quirks_mode=false, max_header_len=32 << 10))]
+    pub fn parse_warc_headers(&mut self, quirks_mode: bool, max_header_len: usize) -> PyResult<usize> {
         if quirks_mode {
-            Ok(self.lock().parse_warc_headers_quirks(quirks_mode)?)
+            Ok(self.lock().parse_warc_headers_with_opts(quirks_mode, max_header_len)?)
         } else {
             Ok(self.lock().parse_warc_headers()?)
         }
@@ -1077,13 +1078,13 @@ impl WarcRecordPy {
     ///
     /// :param auto_decode: automatically decode HTTP payload encodings
     ///                     (accepted values: ``'none'``, ``'content'``, ``'transfer'``, ``'all'``)
+    /// :param max_header_len: maximum allowed header length (throws an error if exceeded)
     /// :param strict_mode: this argument is deprecated and ignored.
-    /// :param type strict_mode: bool
-    #[pyo3(signature = (auto_decode="none", *, strict_mode=true))]
-    pub fn parse_http(&mut self, auto_decode: &str, strict_mode: bool) -> PyResult<()> {
+    #[pyo3(signature = (auto_decode="none", max_header_len=32 << 10, *, strict_mode=true))]
+    pub fn parse_http(&mut self, auto_decode: &str, max_header_len: usize, strict_mode: bool) -> PyResult<()> {
         let _ = strict_mode;
         self.lock()
-            .parse_http_with_decode_opts(auto_decode_str_to_enum(auto_decode)?)?;
+            .parse_http_with_opts(auto_decode_str_to_enum(auto_decode)?, max_header_len)?;
         Ok(())
     }
 
@@ -1212,6 +1213,7 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param verify_digests: skip records with missing or invalid block digests
 /// :param quirks_mode: enable lenient parsing for malformed records
 /// :param auto_decode: automatically decode HTTP payload encodings
+/// :param max_header_len: maximum allowed header length (throws an error if exceeded)
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
 /// :param default_buffer_size: default buffer size to use for reading from files
 ///                             (has no effect if ``stream`` is not a path-like object)
@@ -1251,6 +1253,7 @@ impl ArchiveIteratorPy {
         verify_digests=false,
         quirks_mode=false,
         auto_decode="none",
+        max_header_len=32 << 10,
         stream_detect=true,
         buffer_size=64 << 10,
         fsspec_args=None,
@@ -1268,6 +1271,7 @@ impl ArchiveIteratorPy {
         verify_digests: bool,
         quirks_mode: bool,
         auto_decode: &str,
+        max_header_len: usize,
         stream_detect: bool,
         buffer_size: usize,
         fsspec_args: Option<Py<PyAny>>,
@@ -1303,6 +1307,7 @@ impl ArchiveIteratorPy {
         iterator = iterator
             .with_quirks_mode(quirks_mode)
             .with_parse_http(parse_http)
+            .with_max_header_len(max_header_len)
             .with_verify_digests(verify_digests)
             .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?);
 

@@ -44,12 +44,14 @@ fn archive_iterator_option_setters() -> io::Result<()> {
         decode_http_payload: AutoDecode::All,
         verify_digests: true,
         quirks_mode: true,
+        max_header_len: 8192,
     };
     assert_ne!(ArchiveIteratorOptions::default().stream_detect, new_opts.stream_detect);
     assert_ne!(ArchiveIteratorOptions::default().parse_http, new_opts.parse_http);
     assert_ne!(ArchiveIteratorOptions::default().decode_http_payload, new_opts.decode_http_payload);
     assert_ne!(ArchiveIteratorOptions::default().verify_digests, new_opts.verify_digests);
     assert_ne!(ArchiveIteratorOptions::default().quirks_mode, new_opts.quirks_mode);
+    assert_ne!(ArchiveIteratorOptions::default().max_header_len, new_opts.max_header_len);
 
     // Test constructor with options
     let it = ArchiveIterator::with_options(reader.clone(), new_opts);
@@ -62,6 +64,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     it.set_decode_http_payload(new_opts.decode_http_payload);
     it.set_verify_digests(new_opts.verify_digests);
     it.set_quirks_mode(new_opts.quirks_mode);
+    it.set_max_header_len(new_opts.max_header_len);
     assert_eq!(it.options, new_opts);
 
     let mut it = ArchiveIterator::new(reader.clone());
@@ -74,7 +77,8 @@ fn archive_iterator_option_setters() -> io::Result<()> {
         .with_parse_http(new_opts.parse_http)
         .with_decode_http_payload(new_opts.decode_http_payload)
         .with_verify_digests(new_opts.verify_digests)
-        .with_quirks_mode(new_opts.quirks_mode);
+        .with_quirks_mode(new_opts.quirks_mode)
+        .with_max_header_len(new_opts.max_header_len);
     assert_eq!(it.options, new_opts);
 
     Ok(())
