@@ -1719,8 +1719,8 @@ impl WarcRecord {
                 Digest::update(&mut block_digest, &buf);
             }
 
+            let mut payload_buf = [0u8; 4096];
             loop {
-                let mut payload_buf = [0u8; 4096];
                 let n = reader.read(&mut payload_buf)?;
                 if n == 0 {
                     break;

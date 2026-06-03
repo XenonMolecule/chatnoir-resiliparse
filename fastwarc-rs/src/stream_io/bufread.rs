@@ -24,7 +24,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 pub(crate) const DEFAULT_BUFFER_SIZE: usize = 64 << 10;
 
 // ===========================================================
-// Buffered reader.
+// Tracking buffered reader.
 // ===========================================================
 
 /// A thin wrapper around [`BufReader`] that implements [`Read`] + [`Seek`], but
