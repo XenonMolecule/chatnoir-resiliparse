@@ -285,7 +285,7 @@ where
         self
     }
 
-    /// Set te maximum accepted length of parsed WARC or HTTP headers.
+    /// Set the maximum accepted length of parsed WARC or HTTP headers.
     pub fn set_max_header_len(&mut self, max_header_len: usize) {
         self.options.max_header_len = max_header_len;
     }
