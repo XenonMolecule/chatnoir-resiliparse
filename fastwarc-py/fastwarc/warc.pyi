@@ -16,7 +16,7 @@ from datetime import datetime
 from collections.abc import Callable, Iterable, Iterator
 from enum import IntFlag
 from typing import BinaryIO, final, Literal, Self
-from typing_extensions import disjoint_base
+from typing_extensions import deprecated, disjoint_base
 
 from .stream_io import _GenericReader, _GenericWriter, _ReaderInput, WarcReader, WarcWriter
 
@@ -127,12 +127,12 @@ class HeaderMap:
 
     def to_dict(self) -> dict[str, str]: ...
 
-    # deprecated
+    @deprecated("Use to_dict() instead.")
     def asdict(self) -> dict[str, str]: ...
 
     def to_tuples(self) -> tuple[tuple[str, str], ...]: ...
 
-    # deprecated
+    @deprecated("Use to_tuples() instead.")
     def astuples(self) -> tuple[tuple[str, str], ...]: ...
 
     def is_empty(self) -> bool: ...
