@@ -33,11 +33,17 @@ __all__ = [
     'ReaderStaleError',
 ]
 
-FastWARCError = OSError
 
-StreamError = OSError
+@deprecated("Use OSError instead.")
+class FastWARCError(OSError): ...
 
-ReaderStaleError = OSError
+
+@deprecated("Use OSError instead.")
+class StreamError(OSError): ...
+
+
+@deprecated("Use OSError instead.")
+class ReaderStaleError(OSError): ...
 
 
 def _warn_deprecated(msg):

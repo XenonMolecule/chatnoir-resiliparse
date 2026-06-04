@@ -95,8 +95,7 @@ no_type = WarcRecordType.no_type
 any_type = WarcRecordType.any_type
 
 
-@final
-class HeaderMap:
+class _HeaderMap:
     def __new__(cls, encoding: str = "utf-8") -> Self: ...
 
     @property
@@ -198,8 +197,13 @@ class HeaderMap:
     def __setstate__(self, state: tuple[bytes, bool]): ...
 
 
-# Legacy name
-WarcHeaderMap = HeaderMap
+@final
+class HeaderMap(_HeaderMap): ...
+
+
+@deprecated("Use HeaderMap instead.")
+@final
+class WarcHeaderMap(_HeaderMap): ...
 
 
 @final
