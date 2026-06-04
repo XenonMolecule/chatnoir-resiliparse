@@ -317,6 +317,28 @@ fn parse_headers_with_continuation_lines() -> io::Result<()> {
 }
 
 #[test]
+fn parse_headers_with_lf_line_endings_in_quirks_mode() -> io::Result<()> {
+    let http_data = b"HTTP/1.1 200 OK\nContent-Length: 123\nContent-Type: text/plain\n\npayload";
+
+    let mut strict_headers = HeaderMap::new(HeaderEncoding::Latin1);
+    let mut strict_reader = io::Cursor::new(http_data);
+    strict_headers.parse_with_with_opts(&mut strict_reader, true, 8192, false)?;
+    assert!(strict_headers.get("Content-Length").is_none());
+
+    let mut quirks_headers = HeaderMap::new(HeaderEncoding::Latin1);
+    let mut quirks_reader = io::Cursor::new(http_data);
+    let bytes_read = quirks_headers.parse_with_with_opts(&mut quirks_reader, true, 8192, true)?;
+
+    assert_eq!(bytes_read, "HTTP/1.1 200 OK\nContent-Length: 123\nContent-Type: text/plain\n\n".len());
+    assert_eq!(quirks_headers.status_line().as_deref(), Some("HTTP/1.1 200 OK"));
+    assert_eq!(quirks_headers.get("Content-Length").as_deref(), Some("123"));
+    assert_eq!(quirks_headers.get("Content-Type").as_deref(), Some("text/plain"));
+    assert_eq!(quirks_reader.position(), bytes_read as u64);
+
+    Ok(())
+}
+
+#[test]
 fn new_empty_header_encoding() -> io::Result<()> {
     let mut headers_unicode = HeaderMap::new(HeaderEncoding::Unicode);
     let mut headers_latin1 = HeaderMap::new(HeaderEncoding::Latin1);

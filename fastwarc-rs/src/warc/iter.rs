@@ -371,8 +371,11 @@ where
                         }
                         if self.options.parse_http
                             && record.is_http()
-                            && let Err(e) = record
-                                .parse_http_with_opts(self.options.decode_http_payload, self.options.max_header_len)
+                            && let Err(e) = record.parse_http_with_opts(
+                                self.options.decode_http_payload,
+                                self.options.max_header_len,
+                                self.options.quirks_mode,
+                            )
                         {
                             return Err(e);
                         }

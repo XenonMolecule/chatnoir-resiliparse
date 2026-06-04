@@ -1064,11 +1064,7 @@ impl WarcRecordPy {
     /// :return: number of bytes read
     #[pyo3(signature = (quirks_mode=false, max_header_len=32 << 10))]
     pub fn parse_warc_headers(&mut self, quirks_mode: bool, max_header_len: usize) -> PyResult<usize> {
-        if quirks_mode {
-            Ok(self.lock().parse_warc_headers_with_opts(quirks_mode, max_header_len)?)
-        } else {
-            Ok(self.lock().parse_warc_headers()?)
-        }
+        Ok(self.lock().parse_warc_headers_with_opts(quirks_mode, max_header_len)?)
     }
 
     /// Parse HTTP headers and advance the payload reader.
@@ -1076,15 +1072,26 @@ impl WarcRecordPy {
     /// It is safe to call this method multiple times, even if the record is not
     /// an HTTP record.
     ///
+    /// If a parsed header exceeds `max_header_len`, an error is raised.
+    ///
+    /// Quirks mode allows parsing of headers terminated with only LF instead of CRLF.
+    ///
     /// :param auto_decode: automatically decode HTTP payload encodings
     ///                     (accepted values: ``'none'``, ``'content'``, ``'transfer'``, ``'all'``)
     /// :param max_header_len: maximum allowed header length (throws an error if exceeded)
+    /// :param quirks_mode: enable parsing of LF-only headers.
     /// :param strict_mode: this argument is deprecated and ignored.
-    #[pyo3(signature = (auto_decode="none", max_header_len=32 << 10, *, strict_mode=true))]
-    pub fn parse_http(&mut self, auto_decode: &str, max_header_len: usize, strict_mode: bool) -> PyResult<()> {
+    #[pyo3(signature = (auto_decode="none", max_header_len=32 << 10, quirks_mode=false, *, strict_mode=true))]
+    pub fn parse_http(
+        &mut self,
+        auto_decode: &str,
+        max_header_len: usize,
+        quirks_mode: bool,
+        strict_mode: bool,
+    ) -> PyResult<()> {
         let _ = strict_mode;
         self.lock()
-            .parse_http_with_opts(auto_decode_str_to_enum(auto_decode)?, max_header_len)?;
+            .parse_http_with_opts(auto_decode_str_to_enum(auto_decode)?, max_header_len, quirks_mode)?;
         Ok(())
     }
 

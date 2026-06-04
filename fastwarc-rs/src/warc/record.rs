@@ -329,7 +329,7 @@ impl HeaderMap {
     /// Parse a WARC or HTTP header block from a stream and populate the header map.
     ///
     /// The default maximum accepted header length is 32 KiB. If headers are longer, an error is returned.
-    /// Use [`Self::parse_with_max_len()`] to set a different maximum.
+    /// Use [`Self::parse_with_with_opts()`] to set a different maximum.
     ///
     /// # Arguments
     ///
@@ -341,49 +341,68 @@ impl HeaderMap {
     /// Number of bytes read from the reader or IO error
     #[inline]
     pub fn parse(&mut self, reader: &mut dyn BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
-        self.parse_with_max_len(reader, has_status_line, 32 << 10)
+        self.parse_with_with_opts(reader, has_status_line, 32 << 10, false)
     }
 
     /// Parse a WARC or HTTP header block from a stream and populate the header map.
     ///
     /// If a parsed header exceeds `max_header_len`, an error is returned.
     ///
+    /// Quirks mode allows parsing of headers terminated with only LF instead of CRLF.
+    ///
     /// # Arguments
     ///
     /// * `reader` - Buffered reader
     /// * `has_status_line` - Whether the first line is a status line or already a header.
     /// * `max_header_len` - Maximum accepted header length in bytes.
+    /// * `quirks_mode` - Whether to allow parsing of headers terminated with only LF instead of CRLF.
     ///
     /// # Returns
     ///
     /// Number of bytes read from the reader or IO error
-    pub fn parse_with_max_len(
+    pub fn parse_with_with_opts(
         &mut self,
         reader: &mut dyn BufReadSeek,
         has_status_line: bool,
         max_header_len: usize,
+        quirks_mode: bool,
     ) -> Result<usize, io::Error> {
         let mut bytes_consumed = 0;
-        let finder = memmem::Finder::new("\r\n\r\n");
+        let crlf_finder = memmem::Finder::new("\r\n\r\n");
+        let lf_finder = quirks_mode.then(|| memmem::Finder::new("\n\n"));
         let mut header_buf = Vec::with_capacity(1024);
         loop {
             let in_buf = reader.fill_buf()?;
             if in_buf.is_empty() {
                 break;
             }
-            let eoh = finder.find(in_buf);
-            let n = eoh.unwrap_or(in_buf.len());
+            let crlf_eoh = crlf_finder.find(in_buf).map(|pos| (pos, 4usize));
+            let lf_eoh = lf_finder
+                .as_ref()
+                .and_then(|finder| finder.find(in_buf).map(|pos| (pos, 2usize)));
+            let eoh = match (crlf_eoh, lf_eoh) {
+                (Some(a), None) => Some(a),
+                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            let n = eoh.map_or(in_buf.len(), |(pos, _)| pos);
             if header_buf.len() + n > max_header_len {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
             }
             header_buf.extend_from_slice(&in_buf[..n]);
             reader.consume(n);
             bytes_consumed += n;
-            if eoh.is_some() {
-                // Add only one CRLF to buffer, but consume both
-                header_buf.extend_from_slice(b"\r\n");
-                reader.consume(4);
-                bytes_consumed += 4;
+            if let Some((_, sep_len)) = eoh {
+                // Add one line separator, but consume both.
+                if sep_len == 2 {
+                    // Quirks mode
+                    header_buf.push(b'\n');
+                } else {
+                    header_buf.extend_from_slice(b"\r\n");
+                }
+                reader.consume(sep_len);
+                bytes_consumed += sep_len;
                 break;
             }
         }
@@ -392,9 +411,19 @@ impl HeaderMap {
         let finder = memmem::Finder::new("\r\n");
         let mut pos = 0;
         while pos < header_buf.len() {
-            let eol = finder.find(&header_buf[pos..]).unwrap_or(header_buf.len() - pos);
-            let line = &header_buf[pos..pos + eol];
-            pos += eol + 2;
+            let eol_match = if quirks_mode {
+                memchr(b'\n', &header_buf[pos..])
+            } else {
+                finder.find(&header_buf[pos..])
+            };
+            let eol = eol_match.unwrap_or(header_buf.len() - pos);
+            let mut line = &header_buf[pos..pos + eol];
+            if quirks_mode {
+                line = line.strip_suffix(b"\r").unwrap_or(line);
+                pos += eol + 1;
+            } else {
+                pos += eol + 2;
+            }
 
             // Status line
             if expect_first_line {
@@ -1356,7 +1385,9 @@ impl WarcRecord {
             }
         }
 
-        bytes_read += self.headers.parse_with_max_len(reader, false, max_header_len)?;
+        bytes_read += self
+            .headers
+            .parse_with_with_opts(reader, false, max_header_len, quirks_mode)?;
 
         let mut parse_count = 0;
         for (k, v) in self.headers.items_bytes() {
@@ -1542,7 +1573,7 @@ impl WarcRecord {
     /// Returns an error if a header exceeds 32 KiB in size. Use [`Self::parse_http_with_opts()`] if you
     /// need to set a larger limit.
     pub fn parse_http(&mut self) -> Result<(), io::Error> {
-        self.parse_http_with_opts(AutoDecode::None, 32 << 10)
+        self.parse_http_with_opts(AutoDecode::None, 32 << 10, false)
     }
 
     /// Parse HTTP headers and advance content reader. Transfer- or content-encoded payloads can be
@@ -1558,7 +1589,7 @@ impl WarcRecord {
     /// Returns an error if a header exceeds 32 KiB in size. Use [`Self::parse_http_with_opts()`] if you
     /// need to set a larger limit.
     pub fn parse_http_with_decode(&mut self, auto_decode: AutoDecode) -> Result<(), io::Error> {
-        self.parse_http_with_opts(auto_decode, 32 << 10)
+        self.parse_http_with_opts(auto_decode, 32 << 10, false)
     }
 
     /// Parse HTTP headers, advance the content reader, and wrap it in a decoder. The parameters can
@@ -1571,18 +1602,28 @@ impl WarcRecord {
     /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
     /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
     ///
+    /// If a parsed header exceeds `max_header_len`, an error is returned.
+    ///
+    /// Quirks mode allows parsing of headers terminated with only LF instead of CRLF.
+    ///
     /// # Arguments
     ///
-    /// * `auto_decode` - whether to auto-decode `Transfer-Encoding`, `Content-Encoding`, both, or none
-    /// * `max_header_len` - maximum accepted header length (returns an error if exceeded)
-    pub fn parse_http_with_opts(&mut self, auto_decode: AutoDecode, max_header_len: usize) -> Result<(), io::Error> {
+    /// * `auto_decode` - Whether to auto-decode `Transfer-Encoding`, `Content-Encoding`, both, or none.
+    /// * `max_header_len` - Maximum accepted header length (returns an error if exceeded).
+    /// * `quirks_mode` - Whether to allow parsing of headers terminated with only LF instead of CRLF.
+    pub fn parse_http_with_opts(
+        &mut self,
+        auto_decode: AutoDecode,
+        max_header_len: usize,
+        quirks_mode: bool,
+    ) -> Result<(), io::Error> {
         if self.http_parsed || !self.is_http {
             return Ok(());
         }
 
         let mut http_headers = HeaderMap::new(HeaderEncoding::Latin1);
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
-        let bytes_consumed = http_headers.parse_with_max_len(reader, true, max_header_len)?;
+        let bytes_consumed = http_headers.parse_with_with_opts(reader, true, max_header_len, quirks_mode)?;
 
         // Parse charset if present
         if let Some(content_type) = http_headers.get("Content-Type").map(|c| c.to_ascii_lowercase()) {
