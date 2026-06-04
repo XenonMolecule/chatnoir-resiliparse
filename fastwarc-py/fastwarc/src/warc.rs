@@ -17,9 +17,10 @@ use crate::stream_io::{
 };
 use fastwarc::stream_io::bufread::{LimitedBufReader, TrackingBufReader};
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
+use fastwarc::warc::header::{HeaderEncoding, HeaderMap};
 use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, SharedWarcRecord, filter};
 use fastwarc::warc::record::DigestError::StreamError;
-use fastwarc::warc::record::{AutoDecode, HeaderEncoding, HeaderMap, WarcRecord, WarcRecordType};
+use fastwarc::warc::record::{AutoDecode, WarcRecord, WarcRecordType};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
