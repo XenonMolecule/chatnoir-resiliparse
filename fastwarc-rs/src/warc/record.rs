@@ -18,6 +18,7 @@ use crate::stream_io::{brotli, chunked, gzip, zstd};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
+use memchr::memchr;
 use sha2::digest;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -400,7 +401,7 @@ impl HeaderMap {
             }
 
             // Parse header line
-            if let Some(colon_pos) = trimmed.iter().position(|&c| c == b':') {
+            if let Some(colon_pos) = memchr(b':', trimmed) {
                 let value = if colon_pos + 1 < trimmed.len() {
                     &trimmed[colon_pos + 1..]
                 } else {
