@@ -14,8 +14,10 @@
 
 # Legacy shims for making the new Rust extension work with the old type names
 
-import warnings
-from typing_extensions import deprecated
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
 
 __all__ = [
     'wrap_stream',
@@ -34,25 +36,20 @@ __all__ = [
 ]
 
 
-@deprecated("Use OSError instead.")
+@deprecated("Use OSError instead.", category=FutureWarning)
 class FastWARCError(OSError): ...
 
 
-@deprecated("Use OSError instead.")
+@deprecated("Use OSError instead.", category=FutureWarning)
 class StreamError(OSError): ...
 
 
-@deprecated("Use OSError instead.")
+@deprecated("Use OSError instead.", category=FutureWarning)
 class ReaderStaleError(OSError): ...
 
 
-def _warn_deprecated(msg):
-    warnings.warn(msg, FutureWarning, 3)
-
-
-@deprecated("wrap_stream is deprecated and will be removed in a future version.")
+@deprecated("wrap_stream is deprecated and will be removed in a future version.", category=FutureWarning)
 def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
-    _warn_deprecated("wrap_stream is deprecated and will be removed in a future version.")
     if isinstance(raw_stream, str):
         if fsspec_args is not False and '://' in raw_stream:
             try:
@@ -65,10 +62,9 @@ def wrap_stream(raw_stream, mode='rb', fsspec_args=None):
     return raw_stream
 
 
-@deprecated("BufferedReader is deprecated and will be removed in a future version.")
+@deprecated("BufferedReader is deprecated and will be removed in a future version.", category=FutureWarning)
 class BufferedReader:
     def __init__(self, stream, *args, **kwargs):
-        _warn_deprecated("BufferedReader is deprecated and will be removed in a future version.")
         self._stream = stream
 
     def close(self):
@@ -87,13 +83,9 @@ class BufferedReader:
         return self._stream.tell()
 
 
-@deprecated("Use the new Reader and Writer classes from stream_io instead.")
+@deprecated("Use the new Reader and Writer classes from stream_io instead.", category=FutureWarning)
 class IOStream:
     def __init__(self, *_, _reader_factory=None, _writer_factory=None, **__):
-        _warn_deprecated(
-            f"{self.__class__.__name__} is deprecated and will be removed in a future version. "
-            "Use the new Reader and Writer classes from stream_io instead.")
-
         self._reader_factory = _reader_factory
         self._writer_factory = _writer_factory
         self._reader = None
@@ -150,7 +142,7 @@ class IOStream:
         s.close()
 
 
-@deprecated("Use the new Reader and Writer classes from stream_io instead.")
+@deprecated("Use the new Reader and Writer classes from stream_io instead.", category=FutureWarning)
 class CompressingStream(IOStream):
     def begin_member(self):
         pass
@@ -160,14 +152,14 @@ class CompressingStream(IOStream):
         self._writer = None
 
 
-@deprecated("Use the plain Python stream object without any wrapper.")
+@deprecated("Use the plain Python stream object without any wrapper.", category=FutureWarning)
 class PythonIOStreamAdapter:
     def __new__(cls, py_stream):
         return IOStream(_reader_factory=lambda: py_stream,
                         _writer_factory=lambda: py_stream)
 
 
-@deprecated("Use the plain file paths instead.")
+@deprecated("Use plain file paths instead.", category=FutureWarning)
 class FileStream:
     def __new__(cls, filename: str, mode: str = 'rb'):
         if 'b' not in mode:
@@ -176,7 +168,7 @@ class FileStream:
         return IOStream(_reader_factory=lambda: f, _writer_factory=lambda: f)
 
 
-@deprecated("Use io.BytesIO instead.")
+@deprecated("Use io.BytesIO instead.", category=FutureWarning)
 class BytesIOStream:
     def __new__(cls, initial_data=None):
         import io
@@ -184,7 +176,7 @@ class BytesIOStream:
         return IOStream(_reader_factory=lambda: bio, _writer_factory=lambda: bio)
 
 
-@deprecated("Use the new GzipReader and GzipWriter classes from stream_io instead.")
+@deprecated("Use the new GzipReader and GzipWriter classes from stream_io instead.", category=FutureWarning)
 class GZipStream:
     def __new__(cls, raw_stream, compression_level=9, zlib=False, fsspec_args=None):
         from ..stream_io import GzipReader, GzipWriter
@@ -196,7 +188,7 @@ class GZipStream:
         return stream
 
 
-@deprecated("Use the new Lz4Reader and Lz4Writer classes from stream_io instead.")
+@deprecated("Use the new Lz4Reader and Lz4Writer classes from stream_io instead.", category=FutureWarning)
 class LZ4Stream:
     def __new__(cls, raw_stream, mode='r', compression_level=12,
                 favor_dec_speed=True, fsspec_args=None):
@@ -208,7 +200,7 @@ class LZ4Stream:
         return stream
 
 
-@deprecated("Use the new BrotliReader and BrotliWriter classes from stream_io instead.")
+@deprecated("Use the new BrotliReader and BrotliWriter classes from stream_io instead.", category=FutureWarning)
 class BrotliStream:
     def __new__(cls, raw_stream, quality=11, lgwin=22, lgblock=0, fsspec_args=None):
         from ..stream_io import BrotliReader, BrotliWriter
