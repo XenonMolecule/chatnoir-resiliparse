@@ -251,6 +251,63 @@ pub enum HeaderEncoding {
     Latin1,
 }
 
+/// Header key or value offsets used in CoW headers.
+type HeaderOffset = (usize, usize);
+
+/// Individual CoW header value (used for status line).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CowHeaderValue {
+    Offsets(HeaderOffset),
+    Owned(Vec<u8>),
+}
+
+#[inline]
+fn _offset_slice(buf: &[u8], offsets: HeaderOffset) -> &[u8] {
+    &buf[offsets.0..offsets.1]
+}
+
+impl CowHeaderValue {
+    #[inline]
+    fn as_slice<'a>(&'a self, raw_header_block: &'a [u8]) -> &'a [u8] {
+        match self {
+            CowHeaderValue::Offsets(offsets) => _offset_slice(raw_header_block, *offsets),
+            CowHeaderValue::Owned(value) => value.as_slice(),
+        }
+    }
+}
+
+/// CoW header (key, value) tuple.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CowHeaderTuple {
+    Offsets(HeaderOffset, HeaderOffset),
+    Owned(Vec<u8>, Vec<u8>),
+}
+
+impl CowHeaderTuple {
+    #[inline]
+    fn key<'a>(&'a self, raw_header_block: &'a [u8]) -> &'a [u8] {
+        match self {
+            CowHeaderTuple::Offsets(k, _) => _offset_slice(raw_header_block, *k),
+            CowHeaderTuple::Owned(k, _) => k.as_slice(),
+        }
+    }
+
+    #[inline]
+    fn value<'a>(&'a self, raw_header_block: &'a [u8]) -> &'a [u8] {
+        match self {
+            CowHeaderTuple::Offsets(_, v) => _offset_slice(raw_header_block, *v),
+            CowHeaderTuple::Owned(_, v) => v.as_slice(),
+        }
+    }
+}
+
+#[inline]
+fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
+    let start = value.len() - value.trim_ascii_start().len();
+    let end = value.trim_ascii_end().len();
+    (start, end)
+}
+
 /// Multimap structure representing a WARC or HTTP header block.
 ///
 /// Headers can be set or retrieved by key and the whole header block can be
@@ -259,11 +316,12 @@ pub enum HeaderEncoding {
 /// WARC headers should be created with [`HeaderEncoding::Unicode`].
 /// HTTP headers should use [`HeaderEncoding::Latin1`]. However, in either case,
 /// you should still avoid non-ASCII characters).
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone)]
 pub struct HeaderMap {
     encoding: HeaderEncoding,
-    status_line: Option<Vec<u8>>,
-    headers: Vec<(Vec<u8>, Vec<u8>)>,
+    raw_header_block: Vec<u8>,
+    status_line: Option<CowHeaderValue>,
+    headers: Vec<CowHeaderTuple>,
 }
 
 /// Internal helper for trimming leading and trailing white space and
@@ -288,6 +346,7 @@ impl HeaderMap {
     pub fn new(encoding: HeaderEncoding) -> Self {
         HeaderMap {
             encoding,
+            raw_header_block: Vec::new(),
             status_line: None,
             headers: Vec::new(),
         }
@@ -367,10 +426,12 @@ impl HeaderMap {
         max_header_len: usize,
         quirks_mode: bool,
     ) -> Result<usize, io::Error> {
+        self.clear();
+
+        let mut raw_header_block = Vec::with_capacity(1024);
         let mut bytes_consumed = 0;
         let crlf_finder = memmem::Finder::new("\r\n\r\n");
         let lf_finder = quirks_mode.then(|| memmem::Finder::new("\n\n"));
-        let mut header_buf = Vec::with_capacity(1024);
         loop {
             let in_buf = reader.fill_buf()?;
             if in_buf.is_empty() {
@@ -387,37 +448,40 @@ impl HeaderMap {
                 (None, None) => None,
             };
             let n = eoh.map_or(in_buf.len(), |(pos, _)| pos);
-            if header_buf.len() + n > max_header_len {
+            if raw_header_block.len() + n > max_header_len {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
             }
-            header_buf.extend_from_slice(&in_buf[..n]);
+            raw_header_block.extend_from_slice(&in_buf[..n]);
             reader.consume(n);
             bytes_consumed += n;
             if let Some((_, sep_len)) = eoh {
                 // Add one line separator, but consume both.
                 if sep_len == 2 {
                     // Quirks mode
-                    header_buf.push(b'\n');
+                    raw_header_block.push(b'\n');
                 } else {
-                    header_buf.extend_from_slice(b"\r\n");
+                    raw_header_block.extend_from_slice(b"\r\n");
                 }
                 reader.consume(sep_len);
                 bytes_consumed += sep_len;
                 break;
             }
         }
+        self.raw_header_block.extend_from_slice(&raw_header_block);
+        self.raw_header_block.shrink_to_fit();
 
         let mut expect_first_line = has_status_line;
         let finder = memmem::Finder::new("\r\n");
         let mut pos = 0;
-        while pos < header_buf.len() {
+        while pos < raw_header_block.len() {
+            let line_start = pos;
             let eol_match = if quirks_mode {
-                memchr(b'\n', &header_buf[pos..])
+                memchr(b'\n', &raw_header_block[pos..])
             } else {
-                finder.find(&header_buf[pos..])
+                finder.find(&raw_header_block[pos..])
             };
-            let eol = eol_match.unwrap_or(header_buf.len() - pos);
-            let mut line = &header_buf[pos..pos + eol];
+            let eol = eol_match.unwrap_or(raw_header_block.len() - pos);
+            let mut line = &raw_header_block[pos..pos + eol];
             if quirks_mode {
                 line = line.strip_suffix(b"\r").unwrap_or(line);
                 pos += eol + 1;
@@ -427,7 +491,8 @@ impl HeaderMap {
 
             // Status line
             if expect_first_line {
-                self.set_status_line_bytes(line);
+                let trimmed = _trim_ascii_offsets(line);
+                self.status_line = Some(CowHeaderValue::Offsets((line_start + trimmed.0, line_start + trimmed.1)));
                 expect_first_line = false;
                 continue;
             }
@@ -439,12 +504,13 @@ impl HeaderMap {
 
             // Parse header line
             if let Some(colon_pos) = memchr(b':', line) {
-                let value = if colon_pos + 1 < line.len() {
-                    &line[colon_pos + 1..]
-                } else {
-                    b""
-                };
-                self._append_bytes_no_sanitize(&line[..colon_pos], value);
+                let key = _trim_ascii_offsets(&line[..colon_pos]);
+                let value = _trim_ascii_offsets(&line[colon_pos + 1..]);
+
+                self.headers.push(CowHeaderTuple::Offsets(
+                    (line_start + key.0, line_start + key.1),
+                    (line_start + colon_pos + 1 + value.0, line_start + colon_pos + 1 + value.1),
+                ));
             } else {
                 // Invalid header, discard
             }
@@ -455,12 +521,16 @@ impl HeaderMap {
 
     /// Get the header status line.
     pub fn status_line(&self) -> Option<Cow<'_, str>> {
-        self.status_line.as_deref().map(|s| self._decode(s))
+        self.status_line
+            .as_ref()
+            .map(|s| self._decode(s.as_slice(&self.raw_header_block)))
     }
 
     /// Get the raw status line as bytes.
     pub fn status_line_bytes(&self) -> Option<Cow<'_, [u8]>> {
-        self.status_line.as_deref().map(Cow::Borrowed)
+        self.status_line
+            .as_ref()
+            .map(|s| Cow::Borrowed(s.as_slice(&self.raw_header_block)))
     }
 
     /// Set status line contents.
@@ -481,7 +551,7 @@ impl HeaderMap {
         let status_line = status_line.as_ref();
         let mut status_line_sanitized = Vec::with_capacity(status_line.len());
         status_line_sanitized.extend(_sanitize_header_value(status_line, true));
-        self.status_line = Some(status_line_sanitized);
+        self.status_line = Some(CowHeaderValue::Owned(status_line_sanitized));
     }
 
     /// HTTP status code (unset if header block is not an HTTP header block).
@@ -489,6 +559,7 @@ impl HeaderMap {
         let Some(s) = &self.status_line else {
             return None;
         };
+        let s = s.as_slice(&self.raw_header_block);
         if !s.starts_with(b"HTTP/") {
             return None;
         }
@@ -504,6 +575,7 @@ impl HeaderMap {
         let Some(s) = &self.status_line else {
             return None;
         };
+        let s = s.as_slice(&self.raw_header_block);
         if !s.starts_with(b"HTTP/") {
             return None;
         }
@@ -526,8 +598,11 @@ impl HeaderMap {
     pub fn get(&self, key: impl AsRef<str>) -> Option<Cow<'_, str>> {
         self.headers
             .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(key.as_ref().as_bytes()))
-            .map(|(_, v)| self._decode(v.as_slice()))
+            .find(|h| {
+                h.key(&self.raw_header_block)
+                    .eq_ignore_ascii_case(key.as_ref().as_bytes())
+            })
+            .map(|h| self._decode(h.value(&self.raw_header_block)))
     }
 
     /// Get all values for a (case-insensitive) header key.
@@ -540,8 +615,11 @@ impl HeaderMap {
     pub fn get_multiple(&self, key: impl AsRef<str>) -> Vec<Cow<'_, str>> {
         self.headers
             .iter()
-            .filter(|(k, _)| k.eq_ignore_ascii_case(key.as_ref().as_bytes()))
-            .map(|(_, v)| self._decode(v.as_slice()))
+            .filter(|h| {
+                h.key(&self.raw_header_block)
+                    .eq_ignore_ascii_case(key.as_ref().as_bytes())
+            })
+            .map(|h| self._decode(h.value(&self.raw_header_block)))
             .collect()
     }
 
@@ -558,8 +636,8 @@ impl HeaderMap {
         let key = key.as_ref();
         self.headers
             .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(key))
-            .map(|(_, v)| Cow::Borrowed(v.as_slice()))
+            .find(|h| h.key(&self.raw_header_block).eq_ignore_ascii_case(key))
+            .map(|h| Cow::Borrowed(h.value(&self.raw_header_block)))
     }
 
     /// Get all byte values for a (case-insensitive) header key.
@@ -573,8 +651,8 @@ impl HeaderMap {
         let key = key.as_ref();
         self.headers
             .iter()
-            .filter(|(k, _)| k.eq_ignore_ascii_case(key))
-            .map(|(_, v)| Cow::Borrowed(v.as_slice()))
+            .filter(|h| h.key(&self.raw_header_block).eq_ignore_ascii_case(key))
+            .map(|h| Cow::Borrowed(h.value(&self.raw_header_block)))
             .collect()
     }
 
@@ -587,7 +665,7 @@ impl HeaderMap {
         let key_bytes = self._encode(key.as_ref());
         self.headers
             .iter()
-            .any(|(k, _)| k.eq_ignore_ascii_case(key_bytes.as_ref()))
+            .any(|h| h.key(&self.raw_header_block).eq_ignore_ascii_case(key_bytes.as_ref()))
     }
 
     /// Check if a (case-insensitive) header key exists.
@@ -597,7 +675,9 @@ impl HeaderMap {
     /// * `key` - Header key as bytes
     pub fn contains_key_bytes(&self, key: impl AsRef<[u8]>) -> bool {
         let key = key.as_ref();
-        self.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case(key))
+        self.headers
+            .iter()
+            .any(|h| h.key(&self.raw_header_block).eq_ignore_ascii_case(key))
     }
 
     /// Insert a new header and overwrite any existing header(s) if the key already exists.
@@ -640,10 +720,10 @@ impl HeaderMap {
 
         let mut found = false;
         self.headers.retain_mut(|h| {
-            if h.0.to_ascii_lowercase() != key_lower {
+            if h.key(self.raw_header_block.as_slice()).to_ascii_lowercase() != key_lower {
                 true
             } else if !found {
-                *h = (_sanitize_header_value(key, true), _sanitize_header_value(value, false));
+                *h = CowHeaderTuple::Owned(_sanitize_header_value(key, true), _sanitize_header_value(value, false));
                 found = true;
                 true
             } else {
@@ -652,7 +732,7 @@ impl HeaderMap {
         });
         if !found {
             self.headers
-                .push((_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
+                .push(CowHeaderTuple::Owned(_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
         }
     }
 
@@ -688,14 +768,14 @@ impl HeaderMap {
         let key = key.as_ref();
         let value = value.as_ref();
         self.headers
-            .push((_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
+            .push(CowHeaderTuple::Owned(_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
     }
 
     /// Internal function for appending a header without sanitization
     /// (assumes data is already sanitized). Still trims leading and trailing white space.
     fn _append_bytes_no_sanitize(&mut self, key: &[u8], value: &[u8]) {
         self.headers
-            .push((key.trim_ascii().to_vec(), value.trim_ascii().to_vec()));
+            .push(CowHeaderTuple::Owned(key.trim_ascii().to_vec(), value.trim_ascii().to_vec()));
     }
 
     /// Internal helper for adding a continuation line to the last-appended header.
@@ -703,11 +783,23 @@ impl HeaderMap {
     fn _add_continuation_bytes(&mut self, value: &[u8]) {
         let trimmed = value.trim_ascii();
         if let Some(last) = self.headers.last_mut() {
-            last.1.reserve(trimmed.len() + 1);
-            last.1.push(b' ');
-            last.1.extend_from_slice(trimmed);
+            match last {
+                CowHeaderTuple::Offsets(ko, vo) => {
+                    let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
+                    let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
+                    value.reserve(trimmed.len() + 1);
+                    value.push(b' ');
+                    value.extend_from_slice(trimmed);
+                    *last = CowHeaderTuple::Owned(key, value);
+                }
+                CowHeaderTuple::Owned(_, value) => {
+                    value.reserve(trimmed.len() + 1);
+                    value.push(b' ');
+                    value.extend_from_slice(trimmed);
+                }
+            }
         } else {
-            self.headers.push((Vec::new(), trimmed.to_vec()));
+            self.headers.push(CowHeaderTuple::Owned(Vec::new(), trimmed.to_vec()));
         }
     }
 
@@ -721,37 +813,51 @@ impl HeaderMap {
     pub fn remove_bytes(&mut self, key: impl AsRef<[u8]>) {
         let key = key.as_ref();
         let key = _sanitize_header_value(key, true);
-        self.headers.retain(|(k, _)| !k.eq_ignore_ascii_case(key.as_slice()));
+        let raw_header_block = self.raw_header_block.as_slice();
+        self.headers
+            .retain(|h| !h.key(raw_header_block).eq_ignore_ascii_case(key.as_slice()));
     }
 
     /// Iterator of keys and values.
     pub fn items(&self) -> impl Iterator<Item = (Cow<'_, str>, Cow<'_, str>)> {
-        self.headers.iter().map(|(k, v)| (self._decode(k), self._decode(v)))
+        self.headers
+            .iter()
+            .map(|h| (self._decode(h.key(&self.raw_header_block)), self._decode(h.value(&self.raw_header_block))))
     }
 
     /// Zero-copy iterator of keys and values as bytes.
-    pub fn items_bytes(&self) -> impl Iterator<Item = &(Vec<u8>, Vec<u8>)> {
-        self.headers.iter()
+    pub fn items_bytes(&self) -> impl Iterator<Item = (Cow<'_, [u8]>, Cow<'_, [u8]>)> {
+        self.headers
+            .iter()
+            .map(|h| (Cow::Borrowed(h.key(&self.raw_header_block)), Cow::Borrowed(h.value(&self.raw_header_block))))
     }
 
     /// Iterator of header keys.
     pub fn keys(&'_ self) -> impl Iterator<Item = CaseInsensitiveKey<'_>> {
-        self.headers.iter().map(|(k, _)| CaseInsensitiveKey(self._decode(k)))
+        self.headers
+            .iter()
+            .map(|h| CaseInsensitiveKey(self._decode(h.key(&self.raw_header_block))))
     }
 
     /// Zero-copy iterator of header keys as bytes.
-    pub fn keys_bytes(&self) -> impl Iterator<Item = &Vec<u8>> {
-        self.headers.iter().map(|(k, _)| k)
+    pub fn keys_bytes(&self) -> impl Iterator<Item = Cow<'_, [u8]>> {
+        self.headers
+            .iter()
+            .map(|h| Cow::Borrowed(h.key(&self.raw_header_block)))
     }
 
     /// Iterator of header values.
     pub fn values(&self) -> impl Iterator<Item = Cow<'_, str>> {
-        self.headers.iter().map(|(_, v)| self._decode(v))
+        self.headers
+            .iter()
+            .map(|h| self._decode(h.value(&self.raw_header_block)))
     }
 
     /// Zero-copy iterator of header values as bytes.
-    pub fn values_bytes(&self) -> impl Iterator<Item = &Vec<u8>> {
-        self.headers.iter().map(|(_, v)| v)
+    pub fn values_bytes(&self) -> impl Iterator<Item = Cow<'_, [u8]>> {
+        self.headers
+            .iter()
+            .map(|h| Cow::Borrowed(h.value(&self.raw_header_block)))
     }
 
     /// Return the headers as a [`HashMap`] of Unicode strings.
@@ -782,6 +888,7 @@ impl HeaderMap {
 
     /// Clear all headers and the status line.
     pub fn clear(&mut self) {
+        self.raw_header_block.clear();
         self.headers.clear();
         self.status_line = None;
     }
@@ -790,13 +897,16 @@ impl HeaderMap {
     pub fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut bytes_written = 0usize;
         if let Some(s) = &self.status_line
-            && !s.is_empty()
+            && !s.as_slice(&self.raw_header_block).is_empty()
         {
-            writer.write_all(s)?;
+            let status_line = s.as_slice(&self.raw_header_block);
+            writer.write_all(status_line)?;
             writer.write_all(b"\r\n")?;
-            bytes_written += s.len() + 2;
+            bytes_written += status_line.len() + 2;
         }
-        for (key, value) in &self.headers {
+        for header in &self.headers {
+            let key = header.key(&self.raw_header_block);
+            let value = header.value(&self.raw_header_block);
             if !key.is_empty() {
                 writer.write_all(key)?;
                 writer.write_all(b": ")?;
@@ -813,6 +923,21 @@ impl HeaderMap {
         Ok(bytes_written)
     }
 }
+
+impl PartialEq for HeaderMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.encoding == other.encoding
+            && self.status_line.as_ref().map(|s| s.as_slice(&self.raw_header_block))
+                == other.status_line.as_ref().map(|s| s.as_slice(&other.raw_header_block))
+            && self.headers.len() == other.headers.len()
+            && self.headers.iter().zip(other.headers.iter()).all(|(left, right)| {
+                left.key(&self.raw_header_block) == right.key(&other.raw_header_block)
+                    && left.value(&self.raw_header_block) == right.value(&other.raw_header_block)
+            })
+    }
+}
+
+impl Eq for HeaderMap {}
 
 impl Display for HeaderMap {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1344,7 +1469,8 @@ impl WarcRecord {
     ) -> Result<usize, io::Error> {
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
         let mut bytes_read = 0usize;
-        let mut line = Vec::with_capacity(256);
+        let status_line;
+        let mut line = Vec::with_capacity(32);
         self.headers.clear();
 
         loop {
@@ -1371,7 +1497,7 @@ impl WarcRecord {
                 // ClueWeb09/12 legacy
                 || (trimmed.starts_with(b"WARC/0.") && trimmed.len() <= 9)
             {
-                self.headers.status_line = Some(trimmed.to_owned());
+                status_line = Some(CowHeaderValue::Owned(trimmed.to_owned()));
                 if let Some(p) = reader.frame_start_position()? {
                     // If supported, use the (potentially more accurate) member start position
                     // instead of the starting inner stream position.
@@ -1388,17 +1514,18 @@ impl WarcRecord {
         bytes_read += self
             .headers
             .parse_with_with_opts(reader, false, max_header_len, quirks_mode)?;
+        self.headers.status_line = status_line;
 
         let mut parse_count = 0;
         for (k, v) in self.headers.items_bytes() {
-            if k == b"WARC-Type" {
-                self.record_type = WarcRecordType::try_from(v.as_slice()).unwrap_or(WarcRecordType::Unknown);
+            if k.as_ref() == b"WARC-Type" {
+                self.record_type = WarcRecordType::try_from(v.as_ref()).unwrap_or(WarcRecordType::Unknown);
                 parse_count += 1;
-            } else if k == b"Content-Type" {
-                self.is_http = v == b"application/http" || v.starts_with(b"application/http;");
+            } else if k.as_ref() == b"Content-Type" {
+                self.is_http = v.as_ref() == b"application/http" || v.starts_with(b"application/http;");
                 parse_count += 1;
-            } else if k == b"Content-Length" {
-                self.content_length = str::from_utf8(v).unwrap_or_default().parse().unwrap_or(0);
+            } else if k.as_ref() == b"Content-Length" {
+                self.content_length = str::from_utf8(v.as_ref()).unwrap_or_default().parse().unwrap_or(0);
                 parse_count += 1;
             }
             if parse_count == 3 {
