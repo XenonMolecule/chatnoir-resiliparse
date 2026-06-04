@@ -18,7 +18,7 @@ use crate::stream_io::{brotli, chunked, gzip, zstd};
 use digest::{Digest, DynDigest};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
-use memchr::memchr;
+use memchr::{memchr, memmem};
 use sha2::digest;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -364,50 +364,58 @@ impl HeaderMap {
         max_header_len: usize,
     ) -> Result<usize, io::Error> {
         let mut bytes_consumed = 0;
-        let mut line = Vec::with_capacity(128);
-        let mut expect_first_line = has_status_line;
-
+        let finder = memmem::Finder::new("\r\n\r\n");
+        let mut header_buf = Vec::with_capacity(1024);
         loop {
-            line.clear();
-            let n = reader.take(max_header_len as u64).read_until(b'\n', &mut line)?;
-            if n == 0 {
+            let in_buf = reader.fill_buf()?;
+            if in_buf.is_empty() {
                 break;
-            } else if n == max_header_len && !line.ends_with(b"\n") {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header line length exceeded."));
             }
+            let eoh = finder.find(in_buf);
+            let n = eoh.unwrap_or(in_buf.len());
+            if header_buf.len() + n > max_header_len {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
+            }
+            header_buf.extend_from_slice(&in_buf[..n]);
+            reader.consume(n);
             bytes_consumed += n;
-
-            // Trim (CR)LF line endings
-            let trimmed = line
-                .strip_suffix(b"\r\n")
-                .or_else(|| line.strip_suffix(b"\n"))
-                .unwrap_or(&line);
-
-            // End of header
-            if trimmed.is_empty() {
+            if eoh.is_some() {
+                // Add only one CRLF to buffer, but consume both
+                header_buf.extend_from_slice(b"\r\n");
+                reader.consume(4);
+                bytes_consumed += 4;
                 break;
             }
+        }
+
+        let mut expect_first_line = has_status_line;
+        let finder = memmem::Finder::new("\r\n");
+        let mut pos = 0;
+        while pos < header_buf.len() {
+            let eol = finder.find(&header_buf[pos..]).unwrap_or(header_buf.len() - pos);
+            let line = &header_buf[pos..pos + eol];
+            pos += eol + 2;
 
             // Status line
             if expect_first_line {
-                self.set_status_line_bytes(trimmed);
+                self.set_status_line_bytes(line);
                 expect_first_line = false;
                 continue;
             }
 
-            if matches!(trimmed.first(), Some(b' ' | b'\t')) {
-                self._add_continuation_bytes(trimmed);
+            if matches!(line.first(), Some(b' ' | b'\t')) {
+                self._add_continuation_bytes(line);
                 continue;
             }
 
             // Parse header line
-            if let Some(colon_pos) = memchr(b':', trimmed) {
-                let value = if colon_pos + 1 < trimmed.len() {
-                    &trimmed[colon_pos + 1..]
+            if let Some(colon_pos) = memchr(b':', line) {
+                let value = if colon_pos + 1 < line.len() {
+                    &line[colon_pos + 1..]
                 } else {
                     b""
                 };
-                self._append_bytes_no_sanitize(&trimmed[..colon_pos], value);
+                self._append_bytes_no_sanitize(&line[..colon_pos], value);
             } else {
                 // Invalid header, discard
             }
