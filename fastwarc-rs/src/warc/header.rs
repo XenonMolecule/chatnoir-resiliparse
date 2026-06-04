@@ -156,11 +156,25 @@ impl CowHeaderTuple {
     }
 }
 
+/// Internal helper for trimming slice offsets to exclude leading and trailing white space.
 #[inline]
 fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
     let start = value.len() - value.trim_ascii_start().len();
     let end = value.trim_ascii_end().len();
     (start, end)
+}
+
+/// Internal helper for trimming leading and trailing white space and
+/// removing internal CR and LF characters. Also strips `':'` if `is_key == true`.
+fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
+    let mut value_sanitized = Vec::with_capacity(value.len());
+    value_sanitized.extend(value.trim_ascii().iter().flat_map(|b| match b {
+        b'\r' => None,
+        b'\n' => Some(b' '),
+        b':' if is_key => None,
+        other => Some(*other),
+    }));
+    value_sanitized
 }
 
 /// Multimap structure representing a WARC or HTTP header block.
@@ -177,19 +191,6 @@ pub struct HeaderMap {
     pub(super) raw_header_block: Vec<u8>,
     pub(super) status_line: Option<CowHeaderValue>,
     pub(super) headers: Vec<CowHeaderTuple>,
-}
-
-/// Internal helper for trimming leading and trailing white space and
-/// removing internal CR and LF characters. Also strips `':'` if `is_key == true`.
-fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
-    let mut value_sanitized = Vec::with_capacity(value.len());
-    value_sanitized.extend(value.trim_ascii().iter().flat_map(|b| match b {
-        b'\r' => None,
-        b'\n' => Some(b' '),
-        b':' if is_key => None,
-        other => Some(*other),
-    }));
-    value_sanitized
 }
 
 impl HeaderMap {
