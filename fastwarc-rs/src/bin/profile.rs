@@ -1,5 +1,4 @@
 use fastwarc::warc::iter::{ArchiveIterator, SharedWarcRecord};
-use std::io::BufReader;
 use std::time::{Duration, Instant};
 
 fn main() {
@@ -12,11 +11,11 @@ fn main() {
     let mut total_count = 0usize;
     let mut total_bytes = 0u64;
 
-    let file = std::fs::File::open(path).unwrap();
-    let reader = BufReader::with_capacity(1 << 20, file);
+    // let file = std::fs::File::open(path).unwrap();
+    // let reader = BufReader::with_capacity(64 << 10, file);
 
     println!("Reading WARC file: {}", path);
-    for record in ArchiveIterator::new(reader) {
+    for record in ArchiveIterator::from_path(path).unwrap().with_parse_http(false) {
         if record.is_err() {
             continue;
         }

@@ -259,6 +259,165 @@ impl HeaderMap {
         self.parse_with_with_opts(reader, has_status_line, 32 << 10, false)
     }
 
+    /// Internal raw header block reader implementation with clean hot path (no quirks mode)..
+    #[inline]
+    fn read_raw_header_block(
+        &mut self,
+        reader: &mut dyn BufReadSeek,
+        raw_header_block: &mut Vec<u8>,
+        max_header_len: usize,
+    ) -> Result<usize, io::Error> {
+        let mut pending_crlf = 0usize;
+        let mut bytes_consumed = 0usize;
+        let crlf_finder = memmem::Finder::new("\r\n\r\n");
+
+        loop {
+            let in_buf = reader.fill_buf()?;
+            if in_buf.is_empty() {
+                return Ok(bytes_consumed);
+            }
+
+            if pending_crlf > 0 {
+                // CRLF bytes pending, check for split EOH marker.
+                let sep_remaining = 4 - pending_crlf;
+                if in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\r\n\r\n"[pending_crlf..] {
+                    // Ensure we have only one CRLF at the end.
+                    raw_header_block.truncate(raw_header_block.len() - pending_crlf);
+                    raw_header_block.extend_from_slice(b"\r\n");
+                    reader.consume(sep_remaining);
+                    bytes_consumed += sep_remaining;
+                    return Ok(bytes_consumed);
+                }
+            }
+
+            let eoh = crlf_finder.find(in_buf);
+            let n = eoh.unwrap_or(in_buf.len());
+            if raw_header_block.len() + n > max_header_len {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
+            }
+            raw_header_block.extend_from_slice(&in_buf[..n]);
+            reader.consume(n);
+            bytes_consumed += n;
+            if eoh.is_some() {
+                // Add one line separator, but consume both.
+                raw_header_block.extend_from_slice(b"\r\n");
+                reader.consume(4);
+                bytes_consumed += 4;
+                return Ok(bytes_consumed);
+            }
+
+            // Count trailing CRLF bytes for split EOH marker detection.
+            pending_crlf = match raw_header_block.as_slice() {
+                [.., b'\r', b'\n', b'\r'] => 3,
+                [.., b'\r', b'\n'] => 2,
+                [.., b'\r'] => 1,
+                _ => 0,
+            };
+        }
+    }
+
+    /// Internal raw header block reader implementation with quirks mode handling in the hot path.
+    #[inline]
+    fn read_raw_header_block_quirks_mode(
+        &mut self,
+        reader: &mut dyn BufReadSeek,
+        raw_header_block: &mut Vec<u8>,
+        max_header_len: usize,
+    ) -> Result<usize, io::Error> {
+        let mut pending_crlf = 0usize;
+        let mut pending_lf = 0usize;
+        let mut bytes_consumed = 0usize;
+        let crlf_finder = memmem::Finder::new("\r\n\r\n");
+        let lf_finder = memmem::Finder::new("\n\n");
+
+        loop {
+            let in_buf = reader.fill_buf()?;
+            if in_buf.is_empty() {
+                return Ok(bytes_consumed);
+            }
+
+            // CRLF bytes pending, check for split EOH marker.
+            let crlf_eoh_split =
+                if pending_crlf > 0 {
+                    let sep_remaining = 4 - pending_crlf;
+                    (in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\r\n\r\n"[pending_crlf..])
+                        .then_some((raw_header_block.len() - pending_crlf, pending_crlf, sep_remaining, 4usize))
+                } else {
+                    None
+                };
+            // LF bytes pending, check for split EOH marker.
+            let lf_eoh_split = if pending_lf > 0 {
+                let sep_remaining = 2 - pending_lf;
+                (in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\n\n"[pending_lf..]).then_some((
+                    raw_header_block.len() - pending_lf,
+                    pending_lf,
+                    sep_remaining,
+                    2usize,
+                ))
+            } else {
+                None
+            };
+            let eoh_split = match (crlf_eoh_split, lf_eoh_split) {
+                (Some(a), None) => Some(a),
+                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            // Split EOH found.
+            if let Some((pos, _, sep_remaining, sep_len)) = eoh_split {
+                raw_header_block.truncate(pos);
+                // Add one line separator, but consume both.
+                if sep_len == 2 {
+                    raw_header_block.push(b'\n');
+                } else {
+                    raw_header_block.extend_from_slice(b"\r\n");
+                }
+                reader.consume(sep_remaining);
+                bytes_consumed += sep_remaining;
+                return Ok(bytes_consumed);
+            }
+
+            // Check for non-split EOH.
+            let crlf_eoh = crlf_finder.find(in_buf).map(|pos| (pos, 4usize));
+            let lf_eoh = lf_finder.find(in_buf).map(|pos| (pos, 2usize));
+            let eoh = match (crlf_eoh, lf_eoh) {
+                (Some(a), None) => Some(a),
+                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            let n = eoh.map_or(in_buf.len(), |(pos, _)| pos);
+            if raw_header_block.len() + n > max_header_len {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
+            }
+            raw_header_block.extend_from_slice(&in_buf[..n]);
+            reader.consume(n);
+            bytes_consumed += n;
+            // EOH found.
+            if let Some((_, sep_len)) = eoh {
+                // Add one line separator, but consume both.
+                if sep_len == 2 {
+                    raw_header_block.push(b'\n');
+                } else {
+                    raw_header_block.extend_from_slice(b"\r\n");
+                }
+                reader.consume(sep_len);
+                bytes_consumed += sep_len;
+                return Ok(bytes_consumed);
+            }
+
+            // Count trailing CRLF bytes for split EOH marker detection.
+            pending_crlf = match raw_header_block.as_slice() {
+                [.., b'\r', b'\n', b'\r'] => 3,
+                [.., b'\r', b'\n'] => 2,
+                [.., b'\r'] => 1,
+                _ => 0,
+            };
+            // Check for trailing LF byte for split quirks EOH marker detection.
+            pending_lf = (raw_header_block.last() == Some(&b'\n')).into();
+        }
+    }
+
     /// Parse a WARC or HTTP header block from a stream and populate the header map.
     ///
     /// If a parsed header exceeds `max_header_len`, an error is returned.
@@ -284,47 +443,15 @@ impl HeaderMap {
     ) -> Result<usize, io::Error> {
         self.clear();
 
-        let mut raw_header_block = Vec::with_capacity(1024);
-        let mut bytes_consumed = 0;
-        let crlf_finder = memmem::Finder::new("\r\n\r\n");
-        let lf_finder = quirks_mode.then(|| memmem::Finder::new("\n\n"));
-        loop {
-            let in_buf = reader.fill_buf()?;
-            if in_buf.is_empty() {
-                break;
-            }
-            let crlf_eoh = crlf_finder.find(in_buf).map(|pos| (pos, 4usize));
-            let lf_eoh = lf_finder
-                .as_ref()
-                .and_then(|finder| finder.find(in_buf).map(|pos| (pos, 2usize)));
-            let eoh = match (crlf_eoh, lf_eoh) {
-                (Some(a), None) => Some(a),
-                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            };
-            let n = eoh.map_or(in_buf.len(), |(pos, _)| pos);
-            if raw_header_block.len() + n > max_header_len {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
-            }
-            raw_header_block.extend_from_slice(&in_buf[..n]);
-            reader.consume(n);
-            bytes_consumed += n;
-            if let Some((_, sep_len)) = eoh {
-                // Add one line separator, but consume both.
-                if sep_len == 2 {
-                    // Quirks mode
-                    raw_header_block.push(b'\n');
-                } else {
-                    raw_header_block.extend_from_slice(b"\r\n");
-                }
-                reader.consume(sep_len);
-                bytes_consumed += sep_len;
-                break;
-            }
-        }
+        let mut raw_header_block = Vec::with_capacity(768);
+        let bytes_consumed = if quirks_mode {
+            self.read_raw_header_block_quirks_mode(reader, &mut raw_header_block, max_header_len)?
+        } else {
+            self.read_raw_header_block(reader, &mut raw_header_block, max_header_len)?
+        };
         self.raw_header_block.extend_from_slice(&raw_header_block);
         self.raw_header_block.shrink_to_fit();
+        self.headers.reserve(bytes_consumed / 64);
 
         let mut expect_first_line = has_status_line;
         let finder = memmem::Finder::new("\r\n");
