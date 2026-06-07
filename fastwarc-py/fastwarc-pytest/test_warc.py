@@ -45,7 +45,7 @@ def _http_payload(body: bytes = HTTP_BODY) -> bytes:
     )
 
 
-def _make_http_record(record_type=response, *, record_urn: bytes = b"urn:uuid:test-record",
+def _make_http_record(record_type=response, *, record_urn: bytes = b"uuid:test-record",
                       body: bytes = HTTP_BODY) -> WarcRecord:
     record = WarcRecord()
     record.init_headers(unknown, record_urn)

@@ -1009,7 +1009,7 @@ impl WarcRecordPy {
     /// record payload.
     ///
     /// :param record_type: WARC-Type
-    /// :param record_urn: WARC-Record-ID as URN without ``'<'`` and ``'>'``
+    /// :param record_urn: WARC-Record-ID as URN without ``'<urn:'`` and ``'>'``
     /// :param content_length: deprecated compatibility argument, ignored
     #[pyo3(signature = (record_type=WarcRecordTypePy::no_type, record_urn=None, *, content_length=None)
     )]
