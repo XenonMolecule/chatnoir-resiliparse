@@ -196,6 +196,66 @@ fn parse_http_headers() -> io::Result<()> {
 }
 
 #[test]
+fn record_iter_next() -> io::Result<()> {
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
+    let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
+
+    let mut record1 = WarcRecord::from_reader(io::Cursor::new(warc_data.clone()))?;
+    assert_eq!(record1.stream_pos(), 0);
+    assert_eq!(record1.record_id().as_deref(), Some("<urn:uuid:record1>"));
+
+    let mut payload = Vec::new();
+    record1.reader_mut().unwrap().read_to_end(&mut payload)?;
+    assert_eq!(payload, b"ABC");
+
+    let mut record2 = record1.next().unwrap()?;
+    assert_eq!(record2.record_id().as_deref(), Some("<urn:uuid:record2>"));
+    assert_eq!(record2.stream_pos(), record_data1.len() as u64);
+    payload.clear();
+    record2.reader_mut().unwrap().read_to_end(&mut payload)?;
+    assert_eq!(payload, b"DEFGHI");
+    assert!(record2.next().is_none());
+
+    Ok(())
+}
+
+#[test]
+fn record_iter_next_inplace() -> io::Result<()> {
+    let record_data1 = http_response_warc_data("<urn:uuid:record1>", "Hello World");
+    let record_data2 = warc_record_data("resource", "<urn:uuid:record2>", None, b"XYZ");
+    let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
+
+    let mut record = WarcRecord::new();
+    record.attach_reader(io::Cursor::new(warc_data));
+    record.parse_warc_headers()?;
+    record.parse_http()?;
+
+    assert!(record.is_http());
+    assert!(record.is_http_parsed());
+    assert!(record.http_headers().is_some());
+    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:record1>"));
+
+    assert!(record.next_inplace().transpose()?.is_some());
+    assert_eq!(record.record_type(), WarcRecordType::Resource);
+    assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:record2>"));
+    assert_eq!(record.stream_pos(), record_data1.len() as u64);
+    assert!(!record.is_http());
+    assert!(!record.is_http_parsed());
+    assert!(record.http_headers().is_none());
+    assert_eq!(record.content_length(), 3);
+
+    let mut buf = Vec::new();
+    record.reader_mut().unwrap().read_to_end(&mut buf)?;
+    assert_eq!(buf, b"XYZ");
+
+    // EOF
+    assert!(record.next_inplace().is_none());
+
+    Ok(())
+}
+
+#[test]
 fn record_http_parsing() -> io::Result<()> {
     let file = get_fixture_path("warcfile.warc");
     let mut parsed_count = 0usize;

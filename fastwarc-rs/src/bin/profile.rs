@@ -15,7 +15,11 @@ fn main() {
     // let reader = BufReader::with_capacity(64 << 10, file);
 
     println!("Reading WARC file: {}", path);
-    for record in ArchiveIterator::from_path(path).unwrap().with_parse_http(false) {
+    for record in ArchiveIterator::from_path(path)
+        .unwrap()
+        .with_parse_http(false)
+        .with_inplace(true)
+    {
         if record.is_err() {
             continue;
         }

@@ -356,7 +356,7 @@ impl HeaderMap {
                 consumed = 1;
                 bytes_consumed += 1;
                 let line = &self.raw_header_block[line_start..];
-                if line.len() == 2 || (quirks_mode && line.trim_ascii().is_empty()) {
+                if line.len() == 2 || (quirks_mode && line.trim_ascii_end().is_empty()) {
                     reader.consume(consumed);
                     return Ok(bytes_consumed);
                 }
@@ -391,7 +391,7 @@ impl HeaderMap {
                 bytes_consumed += eol + sep_len;
 
                 let line = &self.raw_header_block[line_start..];
-                if line.len() == sep_len || (quirks_mode && line.trim_ascii().is_empty()) {
+                if line.len() == sep_len || (quirks_mode && line.trim_ascii_end().is_empty()) {
                     reader.consume(consumed);
                     return Ok(bytes_consumed);
                 }

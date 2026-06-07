@@ -45,6 +45,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
         verify_digests: true,
         quirks_mode: true,
         max_header_len: 8192,
+        inplace: true,
     };
     assert_ne!(ArchiveIteratorOptions::default().stream_detect, new_opts.stream_detect);
     assert_ne!(ArchiveIteratorOptions::default().parse_http, new_opts.parse_http);
@@ -52,6 +53,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     assert_ne!(ArchiveIteratorOptions::default().verify_digests, new_opts.verify_digests);
     assert_ne!(ArchiveIteratorOptions::default().quirks_mode, new_opts.quirks_mode);
     assert_ne!(ArchiveIteratorOptions::default().max_header_len, new_opts.max_header_len);
+    assert_ne!(ArchiveIteratorOptions::default().inplace, new_opts.inplace);
 
     // Test constructor with options
     let it = ArchiveIterator::with_options(reader.clone(), new_opts);
@@ -65,6 +67,7 @@ fn archive_iterator_option_setters() -> io::Result<()> {
     it.set_verify_digests(new_opts.verify_digests);
     it.set_quirks_mode(new_opts.quirks_mode);
     it.set_max_header_len(new_opts.max_header_len);
+    it.set_inplace(new_opts.inplace);
     assert_eq!(it.options, new_opts);
 
     let mut it = ArchiveIterator::new(reader.clone());
@@ -78,7 +81,8 @@ fn archive_iterator_option_setters() -> io::Result<()> {
         .with_decode_http_payload(new_opts.decode_http_payload)
         .with_verify_digests(new_opts.verify_digests)
         .with_quirks_mode(new_opts.quirks_mode)
-        .with_max_header_len(new_opts.max_header_len);
+        .with_max_header_len(new_opts.max_header_len)
+        .with_inplace(new_opts.inplace);
     assert_eq!(it.options, new_opts);
 
     Ok(())
@@ -91,15 +95,6 @@ fn archive_iterator() -> io::Result<()> {
     let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
 
     let reader = io::Cursor::new(warc_data);
-
-    // Manual iteration
-    let mut record1 = WarcRecord::from_reader(reader.clone())?;
-    assert_eq!(record1.stream_pos(), 0);
-    assert_eq!(record1.record_id().unwrap(), "<urn:uuid:record1>");
-    let mut record2 = record1.next().unwrap()?;
-    assert_eq!(record2.record_id().unwrap(), "<urn:uuid:record2>");
-    assert_eq!(record2.stream_pos(), warc_record_data("request", "<urn:uuid:record1>", None, b"ABC").len() as u64);
-    assert!(record2.next().is_none());
 
     // ArchiveIterator (without reading payload -> consumed automatically)
     let mut it = ArchiveIterator::new(reader.clone());
@@ -132,6 +127,28 @@ fn archive_iterator() -> io::Result<()> {
 
     // Trait-derived iterator methods
     assert_eq!(ArchiveIterator::new(reader).count(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn archive_iterator_inplace() -> io::Result<()> {
+    let record_data1 = warc_record_data("request", "<urn:uuid:record1>", None, b"ABC");
+    let record_data2 = warc_record_data("response", "<urn:uuid:record2>", None, b"DEFGHI");
+    let warc_data = [record_data1.as_slice(), record_data2.as_slice()].concat();
+    let reader = io::Cursor::new(warc_data);
+
+    let mut it = ArchiveIterator::new(reader).with_inplace(true);
+
+    let record1 = it.next().unwrap()?;
+    assert_eq!(record1.borrow().record_id().as_deref(), Some("<urn:uuid:record1>"));
+    assert_eq!(record1.borrow().stream_pos(), 0);
+
+    let record2 = it.next().unwrap()?;
+    assert!(Rc::ptr_eq(&record1, &record2));
+    assert_eq!(record2.borrow().record_id().as_deref(), Some("<urn:uuid:record2>"));
+    assert_eq!(record2.borrow().stream_pos(), record_data1.len() as u64);
+    assert!(it.next().is_none());
 
     Ok(())
 }
