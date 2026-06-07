@@ -262,7 +262,6 @@ impl HeaderMap {
     /// Internal raw header block reader implementation with clean hot path (no quirks mode)..
     #[inline]
     fn read_raw_header_block(
-        &mut self,
         reader: &mut dyn BufReadSeek,
         raw_header_block: &mut Vec<u8>,
         max_header_len: usize,
@@ -319,7 +318,6 @@ impl HeaderMap {
     /// Internal raw header block reader implementation with quirks mode handling in the hot path.
     #[inline]
     fn read_raw_header_block_quirks_mode(
-        &mut self,
         reader: &mut dyn BufReadSeek,
         raw_header_block: &mut Vec<u8>,
         max_header_len: usize,
@@ -442,37 +440,44 @@ impl HeaderMap {
         quirks_mode: bool,
     ) -> Result<usize, io::Error> {
         self.clear();
-
-        let mut raw_header_block = Vec::with_capacity(768);
+        self.raw_header_block
+            .reserve(768usize.saturating_sub(self.raw_header_block.capacity()));
         let bytes_consumed = if quirks_mode {
-            self.read_raw_header_block_quirks_mode(reader, &mut raw_header_block, max_header_len)?
+            Self::read_raw_header_block_quirks_mode(reader, &mut self.raw_header_block, max_header_len)?
         } else {
-            self.read_raw_header_block(reader, &mut raw_header_block, max_header_len)?
+            Self::read_raw_header_block(reader, &mut self.raw_header_block, max_header_len)?
         };
-        self.raw_header_block.extend_from_slice(&raw_header_block);
-        self.raw_header_block.shrink_to_fit();
         self.headers.reserve(bytes_consumed / 64);
 
         let mut expect_first_line = has_status_line;
         let finder = memmem::Finder::new("\r\n");
         let mut pos = 0;
-        while pos < raw_header_block.len() {
+        while pos < self.raw_header_block.len() {
             let line_start = pos;
             let eol_match = if quirks_mode {
-                memchr(b'\n', &raw_header_block[pos..])
+                memchr(b'\n', &self.raw_header_block[pos..])
             } else {
-                finder.find(&raw_header_block[pos..])
+                finder.find(&self.raw_header_block[pos..])
             };
-            let eol = eol_match.unwrap_or(raw_header_block.len() - pos);
-            let mut line = &raw_header_block[pos..pos + eol];
-            if quirks_mode {
+            let eol = eol_match.unwrap_or(self.raw_header_block.len() - pos);
+            let mut line = &self.raw_header_block[pos..pos + eol];
+            pos = if quirks_mode {
                 line = line.strip_suffix(b"\r").unwrap_or(line);
-                pos += eol + 1;
+                pos + eol + 1
             } else {
-                pos += eol + 2;
-            }
+                pos + eol + 2
+            };
 
-            // Status line
+            let offsets = memchr(b':', line).map(|colon_pos| {
+                let key = _trim_ascii_offsets(&line[..colon_pos]);
+                let value = _trim_ascii_offsets(&line[colon_pos + 1..]);
+                (
+                    (line_start + key.0, line_start + key.1),
+                    (line_start + colon_pos + 1 + value.0, line_start + colon_pos + 1 + value.1),
+                )
+            });
+
+            // Status line.
             if expect_first_line {
                 let trimmed = _trim_ascii_offsets(line);
                 self.status_line = Some(CowHeaderValue::Offsets((line_start + trimmed.0, line_start + trimmed.1)));
@@ -480,22 +485,33 @@ impl HeaderMap {
                 continue;
             }
 
+            // Indented continuation line.
             if matches!(line.first(), Some(b' ' | b'\t')) {
-                self.add_continuation_bytes(line);
+                let trimmed = self.raw_header_block[line_start..pos - if quirks_mode { 1 } else { 2 }]
+                    .strip_suffix(b"\r")
+                    .unwrap_or(&self.raw_header_block[line_start..pos - if quirks_mode { 1 } else { 2 }])
+                    .trim_ascii();
+                match self.headers.last_mut() {
+                    Some(last) => match last {
+                        CowHeaderTuple::Offsets(ko, vo) => {
+                            let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
+                            let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
+                            value.extend_from_slice(b" ");
+                            value.extend_from_slice(trimmed);
+                            *last = CowHeaderTuple::Owned(key, value);
+                        }
+                        CowHeaderTuple::Owned(_, value) => {
+                            value.extend_from_slice(b" ");
+                            value.extend_from_slice(trimmed);
+                        }
+                    },
+                    None => self.headers.push(CowHeaderTuple::Owned(Vec::new(), trimmed.to_vec())),
+                }
                 continue;
             }
 
-            // Parse header line
-            if let Some(colon_pos) = memchr(b':', line) {
-                let key = _trim_ascii_offsets(&line[..colon_pos]);
-                let value = _trim_ascii_offsets(&line[colon_pos + 1..]);
-
-                self.headers.push(CowHeaderTuple::Offsets(
-                    (line_start + key.0, line_start + key.1),
-                    (line_start + colon_pos + 1 + value.0, line_start + colon_pos + 1 + value.1),
-                ));
-            } else {
-                // Invalid header, discard
+            if let Some((key, value)) = offsets {
+                self.headers.push(CowHeaderTuple::Offsets(key, value));
             }
         }
 
@@ -759,31 +775,6 @@ impl HeaderMap {
     pub(super) fn append_bytes_no_sanitize(&mut self, key: &[u8], value: &[u8]) {
         self.headers
             .push(CowHeaderTuple::Owned(key.trim_ascii().to_vec(), value.trim_ascii().to_vec()));
-    }
-
-    /// Internal helper for adding a continuation line to the last-appended header.
-    /// No value sanitization is performed, but white space is trimmed.
-    fn add_continuation_bytes(&mut self, value: &[u8]) {
-        let trimmed = value.trim_ascii();
-        if let Some(last) = self.headers.last_mut() {
-            match last {
-                CowHeaderTuple::Offsets(ko, vo) => {
-                    let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
-                    let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
-                    value.reserve(trimmed.len() + 1);
-                    value.push(b' ');
-                    value.extend_from_slice(trimmed);
-                    *last = CowHeaderTuple::Owned(key, value);
-                }
-                CowHeaderTuple::Owned(_, value) => {
-                    value.reserve(trimmed.len() + 1);
-                    value.push(b' ');
-                    value.extend_from_slice(trimmed);
-                }
-            }
-        } else {
-            self.headers.push(CowHeaderTuple::Owned(Vec::new(), trimmed.to_vec()));
-        }
     }
 
     /// Remove a header if it exists.
