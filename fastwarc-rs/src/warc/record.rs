@@ -21,7 +21,7 @@ use sha2::digest;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::io::{self, Read, Seek};
+use std::io::{self, BufRead, Read, Seek};
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 use time::OffsetDateTime;
 use time::format_description::well_known::Iso8601;
@@ -630,13 +630,17 @@ impl WarcRecord {
             return Ok(0);
         }
         if let Some(r) = get_reader_mut!(self) {
-            if let Ok(n) = i64::try_from(n) {
-                let initial = r.stream_position()?;
-                let new_pos = r.seek(io::SeekFrom::Current(n))?;
-                Ok((new_pos - initial) as usize)
-            } else {
-                Err(io::Error::new(io::ErrorKind::InvalidInput, "Consume offset too large"))
+            let mut consumed = 0;
+            while consumed < n {
+                let buf = r.fill_buf()?;
+                if buf.is_empty() {
+                    break;
+                }
+                let n_ = buf.len().min(n - consumed);
+                consumed += n_;
+                r.consume(n_);
             }
+            Ok(consumed)
         } else {
             Err(io::Error::other("No reader set"))
         }
