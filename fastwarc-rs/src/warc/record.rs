@@ -21,7 +21,7 @@ use sha2::digest;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::io::{self, BufRead, Read, Seek};
+use std::io::{self, Read, Seek};
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 use time::OffsetDateTime;
 use time::format_description::well_known::Iso8601;
@@ -236,6 +236,19 @@ fn _get_digest(algorithm: &str) -> Result<Box<dyn DynDigest>, DigestError> {
         }
         _ => Err(DigestError::Unsupported(algorithm.to_string())),
     }
+}
+
+/// Internal: Parse Content-Length header bytes into a number.
+#[inline]
+fn _parse_content_length_bytes(value: &[u8]) -> u64 {
+    let mut parsed = 0u64;
+    for &b in value {
+        if !b.is_ascii_digit() {
+            return 0;
+        }
+        parsed = parsed.saturating_mul(10).saturating_add((b - b'0') as u64);
+    }
+    parsed
 }
 
 /// Auto-decode options for [`WarcRecord::parse_http()`].
@@ -707,11 +720,9 @@ impl WarcRecord {
                 || (trimmed.starts_with(b"WARC/0.") && trimmed.len() <= 9)
             {
                 status_line = Some(CowHeaderValue::Owned(trimmed.to_owned()));
-                if let Some(p) = reader.frame_start_position()? {
-                    // If supported, use the (potentially more accurate) member start position
-                    // instead of the starting inner stream position.
-                    self.stream_pos = p;
-                }
+                // If supported, use the (potentially more accurate) member start position
+                // instead of the starting inner stream position.
+                self.stream_pos = reader.frame_start_position()?.unwrap_or(self.stream_pos);
                 break;
             } else if !quirks_mode {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid WARC header"));
