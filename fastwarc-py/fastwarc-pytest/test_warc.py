@@ -510,6 +510,28 @@ def test_archive_iterator_accepts_fsspec_url_with_args_dict():
     assert record.verify_block_digest()
 
 
+def test_archive_iterator_inplace():
+    first = _make_http_record(response, record_urn=b"uuid:first", body=b"Hello")
+    second = _make_http_record(request, record_urn=b"uuid:second", body=b"World")
+    stream = io.BytesIO(_serialize_record(first) + _serialize_record(second))
+
+    iterator = ArchiveIterator(stream, parse_http=False, inplace=True)
+
+    rec1 = next(iterator)
+    assert rec1.record_id == "<urn:uuid:first>"
+    assert rec1.record_type == response
+    assert rec1.reader.read() == _http_payload(b"Hello")
+
+    rec2 = next(iterator)
+    assert rec1 is rec2
+    assert rec2.record_id == "<urn:uuid:second>"
+    assert rec2.record_type == request
+    assert rec2.reader.read() == _http_payload(b"World")
+
+    with pytest.raises(StopIteration):
+        next(iterator)
+
+
 @pytest.mark.parametrize(
     ("func_filter", "parse_http", "expected_count", "validator"),
     [

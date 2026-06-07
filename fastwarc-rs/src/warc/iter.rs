@@ -54,6 +54,8 @@ pub struct ArchiveIteratorImpl<R> {
 ///   detects the stream compression type based on the file extension or magic bytes.
 /// * `max_header_len` - maximum accepted WARC or HTTP header length. If a parsed header is longer than this,
 ///   an error is returned (default: 32 KiB).
+/// * `inplace` - Reuse and mutate [`WarcRecord`] objects in-place instead of constructing new instances
+///   in each iteration.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ArchiveIteratorOptions {
     pub stream_detect: bool,
@@ -62,6 +64,7 @@ pub struct ArchiveIteratorOptions {
     pub verify_digests: bool,
     pub quirks_mode: bool,
     pub max_header_len: usize,
+    pub inplace: bool,
 }
 
 impl Default for ArchiveIteratorOptions {
@@ -73,6 +76,7 @@ impl Default for ArchiveIteratorOptions {
             verify_digests: false,
             quirks_mode: false,
             max_header_len: 32 << 10,
+            inplace: false,
         }
     }
 }
@@ -296,6 +300,17 @@ where
         self
     }
 
+    /// Mutate [`WarcRecord`] objects in-place instead of returning a new object every iteration.
+    pub fn set_inplace(&mut self, inplace: bool) {
+        self.options.inplace = inplace;
+    }
+
+    /// Consuming setter: Mutate [`WarcRecord`] objects in-place instead of returning a new object every iteration.
+    pub fn with_inplace(mut self, inplace: bool) -> Self {
+        self.set_inplace(inplace);
+        self
+    }
+
     /// Convert the iterator into a [`FilteredArchiveIterator`] for filtering records
     /// based on function predicates.
     ///
@@ -361,35 +376,42 @@ where
         self.stream_started = true;
 
         loop {
-            let next = self.cur.with_mut(|r| r.next_impl(self.options.max_header_len))?;
-            return match next {
-                Ok(n) => {
-                    self.cur = S::new(n);
-                    let keep_record = self.cur.with_mut(|record| {
-                        if self.options.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
-                            return Ok(false);
-                        }
-                        if self.options.parse_http
-                            && record.is_http()
-                            && let Err(e) = record.parse_http_with_opts(
-                                self.options.decode_http_payload,
-                                self.options.max_header_len,
-                                self.options.quirks_mode,
-                            )
-                        {
-                            return Err(e);
-                        }
-                        Ok(true)
-                    });
-                    match keep_record {
-                        Ok(keep) if !keep => continue,
-                        Err(e) => return Some(Err(e)),
-                        _ => {}
-                    };
-                    Some(Ok(self.cur.clone()))
+            self.cur = if self.options.inplace {
+                match self
+                    .cur
+                    .with_mut(|r| r.next_inplace_impl(self.options.max_header_len))?
+                {
+                    Ok(_) => self.cur.clone(),
+                    Err(e) => return Some(Err(e)),
                 }
-                Err(e) => Some(Err(e)),
+            } else {
+                match self.cur.with_mut(|r| r.next_impl(self.options.max_header_len))? {
+                    Ok(n) => S::new(n),
+                    Err(e) => return Some(Err(e)),
+                }
             };
+            let keep_record = self.cur.with_mut(|record| {
+                if self.options.verify_digests && !record.verify_block_digest(false).unwrap_or(false) {
+                    return Ok(false);
+                }
+                if self.options.parse_http
+                    && record.is_http()
+                    && let Err(e) = record.parse_http_with_opts(
+                        self.options.decode_http_payload,
+                        self.options.max_header_len,
+                        self.options.quirks_mode,
+                    )
+                {
+                    return Err(e);
+                }
+                Ok(true)
+            });
+            match keep_record {
+                Ok(keep) if !keep => continue,
+                Err(e) => return Some(Err(e)),
+                _ => {}
+            };
+            return Some(Ok(self.cur.clone()));
         }
     }
 }

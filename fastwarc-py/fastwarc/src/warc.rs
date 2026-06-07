@@ -1225,6 +1225,8 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param stream_detect: auto-detect gzip, zstd, or lz4 compressed streams
 /// :param default_buffer_size: default buffer size to use for reading from files
 ///                             (has no effect if ``stream`` is not a path-like object)
+/// :param inplace: Reuse and mutate the same :class:`WarcRecord` instance instead of creating
+///                 a new instance in each iteration.
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc", unsendable)]
@@ -1234,6 +1236,8 @@ pub struct ArchiveIteratorPy {
     min_content_length: Option<u64>,
     max_content_length: Option<u64>,
     func_filter: Option<Py<PyAny>>,
+    inplace: bool,
+    current_record: Option<Py<WarcRecordPy>>,
 }
 
 fn auto_decode_str_to_enum(value: &str) -> PyResult<AutoDecode> {
@@ -1264,6 +1268,7 @@ impl ArchiveIteratorPy {
         max_header_len=32 << 10,
         stream_detect=true,
         buffer_size=64 << 10,
+        inplace=false,
         fsspec_args=None,
         *,
         strict_mode=true
@@ -1282,6 +1287,7 @@ impl ArchiveIteratorPy {
         max_header_len: usize,
         stream_detect: bool,
         buffer_size: usize,
+        inplace: bool,
         fsspec_args: Option<Py<PyAny>>,
         strict_mode: bool,
     ) -> PyResult<Self> {
@@ -1317,7 +1323,8 @@ impl ArchiveIteratorPy {
             .with_parse_http(parse_http)
             .with_max_header_len(max_header_len)
             .with_verify_digests(verify_digests)
-            .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?);
+            .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?)
+            .with_inplace(inplace);
 
         // TODO: Move common methods to trait and define filters here.
         // let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
@@ -1332,6 +1339,8 @@ impl ArchiveIteratorPy {
             min_content_length,
             max_content_length,
             func_filter,
+            inplace,
+            current_record: None,
         })
     }
 
@@ -1359,7 +1368,17 @@ impl ArchiveIteratorPy {
             }
             drop(record_ref);
 
-            let record_obj = Py::new(py, WarcRecordPy { inner: record.clone() })?;
+            let record_obj = if self.inplace {
+                if let Some(record_obj) = &self.current_record {
+                    record_obj.clone_ref(py)
+                } else {
+                    let record_obj = Py::new(py, WarcRecordPy { inner: record.clone() })?;
+                    self.current_record = Some(record_obj.clone_ref(py));
+                    record_obj
+                }
+            } else {
+                Py::new(py, WarcRecordPy { inner: record.clone() })?
+            };
             // TODO: Use native dispatch for pre-defined filters
             if let Some(func_filter) = &self.func_filter {
                 let keep = func_filter.bind(py).call1((record_obj.bind(py),))?.is_truthy()?;

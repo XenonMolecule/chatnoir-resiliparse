@@ -693,7 +693,6 @@ impl WarcRecord {
         let mut bytes_read = 0usize;
         let status_line;
         let mut line = Vec::with_capacity(32);
-        self.headers.clear();
 
         loop {
             line.clear();
@@ -708,7 +707,7 @@ impl WarcRecord {
             bytes_read += n;
 
             // Trim ASCII whitespace (including CR/LF line endings)
-            let trimmed = line.trim_ascii();
+            let trimmed = line.trim_ascii_end();
             if trimmed.is_empty() {
                 // Skip empty lines
                 continue;
@@ -1350,6 +1349,47 @@ impl WarcRecord {
         }
         let reader = self.detach_reader()?;
         Self::from_reader_internal(reader, self.quirks_mode, max_header_len).transpose()
+    }
+
+    /// Read the next record from the attached stream. Mutates this [`WarcRecord`] instance
+    /// in-place instead of returning a new instance.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if next record read successfully, `None` at EOF, `Err(_)` if an I/O error
+    /// occurred. If the result is not `Ok(_)`, the instance should be treated as tainted and should
+    /// no longer be used. You may still call [`Self::detach_reader()`], however.
+    #[inline]
+    pub fn next_inplace(&mut self) -> Option<io::Result<()>> {
+        self.next_inplace_impl(32 << 10)
+    }
+
+    /// Internal next_inplace() implementation
+    #[inline]
+    pub(super) fn next_inplace_impl(&mut self, max_header_len: usize) -> Option<io::Result<()>> {
+        if !matches!(self.reader, Some(ReaderType::Frozen(_)))
+            && self.content_length > 0
+            && let Err(e) = self.consume()
+        {
+            return Some(Err(e));
+        }
+        match &mut self.reader {
+            Some(ReaderType::Original(r)) => r.reset_limit(),
+            Some(ReaderType::Wrapped(r)) => r.reset_limit(),
+            _ => return None,
+        };
+
+        self.record_type = WarcRecordType::NoType;
+        self.is_http = false;
+        self.http_parsed = false;
+        self.http_charset = None;
+        self.http_headers = None;
+
+        match self.parse_warc_headers_with_opts(self.quirks_mode, max_header_len) {
+            Err(e) => Some(Err(e)),
+            Ok(0) => None,
+            Ok(_) => Some(Ok(())),
+        }
     }
 }
 

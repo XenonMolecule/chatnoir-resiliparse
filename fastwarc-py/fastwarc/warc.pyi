@@ -339,6 +339,7 @@ class ArchiveIterator(Iterable[WarcRecord]):
             max_header_len: int = 32 << 10,
             stream_detect: bool = True,
             buffer_size: int = 64 << 10,
+            inplace: bool = False,
             fsspec_args=None,
             *,
             strict_mode: bool = True
