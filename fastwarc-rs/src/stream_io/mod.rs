@@ -65,14 +65,17 @@ pub(super) use impl_stream_from_path;
 /// Internal helper for implementing to_any() boilerplate methods.
 macro_rules! impl_to_any_methods {
     () => {
+        #[inline]
         fn as_any(&self) -> &dyn Any {
             self
         }
 
+        #[inline]
         fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
 
+        #[inline]
         fn into_any(self: Box<Self>) -> Box<dyn Any> {
             self
         }
@@ -88,6 +91,7 @@ pub(super) use impl_to_any_methods;
 ///
 /// For this to work, `reader.stream_position()` must report an accurate
 /// position after calling `reader.consume()`.
+#[inline]
 fn _forward_seek(reader: &mut impl BufReadSeek, pos: io::SeekFrom) -> io::Result<u64> {
     let diff = match pos {
         io::SeekFrom::Start(p) => -(reader.stream_position()? as i128) + p as i128,

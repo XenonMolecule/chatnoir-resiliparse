@@ -81,11 +81,13 @@ impl<T: Read + Seek> TrackingBufReader<T> {
     }
 
     /// Get a reference to the inner reader.
+    #[inline]
     pub fn get_ref(&self) -> &T {
         self.inner.get_ref()
     }
 
     /// Get a mutable reference to the inner reader.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
     }
@@ -93,16 +95,19 @@ impl<T: Read + Seek> TrackingBufReader<T> {
     /// Unwrap this [`TrackingBufReader`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    #[inline]
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
 
     /// Return a reference to the internally buffered data.
+    #[inline]
     pub fn buffer(&self) -> &[u8] {
         self.inner.buffer()
     }
 
-    /// Return the number of bytes the internal buffer can hold at once
+    /// Return the number of bytes the internal buffer can hold at once.
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.inner.capacity()
     }
@@ -111,6 +116,7 @@ impl<T: Read + Seek> TrackingBufReader<T> {
 macro_rules! impl_tracking_bufread_seek {
     ($Type:ty, $($TraitBounds:tt)+) => {
         impl<T: $($TraitBounds)+> Read for $Type {
+            #[inline]
             fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
                 let n = self.fill_buf()?.read(buf)?;
                 self.consume(n);
@@ -119,6 +125,7 @@ macro_rules! impl_tracking_bufread_seek {
         }
 
         impl<T: $($TraitBounds)+> Seek for $Type {
+            #[inline]
             fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
                 if let SeekFrom::Current(pos) = pos {
                     if pos == 0 {
@@ -136,10 +143,12 @@ macro_rules! impl_tracking_bufread_seek {
         }
 
         impl<T: $($TraitBounds)+> BufRead for $Type {
+            #[inline]
             fn fill_buf(&mut self) -> io::Result<&[u8]> {
                 self.inner.fill_buf()
             }
 
+            #[inline]
             fn consume(&mut self, amount: usize) {
                 self.inner.consume(amount);
                 self.pos += amount as u64;
@@ -199,11 +208,13 @@ impl<T: BufReadSeek> RawReaderAdapter<T> {
     }
 
     /// Get a reference to the inner reader.
+    #[inline]
     pub fn get_ref(&self) -> &T {
         &self.inner
     }
 
     /// Get a mutable reference to the inner reader.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -211,6 +222,7 @@ impl<T: BufReadSeek> RawReaderAdapter<T> {
     /// Unwrap this [`RawReaderAdapter`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    #[inline]
     pub fn into_inner(self) -> T {
         self.inner
     }
@@ -240,42 +252,49 @@ impl_tracking_bufread_seek!(RawReaderAdapter<T>, BufReadSeek);
 // ===========================================================
 
 impl<T: WarcRead> IntoWarcReader for T {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(self)
     }
 }
 
 impl IntoWarcReader for Box<dyn WarcRead> {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         self
     }
 }
 
 impl IntoWarcReader for Box<dyn WarcRead + Send> {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         self
     }
 }
 
 impl IntoWarcReader for Box<dyn WarcRead + Send + Sync> {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         self
     }
 }
 
 impl<T: ReadSeek> IntoWarcReader for BufReader<T> {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(RawReaderAdapter::new(self))
     }
 }
 
 impl<T: AsRef<[u8]> + 'static> IntoWarcReader for io::Cursor<T> {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(RawReaderAdapter::new(self))
     }
 }
 
 impl IntoWarcReader for std::fs::File {
+    #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(TrackingBufReader::new(self))
     }
@@ -301,11 +320,13 @@ impl<T: _Write> RawWriterAdapter<T> {
     }
 
     /// Get a reference to the inner writer.
+    #[inline]
     pub fn get_ref(&self) -> &T {
         &self.inner
     }
 
     /// Get a mutable reference to the inner writer.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -313,16 +334,19 @@ impl<T: _Write> RawWriterAdapter<T> {
     /// Unwrap this [`RawWriterAdapter`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    #[inline]
     pub fn into_inner(self) -> T {
         self.inner
     }
 }
 
 impl<T: _Write> Write for RawWriterAdapter<T> {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
@@ -337,30 +361,35 @@ impl<T: _Write> WarcWrite for RawWriterAdapter<T> {
 // ===========================================================
 
 impl<T: WarcWrite> IntoWarcWriter for T {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(self)
     }
 }
 
 impl IntoWarcWriter for Box<dyn WarcWrite> {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         self
     }
 }
 
 impl IntoWarcWriter for Box<dyn WarcWrite + Send> {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         self
     }
 }
 
 impl IntoWarcWriter for Box<dyn WarcWrite + Send + Sync> {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         self
     }
 }
 
 impl<T: _Write> IntoWarcWriter for io::BufWriter<T> {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(RawWriterAdapter::new(self))
     }
@@ -371,12 +400,14 @@ where
     T: AsMut<[u8]> + 'static,
     io::Cursor<T>: Write,
 {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(RawWriterAdapter::new(self))
     }
 }
 
 impl IntoWarcWriter for std::fs::File {
+    #[inline]
     fn into_warc_writer(self) -> Box<dyn WarcWrite> {
         Box::new(RawWriterAdapter::new(self))
     }
@@ -424,18 +455,21 @@ impl LimitedBufReader {
     /// # Arguments
     ///
     /// * `limit` - new reader limit
+    #[inline]
     pub fn set_limit(&mut self, limit: u64) {
         self.limit = limit;
         self.pos = 0;
     }
 
     /// Reset the reader to being unlimited.
+    #[inline]
     pub fn reset_limit(&mut self) {
         self.limit = u64::MAX;
         self.pos = self.inner.stream_position().unwrap_or(0);
     }
 
     /// Get the current limit.
+    #[inline]
     pub fn limit(&self) -> u64 {
         self.limit
     }
@@ -451,11 +485,13 @@ impl LimitedBufReader {
     /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
+    #[inline]
     pub fn into_inner(self) -> Box<dyn WarcRead> {
         self.inner
     }
 
     /// Borrow the wrapped reader as [`Any`] for type inspection.
+    #[inline]
     pub fn inner_as_any(&self) -> &dyn Any {
         self.inner.as_any()
     }
@@ -475,6 +511,7 @@ impl LimitedBufReader {
     /// # Returns
     ///
     /// Number of bytes read
+    #[inline]
     pub fn read_line(&mut self, buf: &mut Vec<u8>, max_line_len: usize) -> io::Result<usize> {
         let start_len = buf.len();
         let max_line_len = max_line_len.min(self.limit() as usize);
@@ -525,12 +562,14 @@ impl WarcRead for LimitedBufReader {
 }
 
 impl BufRead for LimitedBufReader {
+    #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         let buf = self.inner.fill_buf()?;
         let buf_limited = &buf[..(buf.len() as u64).min(self.limit - self.pos) as usize];
         Ok(buf_limited)
     }
 
+    #[inline]
     fn consume(&mut self, amount: usize) {
         let amount = (amount as u64).min(self.limit - self.pos) as usize;
         self.inner.consume(amount);
@@ -539,6 +578,7 @@ impl BufRead for LimitedBufReader {
 }
 
 impl Read for LimitedBufReader {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let l = buf.len();
         let buf_limited = &mut buf[..(l as u64).min(self.limit - self.pos) as usize];
@@ -549,6 +589,7 @@ impl Read for LimitedBufReader {
 }
 
 impl Seek for LimitedBufReader {
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         if pos == SeekFrom::Current(0) {
             return Ok(self.pos);
