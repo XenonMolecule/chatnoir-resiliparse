@@ -496,11 +496,13 @@ impl HeaderMap {
                         CowHeaderTuple::Offsets(ko, vo) => {
                             let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
                             let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
+                            value.reserve(trimmed.len() + 1);
                             value.extend_from_slice(b" ");
                             value.extend_from_slice(trimmed);
                             *last = CowHeaderTuple::Owned(key, value);
                         }
                         CowHeaderTuple::Owned(_, value) => {
+                            value.reserve(trimmed.len() + 1);
                             value.extend_from_slice(b" ");
                             value.extend_from_slice(trimmed);
                         }
