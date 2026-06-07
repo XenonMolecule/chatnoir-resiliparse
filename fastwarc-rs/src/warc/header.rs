@@ -259,160 +259,50 @@ impl HeaderMap {
         self.parse_with_with_opts(reader, has_status_line, 32 << 10, false)
     }
 
-    /// Internal raw header block reader implementation with clean hot path (no quirks mode)..
+    /// Internal: Split a header line at the first colon and push the offsets to the header list.
     #[inline]
-    fn read_raw_header_block(
-        reader: &mut dyn BufReadSeek,
-        raw_header_block: &mut Vec<u8>,
-        max_header_len: usize,
-    ) -> Result<usize, io::Error> {
-        let mut pending_crlf = 0usize;
-        let mut bytes_consumed = 0usize;
-        let crlf_finder = memmem::Finder::new("\r\n\r\n");
+    fn split_and_push_parsed_line(&mut self, line_start: usize, expect_status_line: &mut bool) {
+        let line = &self.raw_header_block[line_start..];
 
-        loop {
-            let in_buf = reader.fill_buf()?;
-            if in_buf.is_empty() {
-                return Ok(bytes_consumed);
-            }
-
-            if pending_crlf > 0 {
-                // CRLF bytes pending, check for split EOH marker.
-                let sep_remaining = 4 - pending_crlf;
-                if in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\r\n\r\n"[pending_crlf..] {
-                    // Ensure we have only one CRLF at the end.
-                    raw_header_block.truncate(raw_header_block.len() - pending_crlf);
-                    raw_header_block.extend_from_slice(b"\r\n");
-                    reader.consume(sep_remaining);
-                    bytes_consumed += sep_remaining;
-                    return Ok(bytes_consumed);
-                }
-            }
-
-            let eoh = crlf_finder.find(in_buf);
-            let n = eoh.unwrap_or(in_buf.len());
-            if raw_header_block.len() + n > max_header_len {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
-            }
-            raw_header_block.extend_from_slice(&in_buf[..n]);
-            reader.consume(n);
-            bytes_consumed += n;
-            if eoh.is_some() {
-                // Add one line separator, but consume both.
-                raw_header_block.extend_from_slice(b"\r\n");
-                reader.consume(4);
-                bytes_consumed += 4;
-                return Ok(bytes_consumed);
-            }
-
-            // Count trailing CRLF bytes for split EOH marker detection.
-            pending_crlf = match raw_header_block.as_slice() {
-                [.., b'\r', b'\n', b'\r'] => 3,
-                [.., b'\r', b'\n'] => 2,
-                [.., b'\r'] => 1,
-                _ => 0,
-            };
+        // Status line.
+        if *expect_status_line {
+            let trimmed = _trim_ascii_offsets(line);
+            self.status_line = Some(CowHeaderValue::Offsets((line_start + trimmed.0, line_start + trimmed.1)));
+            *expect_status_line = false;
+            return;
         }
-    }
 
-    /// Internal raw header block reader implementation with quirks mode handling in the hot path.
-    #[inline]
-    fn read_raw_header_block_quirks_mode(
-        reader: &mut dyn BufReadSeek,
-        raw_header_block: &mut Vec<u8>,
-        max_header_len: usize,
-    ) -> Result<usize, io::Error> {
-        let mut pending_crlf = 0usize;
-        let mut pending_lf = 0usize;
-        let mut bytes_consumed = 0usize;
-        let crlf_finder = memmem::Finder::new("\r\n\r\n");
-        let lf_finder = memmem::Finder::new("\n\n");
-
-        loop {
-            let in_buf = reader.fill_buf()?;
-            if in_buf.is_empty() {
-                return Ok(bytes_consumed);
+        // Continuation line.
+        if matches!(line.first(), Some(b' ' | b'\t')) {
+            let trimmed = line.trim_ascii();
+            match self.headers.last_mut() {
+                Some(last) => match last {
+                    CowHeaderTuple::Offsets(ko, vo) => {
+                        let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
+                        let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
+                        value.reserve(trimmed.len() + 1);
+                        value.extend_from_slice(b" ");
+                        value.extend_from_slice(trimmed);
+                        *last = CowHeaderTuple::Owned(key, value);
+                    }
+                    CowHeaderTuple::Owned(_, value) => {
+                        value.reserve(trimmed.len() + 1);
+                        value.extend_from_slice(b" ");
+                        value.extend_from_slice(trimmed);
+                    }
+                },
+                None => self.headers.push(CowHeaderTuple::Owned(Vec::new(), trimmed.to_vec())),
             }
+            return;
+        }
 
-            // CRLF bytes pending, check for split EOH marker.
-            let crlf_eoh_split =
-                if pending_crlf > 0 {
-                    let sep_remaining = 4 - pending_crlf;
-                    (in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\r\n\r\n"[pending_crlf..])
-                        .then_some((raw_header_block.len() - pending_crlf, pending_crlf, sep_remaining, 4usize))
-                } else {
-                    None
-                };
-            // LF bytes pending, check for split EOH marker.
-            let lf_eoh_split = if pending_lf > 0 {
-                let sep_remaining = 2 - pending_lf;
-                (in_buf.len() >= sep_remaining && in_buf[..sep_remaining] == b"\n\n"[pending_lf..]).then_some((
-                    raw_header_block.len() - pending_lf,
-                    pending_lf,
-                    sep_remaining,
-                    2usize,
-                ))
-            } else {
-                None
-            };
-            let eoh_split = match (crlf_eoh_split, lf_eoh_split) {
-                (Some(a), None) => Some(a),
-                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            };
-            // Split EOH found.
-            if let Some((pos, _, sep_remaining, sep_len)) = eoh_split {
-                raw_header_block.truncate(pos);
-                // Add one line separator, but consume both.
-                if sep_len == 2 {
-                    raw_header_block.push(b'\n');
-                } else {
-                    raw_header_block.extend_from_slice(b"\r\n");
-                }
-                reader.consume(sep_remaining);
-                bytes_consumed += sep_remaining;
-                return Ok(bytes_consumed);
-            }
-
-            // Check for non-split EOH.
-            let crlf_eoh = crlf_finder.find(in_buf).map(|pos| (pos, 4usize));
-            let lf_eoh = lf_finder.find(in_buf).map(|pos| (pos, 2usize));
-            let eoh = match (crlf_eoh, lf_eoh) {
-                (Some(a), None) => Some(a),
-                (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            };
-            let n = eoh.map_or(in_buf.len(), |(pos, _)| pos);
-            if raw_header_block.len() + n > max_header_len {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
-            }
-            raw_header_block.extend_from_slice(&in_buf[..n]);
-            reader.consume(n);
-            bytes_consumed += n;
-            // EOH found.
-            if let Some((_, sep_len)) = eoh {
-                // Add one line separator, but consume both.
-                if sep_len == 2 {
-                    raw_header_block.push(b'\n');
-                } else {
-                    raw_header_block.extend_from_slice(b"\r\n");
-                }
-                reader.consume(sep_len);
-                bytes_consumed += sep_len;
-                return Ok(bytes_consumed);
-            }
-
-            // Count trailing CRLF bytes for split EOH marker detection.
-            pending_crlf = match raw_header_block.as_slice() {
-                [.., b'\r', b'\n', b'\r'] => 3,
-                [.., b'\r', b'\n'] => 2,
-                [.., b'\r'] => 1,
-                _ => 0,
-            };
-            // Check for trailing LF byte for split quirks EOH marker detection.
-            pending_lf = (raw_header_block.last() == Some(&b'\n')).into();
+        if let Some(colon_pos) = memchr(b':', line) {
+            let key = _trim_ascii_offsets(&line[..colon_pos]);
+            let value = _trim_ascii_offsets(&line[colon_pos + 1..]);
+            self.headers.push(CowHeaderTuple::Offsets(
+                (line_start + key.0, line_start + key.1),
+                (line_start + colon_pos + 1 + value.0, line_start + colon_pos + 1 + value.1),
+            ));
         }
     }
 
@@ -442,82 +332,74 @@ impl HeaderMap {
         self.clear();
         self.raw_header_block
             .reserve(768usize.saturating_sub(self.raw_header_block.capacity()));
-        let bytes_consumed = if quirks_mode {
-            Self::read_raw_header_block_quirks_mode(reader, &mut self.raw_header_block, max_header_len)?
-        } else {
-            Self::read_raw_header_block(reader, &mut self.raw_header_block, max_header_len)?
-        };
-        self.headers.reserve(bytes_consumed / 64);
+        self.headers.reserve(16);
 
-        let mut expect_first_line = has_status_line;
-        let finder = memmem::Finder::new("\r\n");
-        let mut pos = 0;
-        while pos < self.raw_header_block.len() {
-            let line_start = pos;
-            let eol_match = if quirks_mode {
-                memchr(b'\n', &self.raw_header_block[pos..])
-            } else {
-                finder.find(&self.raw_header_block[pos..])
-            };
-            let eol = eol_match.unwrap_or(self.raw_header_block.len() - pos);
-            let mut line = &self.raw_header_block[pos..pos + eol];
-            pos = if quirks_mode {
-                line = line.strip_suffix(b"\r").unwrap_or(line);
-                pos + eol + 1
-            } else {
-                pos + eol + 2
-            };
+        let mut bytes_consumed = 0usize;
+        let mut expect_status_line = has_status_line;
+        let mut line_start = 0usize;
+        let crlf_finder = memmem::Finder::new("\r\n");
 
-            let offsets = memchr(b':', line).map(|colon_pos| {
-                let key = _trim_ascii_offsets(&line[..colon_pos]);
-                let value = _trim_ascii_offsets(&line[colon_pos + 1..]);
-                (
-                    (line_start + key.0, line_start + key.1),
-                    (line_start + colon_pos + 1 + value.0, line_start + colon_pos + 1 + value.1),
-                )
-            });
-
-            // Status line.
-            if expect_first_line {
-                let trimmed = _trim_ascii_offsets(line);
-                self.status_line = Some(CowHeaderValue::Offsets((line_start + trimmed.0, line_start + trimmed.1)));
-                expect_first_line = false;
-                continue;
-            }
-
-            // Indented continuation line.
-            if matches!(line.first(), Some(b' ' | b'\t')) {
-                let trimmed = self.raw_header_block[line_start..pos - if quirks_mode { 1 } else { 2 }]
-                    .strip_suffix(b"\r")
-                    .unwrap_or(&self.raw_header_block[line_start..pos - if quirks_mode { 1 } else { 2 }])
-                    .trim_ascii();
-                match self.headers.last_mut() {
-                    Some(last) => match last {
-                        CowHeaderTuple::Offsets(ko, vo) => {
-                            let key = _offset_slice(&self.raw_header_block, *ko).to_vec();
-                            let mut value = _offset_slice(&self.raw_header_block, *vo).to_vec();
-                            value.reserve(trimmed.len() + 1);
-                            value.extend_from_slice(b" ");
-                            value.extend_from_slice(trimmed);
-                            *last = CowHeaderTuple::Owned(key, value);
-                        }
-                        CowHeaderTuple::Owned(_, value) => {
-                            value.reserve(trimmed.len() + 1);
-                            value.extend_from_slice(b" ");
-                            value.extend_from_slice(trimmed);
-                        }
-                    },
-                    None => self.headers.push(CowHeaderTuple::Owned(Vec::new(), trimmed.to_vec())),
+        loop {
+            let chunk = reader.fill_buf()?;
+            if chunk.is_empty() {
+                if !self.raw_header_block[line_start..].is_empty() {
+                    self.split_and_push_parsed_line(line_start, &mut expect_status_line);
                 }
-                continue;
+                return Ok(bytes_consumed);
             }
 
-            if let Some((key, value)) = offsets {
-                self.headers.push(CowHeaderTuple::Offsets(key, value));
+            let mut consumed = 0usize;
+
+            // Split CRLF.
+            if self.raw_header_block.last() == Some(&b'\r') && chunk.first() == Some(&b'\n') {
+                self.raw_header_block.push(b'\n');
+                consumed = 1;
+                bytes_consumed += 1;
+                let line = &self.raw_header_block[line_start..];
+                if line.len() == 2 || (quirks_mode && line.trim_ascii().is_empty()) {
+                    reader.consume(consumed);
+                    return Ok(bytes_consumed);
+                }
+                self.split_and_push_parsed_line(line_start, &mut expect_status_line);
+                line_start = self.raw_header_block.len();
             }
+
+            while consumed < chunk.len() {
+                let eol = if quirks_mode {
+                    memchr(b'\n', &chunk[consumed..]).map(|pos| (pos, 1usize))
+                } else {
+                    crlf_finder.find(&chunk[consumed..]).map(|pos| (pos, 2usize))
+                };
+
+                let Some((eol, sep_len)) = eol else {
+                    if self.raw_header_block.len() + chunk.len() > max_header_len {
+                        return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
+                    }
+                    let remaining = &chunk[consumed..];
+                    self.raw_header_block.extend_from_slice(remaining);
+                    bytes_consumed += remaining.len();
+                    consumed = chunk.len();
+                    break;
+                };
+                if self.raw_header_block.len() + eol + sep_len > max_header_len {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, "Maximum header length exceeded."));
+                }
+
+                let line_chunk = &chunk[consumed..consumed + eol + sep_len];
+                self.raw_header_block.extend_from_slice(line_chunk);
+                consumed += eol + sep_len;
+                bytes_consumed += eol + sep_len;
+
+                let line = &self.raw_header_block[line_start..];
+                if line.len() == sep_len || (quirks_mode && line.trim_ascii().is_empty()) {
+                    reader.consume(consumed);
+                    return Ok(bytes_consumed);
+                }
+                self.split_and_push_parsed_line(line_start, &mut expect_status_line);
+                line_start = self.raw_header_block.len();
+            }
+            reader.consume(consumed);
         }
-
-        Ok(bytes_consumed)
     }
 
     /// Get the header status line.
