@@ -10,6 +10,8 @@ import (
 	"github.com/slyrz/warc"
 )
 
+const BufferSize = 4096 << 10
+
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Printf("Usage: %s WARCFILE\n", os.Args[0])
@@ -31,7 +33,7 @@ func main() {
 	}
 	defer file.Close()
 
-	bufferedFile := bufio.NewReaderSize(file, 4096<<10)
+	bufferedFile := bufio.NewReaderSize(file, BufferSize)
 	reader, err := warc.NewReaderMode(bufferedFile, warc.SequentialMode)
 	if err != nil {
 		panic(err)

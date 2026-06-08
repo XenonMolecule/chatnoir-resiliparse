@@ -10,6 +10,8 @@
 #include <vector>
 #include <warcpp/warcpp.hpp>
 
+constexpr std::size_t BUFFER_SIZE = 4096 << 10;
+
 int main(int argc, char** argv)
 {
     if (argc < 2) {
@@ -18,7 +20,7 @@ int main(int argc, char** argv)
     }
 
     auto const path = std::string(argv[1]);
-    auto file_buffer = std::vector<char>(4096 << 10);
+    auto file_buffer = std::vector<char>(BUFFER_SIZE);
     auto file = std::ifstream();
     file.rdbuf()->pubsetbuf(file_buffer.data(),
         static_cast<std::streamsize>(file_buffer.size()));

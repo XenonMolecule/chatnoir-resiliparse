@@ -3,6 +3,8 @@ import time
 
 from warcio.archiveiterator import ArchiveIterator
 
+BUFFER_SIZE = 4096 << 10
+
 
 def main():
     if len(sys.argv) != 2:
@@ -18,7 +20,7 @@ def main():
     total_bytes = 0
 
     print(f'Reading WARC file: {path}')
-    with open(path, 'rb', buffering=4096 << 10) as stream:
+    with open(path, 'rb', buffering=BUFFER_SIZE) as stream:
         for record in ArchiveIterator(stream, arc2warc=False):
             content_length = int(record.rec_headers.get_header('Content-Length') or 0)
             last_count += 1

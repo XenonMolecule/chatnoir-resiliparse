@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::{Duration, Instant};
 
+const BUFFER_SIZE: usize = 4096 << 10;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
@@ -23,11 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(&path)?;
     let reader: Box<dyn BufRead> = if path.ends_with(".gz") {
         Box::new(BufReader::with_capacity(
-            4096 << 10,
-            MultiGzDecoder::new(BufReader::with_capacity(4096 << 10, file)),
+            BUFFER_SIZE,
+            MultiGzDecoder::new(BufReader::with_capacity(BUFFER_SIZE, file)),
         ))
     } else {
-        Box::new(BufReader::with_capacity(4096 << 10, file))
+        Box::new(BufReader::with_capacity(BUFFER_SIZE, file))
     };
     let warc = WarcReader::new(reader);
 

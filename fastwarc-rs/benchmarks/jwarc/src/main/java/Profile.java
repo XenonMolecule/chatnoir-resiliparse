@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class Profile {
+    private static final int BUFFER_SIZE = 4096 << 10;
+
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
             System.err.printf("Usage: %s WARCFILE%n", System.getProperty("sun.java.command"));
@@ -23,7 +25,7 @@ public class Profile {
         long totalBytes = 0;
 
         System.out.println("Reading WARC file: " + path);
-        ByteBuffer buffer = ByteBuffer.allocate(4096 << 10);
+        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
         buffer.flip();
         try (WarcReader reader = new WarcReader(FileChannel.open(path), buffer)) {
             for (WarcRecord record : reader) {
