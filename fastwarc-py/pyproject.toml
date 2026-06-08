@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "FastWARC"
-version = "1.0.3"
-description = "A high-performance WARC parsing library written in Rust with bindings for Python."
+version = "1.0.4"
+description = "The world's fastest WARC parsing library written in Rust with bindings for Python."
 authors = [
     { name = "Janek Bevendorff" }
 ]
