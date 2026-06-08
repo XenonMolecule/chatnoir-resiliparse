@@ -725,7 +725,11 @@ impl WarcRecord {
                 status_line = Some(CowHeaderValue::Owned(trimmed.to_owned()));
                 // If supported, use the (potentially more accurate) member start position
                 // instead of the starting inner stream position.
-                self.stream_pos = reader.frame_start_position()?.unwrap_or(self.stream_pos);
+                if let Some(p) = reader.frame_start_position()?
+                    && p > 0
+                {
+                    self.stream_pos = p;
+                }
                 break;
             } else if !quirks_mode {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid WARC header"));
