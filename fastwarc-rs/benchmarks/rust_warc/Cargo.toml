@@ -1,0 +1,15 @@
+[package]
+name = "rust-warc-profile"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "profile"
+path = "src/main.rs"
+
+[dependencies]
+flate2 = "1"
+rust_warc = "1.2"

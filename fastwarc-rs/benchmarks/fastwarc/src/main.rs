@@ -3,6 +3,11 @@ use std::time::{Duration, Instant};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        println!("Usage: {} WARCFILE", args[0]);
+        return;
+    }
+
     let path = &args[1];
     let start = Instant::now();
     let mut last_timer = start;
@@ -10,9 +15,6 @@ fn main() {
     let mut last_bytes = 0u64;
     let mut total_count = 0usize;
     let mut total_bytes = 0u64;
-
-    // let file = std::fs::File::open(path).unwrap();
-    // let reader = BufReader::with_capacity(64 << 10, file);
 
     println!("Reading WARC file: {}", path);
     for record in ArchiveIterator::from_path(path)
@@ -45,9 +47,6 @@ fn main() {
                 last_timer = Instant::now();
             }
         });
-        // if total_count > 20000 {
-        //     break;
-        // }
     }
     println!("Time elapsed: {:.1}s", (Instant::now() - start).as_secs_f64());
 }

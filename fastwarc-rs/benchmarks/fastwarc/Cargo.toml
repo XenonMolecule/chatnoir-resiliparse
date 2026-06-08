@@ -1,0 +1,14 @@
+[package]
+name = "fastwarc-profile"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "profile"
+path = "src/main.rs"
+
+[dependencies]
+fastwarc = "1"
