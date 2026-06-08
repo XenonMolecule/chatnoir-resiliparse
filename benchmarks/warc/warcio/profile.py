@@ -12,7 +12,7 @@ def main():
         return
 
     path = sys.argv[1]
-    start = time.monotonic()
+    start = time.perf_counter()
     last_timer = start
     last_count = 0
     last_bytes = 0
@@ -21,14 +21,14 @@ def main():
 
     print(f'Reading WARC file: {path}')
     with open(path, 'rb', buffering=BUFFER_SIZE) as stream:
-        for record in ArchiveIterator(stream, arc2warc=False):
+        for record in ArchiveIterator(stream):
             content_length = int(record.rec_headers.get_header('Content-Length') or 0)
             last_count += 1
             last_bytes += content_length
             total_count += 1
             total_bytes += content_length
 
-            now = time.monotonic()
+            now = time.perf_counter()
             elapsed = now - last_timer
             if elapsed >= 0.5:
                 print(
@@ -41,7 +41,7 @@ def main():
                 last_bytes = 0
                 last_timer = now
 
-    print(f'Time elapsed: {time.monotonic() - start:.1f}s')
+    print(f'Time elapsed: {time.perf_counter() - start:.1f}s')
 
 
 if __name__ == '__main__':
