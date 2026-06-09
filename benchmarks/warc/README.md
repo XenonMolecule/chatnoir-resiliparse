@@ -30,7 +30,9 @@ All benchmarks come with a `Makefile` that produces a `./profile` executable. Th
 file (uncompressed or compressed) and prints timing and throughput statistics.
 
 All benchmarked parsers support uncompressed `.warc` files, and most support also compressed `.warc.gz` files. At the
-moment, FastWARC and libarchive are the only parsers that also (fully) support `.warc.zst` and `.warc.lz4` files.
+moment, FastWARC and `libarchive` are the only parsers that also (fully) support `.warc.zst` and `.warc.lz4` files.
+`gowarc` supports `.warc.zst`, but not `.warc.lz4`. The `.warc.zst` implementation in `jwarc` seems to be
+incomplete and buggy.
 
 **IMPORTANT:** Before running a benchmark, you should drop the page cache with
 `echo 3 | sudo tee /proc/sys/vm/drop_caches` for more realistic results.
@@ -98,10 +100,10 @@ Summary: 0.8s, 137433 records/s, 6372.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.
 Following is a summary of the benchmarking results as a table. More details can be found in the individual subfolders.
 
 The rows are sorted by best uncompressed throughput. Compressed times can vary greatly based on the compressor
-implementation used. FastWARC generally has the fastest compressors and is only beaten by `libarchive`'s LZ4
+implementation used. FastWARC generally has the fastest (de-)compressors and is beaten only by `libarchive`'s LZ4
 implementation.
 
-FastWARC and `libarchive` both have the overall fastest parsers, but FastWARC comes out on top when the WARC file is
+FastWARC and `libarchive` both have the overall fastest parsers. FastWARC comes out on top when the WARC file is
 read from a cold disk instead of from the page cache (or directly from RAM) or when the WARC is compressed (which is
 almost always the case).
 
@@ -129,7 +131,7 @@ performance, read buffer size: 1 MiB).
 | `warc-rs`      |                6.1s |       13.7s |           - |          - |                874.0 |        386.3 |            - |           - |
 | `jwarc`        |                7.8s |       14.0s |          -* |          - |                681.4 |        379.7 |           -* |           - |
 | `warcpp`       |                8.0s |           - |           - |          - |                652.5 |            - |            - |           - |
-| `nodewarc`     |               13.4s |       33.9s |           - |          - |                396.3 |        156.3 |            - |           - |
+| `node-warc`    |               13.4s |       33.9s |           - |          - |                396.3 |        156.3 |            - |           - |
 | `warcio`       |               15.7s |       25.9s |           - |          - |                338.2 |        204.9 |            - |           - |
 | `warcprotocol` |               20.6s |      137.5s |           - |          - |                257.8 |         38.5 |            - |           - |
 
@@ -150,10 +152,10 @@ realistic benchmark.
 | `slyrz_warc`   |                1.9s |       22.5s |           - |          - |               2860.6 |        235.6 |            - |           - |
 | `gowarc`       |                2.0s |       34.3s |        8.2s |          - |               2659.3 |        154.3 |        644.1 |           - |
 | `warcio.js`    |                2.1s |       43.8s |           - |          - |               2466.1 |        120.0 |            - |           - |
-| `warc-rs`      |                3.6s |       13.4s |           - |          - |               1461.1 |        394.7 |            - |           - |
 | `jwarc`        |                2.7s |       13.5s |          -* |          - |               1927.1 |        393.3 |           -* |           - |
+| `warc-rs`      |                3.6s |       13.4s |           - |          - |               1461.1 |        394.7 |            - |           - |
 | `warcpp`       |                4.6s |           - |           - |          - |               1139.3 |            - |            - |           - |
-| `nodewarc`     |                9.7s |       34.4s |           - |          - |                546.5 |        154.0 |            - |           - |
+| `node-warc`    |                9.7s |       34.4s |           - |          - |                546.5 |        154.0 |            - |           - |
 | `warcio`       |               12.8s |       24.9s |           - |          - |                414.3 |        212.4 |            - |           - |
 | `warcprotocol` |               18.2s |      141.2s |           - |          - |                291.6 |         37.5 |            - |           - |
 
