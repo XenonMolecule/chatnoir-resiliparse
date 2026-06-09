@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-from fastwarc.warc import ArchiveIterator
+from fastwarc import ArchiveIterator
 
 DEFAULT_BUFFER_SIZE = 1024 << 10
 
