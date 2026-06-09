@@ -49,7 +49,7 @@ cargo build --release
 
 ### Run a benchmark:
 
-```
+```console
 $ echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
