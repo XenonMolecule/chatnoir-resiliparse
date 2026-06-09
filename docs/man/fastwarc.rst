@@ -309,42 +309,34 @@ ClueWeb22
 
 Benchmarks
 ----------
-Depending on your CPU, your storage speed, and the WARC compression algorithm, you can typically expect speedups between 1.3x and 6.5x over WARCIO.
+Depending on your CPU, memory architecture, storage speed, and the WARC compression algorithm, you can typically expect speedups between 1.5x and 5x and in extreme cases even up to 13x over WARCIO.
 
-The :ref:`fastwarc-cli` comes with a benchmarking tool for measuring WARC record decompression and parsing performance on your own machine. The benchmarking results can be compared directly with WARCIO. Here are three example runs on an AMD Ryzen Threadripper 2920X (with NVMe SSD) over five `Common Crawl <https://commoncrawl.org/>`__ WARCs:
+Read directly from DDR4-DRAM, FastWARC can achieve throughputs for uncompressed WARC files of more than 6.4 GiB/s on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s. Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (compression level 3) and LZ4 around 1.6 GiB/s.
 
-**Uncompressed WARC:**
+The FastWARC GitHub repository contains a `comprehensive suite of benchmarks <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ of FastWARC (both Rust native and Python), as well as several other popular open source WARC reading libraries.
 
-.. code-block:: console
+The following times were benchmarked on a 2020 M1 MacBook Pro:
 
-  $ fastwarc benchmark CC-MAIN-*.warc --bench-warcio
+.. code-block::
 
-  Benchmarking read performance from 5 input path(s)...
-  FastWARC: 630,245 records read in 5.81 seconds (108,487.93 records/s).
-  WARCIO:   630,245 records read in 37.19 seconds (16,945.51 records/s).
-  Time difference: -31.38 seconds, speedup: 6.40
+  # Uncompressed WARC:
+  FastWARC: 1.9s, 59283 records/s, 2748.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+  WARCIO: 5.0s, 22642 records/s, 1049.8 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-**Gzip WARC:**
+  # Gzip WARC:
+  FastWARC: 6.5s, 17600 records/s, 816.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+  WARCIO: 9.8s, 11706 records/s, 542.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-.. code-block:: console
+The following times were benchmarked on a Threadripper 2920X 12-Core CPU with a Samsung 980PRO NVMe SSD (cold read without page cache):
 
-  $ fastwarc benchmark CC-MAIN-*.warc.gz --bench-warcio
+.. code-block::
 
-  Benchmarking read performance from 5 input path(s)...
-  FastWARC: 630,245 records read in 60.52 seconds (10,413.38 records/s).
-  WARCIO:   630,245 records read in 97.56 seconds (6,460.06 records/s).
-  Time difference: -37.04 seconds, speedup: 1.61
+  # Uncompressed WARC:
+  FastWARC: 3.5s, 32395 records/s, 1502.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+  WARCIO: 15.7s, 7294 records/s, 338.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-**LZ4 WARC:**
+  # Gzip WARC:
+  FastWARC: 6.9s, 16470 records/s, 763.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+  WARCIO: 25.9s, 4419 records/s, 204.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-.. code-block:: console
-
-  $ fastwarc benchmark CC-MAIN-*.warc.lz4
-
-  Benchmarking read performance from 5 input path(s)...
-  FastWARC: 630,245 records read in 12.65 seconds (49,825.44 records/s).
-
-(Direct comparison not possible, since WARCIO does not support LZ4.)
-
-The read benchmarking tool has additional options, such as reading WARCs directly from a remote S3 data source
-using `Boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/index.html>`__.
+For more detailed information and benchmarking results, checkout the `benchmarking folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ in the GitHub repository.
