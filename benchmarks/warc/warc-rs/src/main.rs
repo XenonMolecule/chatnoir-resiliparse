@@ -4,7 +4,7 @@ use std::io::BufReader;
 use std::time::{Duration, Instant};
 use warc::WarcReader;
 
-const DEFAULT_BUFFER_SIZE: usize = 4096 << 10;
+const DEFAULT_BUFFER_SIZE: usize = 1024 << 10;
 
 fn buffer_size() -> usize {
     std::env::var("BUFFER_SIZE")

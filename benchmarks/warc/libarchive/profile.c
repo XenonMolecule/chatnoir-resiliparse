@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define DEFAULT_BUFFER_SIZE (4096 << 10)
+#define DEFAULT_BUFFER_SIZE (1024 << 10)
 
 static size_t buffer_size(void)
 {

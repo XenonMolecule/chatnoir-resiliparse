@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import {WARCParser} from 'warcio';
 
-const DEFAULT_BUFFER_SIZE = 4096 << 10;
+const DEFAULT_BUFFER_SIZE = 1024 << 10;
 
 function bufferSize() {
     const value = Number.parseInt(process.env.BUFFER_SIZE ?? '', 10);
@@ -42,14 +42,14 @@ for await (const record of parser) {
     if (elapsed >= 0.5) {
         console.log(
             `${(lastCount / elapsed).toFixed(0)} records/s, ` +
-                `${
-                    (lastBytes / elapsed / 1024.0 / 1024.0)
-                        .toFixed(1)} MiB/s, ` +
-                `${
-                    (lastBytes / Math.max(lastCount, 1) / 1024.0)
-                        .toFixed(1)} KiB/rec ` +
-                `(${totalCount} total, ${
-                    (totalBytes / 1024.0 / 1024.0).toFixed(1)} MiB)`,
+            `${
+                (lastBytes / elapsed / 1024.0 / 1024.0)
+                    .toFixed(1)} MiB/s, ` +
+            `${
+                (lastBytes / Math.max(lastCount, 1) / 1024.0)
+                    .toFixed(1)} KiB/rec ` +
+            `(${totalCount} total, ${
+                (totalBytes / 1024.0 / 1024.0).toFixed(1)} MiB)`,
         );
         lastCount = 0;
         lastBytes = 0;
@@ -60,8 +60,8 @@ for await (const record of parser) {
 const totalElapsed = Number(process.hrtime.bigint() - start) / 1e9;
 console.log(
     `Summary: ${totalElapsed.toFixed(1)}s, ` +
-        `${(totalCount / totalElapsed).toFixed(0)} records/s, ` +
-        `${(totalBytes / totalElapsed / 1024.0 / 1024.0).toFixed(1)} MiB/s, ` +
-        `${(totalBytes / Math.max(totalCount, 1) / 1024.0).toFixed(1)} KiB/rec ` +
-        `(${totalCount} total, ${(totalBytes / 1024.0 / 1024.0).toFixed(1)} MiB)`,
+    `${(totalCount / totalElapsed).toFixed(0)} records/s, ` +
+    `${(totalBytes / totalElapsed / 1024.0 / 1024.0).toFixed(1)} MiB/s, ` +
+    `${(totalBytes / Math.max(totalCount, 1) / 1024.0).toFixed(1)} KiB/rec ` +
+    `(${totalCount} total, ${(totalBytes / 1024.0 / 1024.0).toFixed(1)} MiB)`,
 );

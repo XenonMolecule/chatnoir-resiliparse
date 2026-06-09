@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class Profile {
-    private static final int DEFAULT_BUFFER_SIZE = 4096 << 10;
+    private static final int DEFAULT_BUFFER_SIZE = 1024 << 10;
 
     private static int bufferSize() {
         String value = System.getenv("BUFFER_SIZE");

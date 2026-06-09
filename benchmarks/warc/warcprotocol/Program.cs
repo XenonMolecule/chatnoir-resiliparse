@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Toimik.WarcProtocol;
 
-const int DefaultBufferSize = 4096 << 10;
+const int DefaultBufferSize = 1024 << 10;
 
 if (args.Length != 1)
 {

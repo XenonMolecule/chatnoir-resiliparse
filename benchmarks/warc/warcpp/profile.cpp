@@ -11,7 +11,7 @@
 #include <vector>
 #include <warcpp/warcpp.hpp>
 
-constexpr std::size_t DEFAULT_BUFFER_SIZE = 4096 << 10;
+constexpr std::size_t DEFAULT_BUFFER_SIZE = 1024 << 10;
 
 std::size_t buffer_size()
 {

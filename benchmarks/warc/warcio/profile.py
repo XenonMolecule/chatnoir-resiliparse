@@ -4,7 +4,7 @@ import time
 
 from warcio.archiveiterator import ArchiveIterator
 
-DEFAULT_BUFFER_SIZE = 4096 << 10
+DEFAULT_BUFFER_SIZE = 1024 << 10
 
 
 def buffer_size():

@@ -11,7 +11,7 @@ import (
 	"github.com/slyrz/warc"
 )
 
-const DefaultBufferSize = 4096 << 10
+const DefaultBufferSize = 1024 << 10
 
 func bufferSize() int {
 	value, err := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
