@@ -59,6 +59,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("Time elapsed: {:.1}s", start.elapsed().as_secs_f64());
+    let total_elapsed = start.elapsed().as_secs_f64();
+    println!(
+        "Summary: {:.1}s, {:.0} records/s, {:.1} MiB/s, {:.1} KiB/rec ({} total, {:.1} MiB)",
+        total_elapsed,
+        total_count as f64 / total_elapsed,
+        total_bytes as f64 / total_elapsed / 1024.0 / 1024.0,
+        total_bytes as f64 / total_count.max(1) as f64 / 1024.0,
+        total_count,
+        total_bytes as f64 / 1024.0 / 1024.0
+    );
     Ok(())
 }

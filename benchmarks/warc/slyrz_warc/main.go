@@ -72,5 +72,14 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Time elapsed: %.1fs\n", time.Since(start).Seconds())
+	totalElapsed := time.Since(start).Seconds()
+	fmt.Printf(
+		"Summary: %.1fs, %.0f records/s, %.1f MiB/s, %.1f KiB/rec (%d total, %.1f MiB)\n",
+		totalElapsed,
+		float64(totalCount)/totalElapsed,
+		float64(totalBytes)/totalElapsed/1024.0/1024.0,
+		float64(totalBytes)/float64(max(totalCount, 1))/1024.0,
+		totalCount,
+		float64(totalBytes)/1024.0/1024.0,
+	)
 }

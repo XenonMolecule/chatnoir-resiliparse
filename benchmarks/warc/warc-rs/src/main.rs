@@ -38,6 +38,17 @@ fn profile_reader<R: std::io::BufRead>(reader: WarcReader<R>, start: Instant) {
             last_timer = Instant::now();
         }
     }
+
+    let total_elapsed = start.elapsed().as_secs_f64();
+    println!(
+        "Summary: {:.1}s, {:.0} records/s, {:.1} MiB/s, {:.1} KiB/rec ({} total, {:.1} MiB)",
+        total_elapsed,
+        total_count as f64 / total_elapsed,
+        total_bytes as f64 / total_elapsed / 1024.0 / 1024.0,
+        total_bytes as f64 / total_count.max(1) as f64 / 1024.0,
+        total_count,
+        total_bytes as f64 / 1024.0 / 1024.0
+    );
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,7 +71,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let file = File::open(path)?;
         profile_reader(WarcReader::new(BufReader::with_capacity(BUFFER_SIZE, file)), start);
     }
-
-    println!("Time elapsed: {:.1}s", start.elapsed().as_secs_f64());
     Ok(())
 }

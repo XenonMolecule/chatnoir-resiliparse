@@ -56,7 +56,15 @@ await foreach (var record in parser.Parse(stream, isCompressed, parseLog))
     }
 }
 
-Console.WriteLine($"Time elapsed: {start.Elapsed.TotalSeconds:F1}s");
+var totalElapsed = start.Elapsed.TotalSeconds;
+Console.WriteLine(
+    "Summary: {0:F1}s, {1:F0} records/s, {2:F1} MiB/s, {3:F1} KiB/rec ({4} total, {5:F1} MiB)",
+    totalElapsed,
+    totalCount / totalElapsed,
+    totalBytes / totalElapsed / 1024.0 / 1024.0,
+    totalBytes / (double)Math.Max(totalCount, 1) / 1024.0,
+    totalCount,
+    totalBytes / 1024.0 / 1024.0);
 
 static long GetContentLength(object record)
 {

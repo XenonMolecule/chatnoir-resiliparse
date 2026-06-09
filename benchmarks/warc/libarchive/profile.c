@@ -96,7 +96,15 @@ int main(int argc, char** argv)
 
     struct timespec end;
     clock_gettime(CLOCK_MONOTONIC, &end);
-    printf("Time elapsed: %.1fs\n", elapsed_seconds(start, end));
+    double total_elapsed = elapsed_seconds(start, end);
+    printf(
+        "Summary: %.1fs, %.0f records/s, %.1f MiB/s, %.1f KiB/rec (%zu total, %.1f MiB)\n",
+        total_elapsed,
+        (double)total_count / total_elapsed,
+        (double)total_bytes / total_elapsed / 1024.0 / 1024.0,
+        (double)total_bytes / (double)(total_count > 0 ? total_count : 1) / 1024.0,
+        total_count,
+        (double)total_bytes / 1024.0 / 1024.0);
 
     return 0;
 }

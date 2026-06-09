@@ -56,6 +56,15 @@ public class Profile {
                 }
             }
         }
-        System.out.printf("Time elapsed: %.1fs%n", (System.nanoTime() - start) / 1_000_000_000.0);
+        double totalElapsed = (System.nanoTime() - start) / 1_000_000_000.0;
+        System.out.printf(
+                "Summary: %.1fs, %.0f records/s, %.1f MiB/s, %.1f KiB/rec (%d total, %.1f MiB)%n",
+                totalElapsed,
+                totalCount / totalElapsed,
+                totalBytes / totalElapsed / 1024.0 / 1024.0,
+                totalBytes / (double) Math.max(totalCount, 1) / 1024.0,
+                totalCount,
+                totalBytes / 1024.0 / 1024.0
+        );
     }
 }

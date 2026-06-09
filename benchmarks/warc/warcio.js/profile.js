@@ -52,7 +52,11 @@ for await (const record of parser) {
     }
 }
 
+const totalElapsed = Number(process.hrtime.bigint() - start) / 1e9;
 console.log(
-    `Time elapsed: ${
-        (Number(process.hrtime.bigint() - start) / 1e9).toFixed(1)}s`,
+    `Summary: ${totalElapsed.toFixed(1)}s, ` +
+        `${(totalCount / totalElapsed).toFixed(0)} records/s, ` +
+        `${(totalBytes / totalElapsed / 1024.0 / 1024.0).toFixed(1)} MiB/s, ` +
+        `${(totalBytes / Math.max(totalCount, 1) / 1024.0).toFixed(1)} KiB/rec ` +
+        `(${totalCount} total, ${(totalBytes / 1024.0 / 1024.0).toFixed(1)} MiB)`,
 );

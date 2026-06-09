@@ -71,7 +71,14 @@ int main(int argc, char** argv)
 
     std::chrono::duration<double> const total_elapsed = clock::now() - start;
     std::cout << std::fixed << std::setprecision(1)
-              << "Time elapsed: " << total_elapsed.count() << "s" << std::endl;
+              << "Summary: " << total_elapsed.count() << "s, "
+              << std::setprecision(0)
+              << total_count / total_elapsed.count() << " records/s, "
+              << std::setprecision(1)
+              << total_bytes / total_elapsed.count() / 1024.0 / 1024.0 << " MiB/s, "
+              << total_bytes / static_cast<double>(std::max<std::size_t>(total_count, 1)) / 1024.0
+              << " KiB/rec (" << total_count << " total, "
+              << total_bytes / 1024.0 / 1024.0 << " MiB)" << std::endl;
 
     return 0;
 }

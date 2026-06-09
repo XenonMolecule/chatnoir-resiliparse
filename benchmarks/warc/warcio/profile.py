@@ -41,7 +41,14 @@ def main():
                 last_bytes = 0
                 last_timer = now
 
-    print(f'Time elapsed: {time.perf_counter() - start:.1f}s')
+    total_elapsed = time.perf_counter() - start
+    print(
+        f'Summary: {total_elapsed:.1f}s, '
+        f'{total_count / total_elapsed:.0f} records/s, '
+        f'{total_bytes / total_elapsed / 1024.0 / 1024.0:.1f} MiB/s, '
+        f'{total_bytes / max(total_count, 1) / 1024.0:.1f} KiB/rec '
+        f'({total_count} total, {total_bytes / 1024.0 / 1024.0:.1f} MiB)'
+    )
 
 
 if __name__ == '__main__':
