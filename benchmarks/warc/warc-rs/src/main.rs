@@ -4,7 +4,15 @@ use std::io::BufReader;
 use std::time::{Duration, Instant};
 use warc::WarcReader;
 
-const BUFFER_SIZE: usize = 4096 << 10;
+const DEFAULT_BUFFER_SIZE: usize = 4096 << 10;
+
+fn buffer_size() -> usize {
+    std::env::var("BUFFER_SIZE")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|&value| value > 0)
+        .unwrap_or(DEFAULT_BUFFER_SIZE)
+}
 
 fn profile_reader<R: std::io::BufRead>(reader: WarcReader<R>, start: Instant) {
     let mut last_timer = start;
@@ -60,16 +68,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let path = &args[1];
     let start = Instant::now();
+    let buffer_size = buffer_size();
 
     println!("Reading WARC file: {}", path);
     if path.ends_with(".gz") {
         let file = File::open(path)?;
-        let file = BufReader::with_capacity(BUFFER_SIZE, file);
+        let file = BufReader::with_capacity(buffer_size, file);
         let gzip_stream = GzipReader::new(file)?;
-        profile_reader(WarcReader::new(BufReader::with_capacity(BUFFER_SIZE, gzip_stream)), start);
+        profile_reader(WarcReader::new(BufReader::with_capacity(buffer_size, gzip_stream)), start);
     } else {
         let file = File::open(path)?;
-        profile_reader(WarcReader::new(BufReader::with_capacity(BUFFER_SIZE, file)), start);
+        profile_reader(WarcReader::new(BufReader::with_capacity(buffer_size, file)), start);
     }
     Ok(())
 }

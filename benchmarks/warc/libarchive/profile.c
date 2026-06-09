@@ -5,7 +5,23 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define BUFFER_SIZE (4096 << 10)
+#define DEFAULT_BUFFER_SIZE (4096 << 10)
+
+static size_t buffer_size(void)
+{
+    const char* value = getenv("BUFFER_SIZE");
+    if (value == NULL || *value == '\0') {
+        return DEFAULT_BUFFER_SIZE;
+    }
+
+    char* end = NULL;
+    unsigned long long parsed = strtoull(value, &end, 10);
+    if (end == value || *end != '\0' || parsed == 0) {
+        return DEFAULT_BUFFER_SIZE;
+    }
+
+    return (size_t)parsed;
+}
 
 static double elapsed_seconds(struct timespec start, struct timespec end)
 {
@@ -31,6 +47,7 @@ int main(int argc, char** argv)
     size_t total_bytes = 0;
 
     printf("Reading WARC file: %s\n", path);
+    size_t buffer_size_value = buffer_size();
 
     struct archive* archive = archive_read_new();
     if (archive == NULL) {
@@ -41,7 +58,7 @@ int main(int argc, char** argv)
     archive_read_support_filter_all(archive);
     archive_read_support_format_warc(archive);
 
-    int result = archive_read_open_filename(archive, path, BUFFER_SIZE);
+    int result = archive_read_open_filename(archive, path, buffer_size_value);
     if (result != ARCHIVE_OK) {
         fprintf(stderr, "failed to open WARC file: %s\n", archive_error_string(archive));
         archive_read_free(archive);

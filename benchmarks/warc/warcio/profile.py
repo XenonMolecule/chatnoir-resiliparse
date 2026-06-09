@@ -1,9 +1,18 @@
+import os
 import sys
 import time
 
 from warcio.archiveiterator import ArchiveIterator
 
-BUFFER_SIZE = 4096 << 10
+DEFAULT_BUFFER_SIZE = 4096 << 10
+
+
+def buffer_size():
+    try:
+        value = int(os.environ.get('BUFFER_SIZE', ''))
+    except ValueError:
+        return DEFAULT_BUFFER_SIZE
+    return value if value > 0 else DEFAULT_BUFFER_SIZE
 
 
 def main():
@@ -20,7 +29,7 @@ def main():
     total_bytes = 0
 
     print(f'Reading WARC file: {path}')
-    with open(path, 'rb', buffering=BUFFER_SIZE) as stream:
+    with open(path, 'rb', buffering=buffer_size()) as stream:
         for record in ArchiveIterator(stream):
             content_length = int(record.rec_headers.get_header('Content-Length') or 0)
             last_count += 1

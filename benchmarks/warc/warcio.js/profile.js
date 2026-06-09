@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import {WARCParser} from 'warcio';
 
-const BUFFER_SIZE = 4096 << 10;
+const DEFAULT_BUFFER_SIZE = 4096 << 10;
+
+function bufferSize() {
+    const value = Number.parseInt(process.env.BUFFER_SIZE ?? '', 10);
+    return Number.isFinite(value) && value > 0 ? value : DEFAULT_BUFFER_SIZE;
+}
 
 if (process.argv.length !== 3) {
     console.log(`Usage: ${process.argv[1]} WARCFILE`);
@@ -18,7 +23,7 @@ let totalBytes = 0;
 
 console.log(`Reading WARC file: ${path}`);
 
-const stream = fs.createReadStream(path, {highWaterMark: BUFFER_SIZE});
+const stream = fs.createReadStream(path, {highWaterMark: bufferSize()});
 const parser = new WARCParser(stream);
 
 for await (const record of parser) {

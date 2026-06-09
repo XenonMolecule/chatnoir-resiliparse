@@ -4,7 +4,12 @@ const fs = require('fs');
 const zlib = require('zlib');
 const {recordIterator} = require('node-warc');
 
-const BUFFER_SIZE = 4096 << 10;
+const DEFAULT_BUFFER_SIZE = 4096 << 10;
+
+function bufferSize() {
+  const value = Number.parseInt(process.env.BUFFER_SIZE ?? '', 10);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_BUFFER_SIZE;
+}
 
 if (process.argv.length !== 3) {
   console.log(`Usage: ${process.argv[1]} WARCFILE`);
@@ -32,9 +37,10 @@ function printFinal() {
   );
 }
 
-let stream = fs.createReadStream(path, {highWaterMark: BUFFER_SIZE});
+const bufferSizeValue = bufferSize();
+let stream = fs.createReadStream(path, {highWaterMark: bufferSizeValue});
 if (path.endsWith('.gz')) {
-  stream = stream.pipe(zlib.createGunzip({chunkSize: BUFFER_SIZE}));
+  stream = stream.pipe(zlib.createGunzip({chunkSize: bufferSizeValue}));
 }
 
 (async () => {

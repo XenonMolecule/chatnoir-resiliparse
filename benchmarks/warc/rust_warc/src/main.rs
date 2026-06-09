@@ -4,7 +4,15 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::{Duration, Instant};
 
-const BUFFER_SIZE: usize = 4096 << 10;
+const DEFAULT_BUFFER_SIZE: usize = 4096 << 10;
+
+fn buffer_size() -> usize {
+    std::env::var("BUFFER_SIZE")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|&value| value > 0)
+        .unwrap_or(DEFAULT_BUFFER_SIZE)
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -22,14 +30,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_bytes = 0usize;
 
     println!("Reading WARC file: {}", path);
+    let buffer_size = buffer_size();
     let file = File::open(&path)?;
     let reader: Box<dyn BufRead> = if path.ends_with(".gz") {
         Box::new(BufReader::with_capacity(
-            BUFFER_SIZE,
-            MultiGzDecoder::new(BufReader::with_capacity(BUFFER_SIZE, file)),
+            buffer_size,
+            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, file)),
         ))
     } else {
-        Box::new(BufReader::with_capacity(BUFFER_SIZE, file))
+        Box::new(BufReader::with_capacity(buffer_size, file))
     };
     let warc = WarcReader::new(reader);
 

@@ -8,7 +8,20 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class Profile {
-    private static final int BUFFER_SIZE = 4096 << 10;
+    private static final int DEFAULT_BUFFER_SIZE = 4096 << 10;
+
+    private static int bufferSize() {
+        String value = System.getenv("BUFFER_SIZE");
+        if (value == null) {
+            return DEFAULT_BUFFER_SIZE;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : DEFAULT_BUFFER_SIZE;
+        } catch (NumberFormatException e) {
+            return DEFAULT_BUFFER_SIZE;
+        }
+    }
 
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
@@ -17,6 +30,7 @@ public class Profile {
         }
 
         Path path = Paths.get(args[0]);
+        int bufferSize = bufferSize();
         long start = System.nanoTime();
         long lastTimer = start;
         long lastCount = 0;
@@ -25,7 +39,7 @@ public class Profile {
         long totalBytes = 0;
 
         System.out.println("Reading WARC file: " + path);
-        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+        ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
         buffer.flip();
         try (WarcReader reader = new WarcReader(FileChannel.open(path), buffer)) {
             for (WarcRecord record : reader) {

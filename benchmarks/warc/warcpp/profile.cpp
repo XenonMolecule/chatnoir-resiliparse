@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -10,7 +11,23 @@
 #include <vector>
 #include <warcpp/warcpp.hpp>
 
-constexpr std::size_t BUFFER_SIZE = 4096 << 10;
+constexpr std::size_t DEFAULT_BUFFER_SIZE = 4096 << 10;
+
+std::size_t buffer_size()
+{
+    auto const* value = std::getenv("BUFFER_SIZE");
+    if (value == nullptr || *value == '\0') {
+        return DEFAULT_BUFFER_SIZE;
+    }
+
+    char* end = nullptr;
+    auto const parsed = std::strtoull(value, &end, 10);
+    if (end == value || *end != '\0' || parsed == 0) {
+        return DEFAULT_BUFFER_SIZE;
+    }
+
+    return static_cast<std::size_t>(parsed);
+}
 
 int main(int argc, char** argv)
 {
@@ -20,7 +37,7 @@ int main(int argc, char** argv)
     }
 
     auto const path = std::string(argv[1]);
-    auto file_buffer = std::vector<char>(BUFFER_SIZE);
+    auto file_buffer = std::vector<char>(buffer_size());
     auto file = std::ifstream();
     file.rdbuf()->pubsetbuf(file_buffer.data(),
         static_cast<std::streamsize>(file_buffer.size()));

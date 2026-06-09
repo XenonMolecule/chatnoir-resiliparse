@@ -5,12 +5,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/slyrz/warc"
 )
 
-const BufferSize = 4096 << 10
+const DefaultBufferSize = 4096 << 10
+
+func bufferSize() int {
+	value, err := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
+	if err != nil || value <= 0 {
+		return DefaultBufferSize
+	}
+	return value
+}
 
 func main() {
 	if len(os.Args) != 2 {
@@ -27,13 +36,14 @@ func main() {
 	totalBytes := int64(0)
 
 	fmt.Printf("Reading WARC file: %s\n", path)
+	bufferSize := bufferSize()
 	file, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	bufferedFile := bufio.NewReaderSize(file, BufferSize)
+	bufferedFile := bufio.NewReaderSize(file, bufferSize)
 	reader, err := warc.NewReaderMode(bufferedFile, warc.SequentialMode)
 	if err != nil {
 		panic(err)

@@ -1,9 +1,18 @@
+import os
 import sys
 import time
 
 from fastwarc.warc import ArchiveIterator
 
-BUFFER_SIZE = 4096 << 10
+DEFAULT_BUFFER_SIZE = 4096 << 10
+
+
+def buffer_size():
+    try:
+        value = int(os.environ.get('BUFFER_SIZE', ''))
+    except ValueError:
+        return DEFAULT_BUFFER_SIZE
+    return value if value > 0 else DEFAULT_BUFFER_SIZE
 
 
 def main():
@@ -21,7 +30,7 @@ def main():
     total_bytes = 0
 
     print(f"Reading WARC file: {path}")
-    for record in ArchiveIterator(path, parse_http=False, buffer_size=BUFFER_SIZE):
+    for record in ArchiveIterator(path, parse_http=False, buffer_size=buffer_size()):
         content_length = record.content_length
         last_count += 1
         last_bytes += content_length

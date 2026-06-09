@@ -1,5 +1,17 @@
 use fastwarc::warc::iter::{ArchiveIterator, SharedWarcRecord};
+use std::fs::File;
+use std::io::BufReader;
 use std::time::{Duration, Instant};
+
+const DEFAULT_BUFFER_SIZE: usize = 4096 << 10;
+
+fn buffer_size() -> usize {
+    std::env::var("BUFFER_SIZE")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|&value| value > 0)
+        .unwrap_or(DEFAULT_BUFFER_SIZE)
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -17,11 +29,9 @@ fn main() {
     let mut total_bytes = 0u64;
 
     println!("Reading WARC file: {}", path);
-    for record in ArchiveIterator::from_path(path)
-        .unwrap()
-        .with_parse_http(false)
-        .with_inplace(true)
-    {
+    let file = File::open(path).unwrap();
+    let reader = BufReader::with_capacity(buffer_size(), file);
+    for record in ArchiveIterator::new(reader).with_parse_http(false).with_inplace(true) {
         if record.is_err() {
             continue;
         }

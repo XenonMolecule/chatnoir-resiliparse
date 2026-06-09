@@ -11,7 +11,15 @@ import (
 	"github.com/internetarchive/gowarc"
 )
 
-const BufferSize = 4096 << 10
+const DefaultBufferSize = 4096 << 10
+
+func bufferSize() int {
+	value, err := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
+	if err != nil || value <= 0 {
+		return DefaultBufferSize
+	}
+	return value
+}
 
 func main() {
 	if len(os.Args) != 2 {
@@ -28,17 +36,18 @@ func main() {
 	totalBytes := int64(0)
 
 	fmt.Printf("Reading WARC file: %s\n", path)
+	bufferSize := bufferSize()
 	file, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	if err := os.Setenv("WARCDecompressedBufSize", strconv.Itoa(BufferSize)); err != nil {
+	if err := os.Setenv("WARCDecompressedBufSize", strconv.Itoa(bufferSize)); err != nil {
 		panic(err)
 	}
 
-	reader, err := warc.NewReader(bufio.NewReaderSize(file, BufferSize))
+	reader, err := warc.NewReader(bufio.NewReaderSize(file, bufferSize))
 	if err != nil {
 		panic(err)
 	}

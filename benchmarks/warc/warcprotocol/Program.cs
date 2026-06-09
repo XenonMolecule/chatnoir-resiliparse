@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Toimik.WarcProtocol;
 
-const int BufferSize = 4096 << 10;
+const int DefaultBufferSize = 4096 << 10;
 
 if (args.Length != 1)
 {
@@ -11,6 +11,7 @@ if (args.Length != 1)
 }
 
 var path = args[0];
+var bufferSize = BufferSize();
 var start = Stopwatch.StartNew();
 var lastTimer = Stopwatch.StartNew();
 var lastCount = 0L;
@@ -29,7 +30,7 @@ await using var stream = new FileStream(
     FileMode.Open,
     FileAccess.Read,
     FileShare.Read,
-    BufferSize,
+    bufferSize,
     FileOptions.SequentialScan);
 
 await foreach (var record in parser.Parse(stream, isCompressed, parseLog))
@@ -88,6 +89,13 @@ static long GetContentLength(object record)
     }
 
     return 0;
+}
+
+static int BufferSize()
+{
+    return int.TryParse(Environment.GetEnvironmentVariable("BUFFER_SIZE"), out var value) && value > 0
+        ? value
+        : DefaultBufferSize;
 }
 
 static bool TryGetLength(object value, out long length)
