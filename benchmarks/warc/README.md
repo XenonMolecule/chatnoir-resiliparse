@@ -35,7 +35,7 @@ moment, FastWARC and libarchive are the only parsers that also (fully) support `
 **IMPORTANT:** Before running a benchmark, you should drop the page cache with
 `echo 3 | sudo tee /proc/sys/vm/drop_caches` for more realistic results.
 
-Build a benchmark:
+### Build a benchmark:
 
 ```console
 $ cd fastwarc
@@ -47,7 +47,7 @@ cargo build --release
 ...
 ```
 
-Run a benchmark:
+### Run a benchmark:
 
 ```
 $ echo 3 | sudo tee /proc/sys/vm/drop_caches
