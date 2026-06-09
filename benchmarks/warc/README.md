@@ -102,7 +102,8 @@ implementation used. FastWARC generally has the fastest compressors and is only 
 implementation.
 
 FastWARC and `libarchive` both have the overall fastest parsers, but FastWARC comes out on top when the WARC file is
-read from a cold disk instead of from the page cache (or directly from RAM).
+read from a cold disk instead of from the page cache (or directly from RAM) or when the WARC is compressed (which is
+almost always the case).
 
 The speedup of `fastwarc-py` over `warcio` lies between 4.5x and 13x (uncompressed) or 3.8x and 4x (Gzip-compressed).
 
