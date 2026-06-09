@@ -83,7 +83,7 @@ class BufferedReader:
         return self._stream.tell()
 
 
-@deprecated("Use the new Reader and Writer classes from stream_io instead.", category=FutureWarning)
+@deprecated("Use the new Reader and Writer classes from stream_io instead.")
 class IOStream:
     def __init__(self, *_, _reader_factory=None, _writer_factory=None, **__):
         self._reader_factory = _reader_factory
