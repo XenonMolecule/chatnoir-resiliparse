@@ -71,14 +71,14 @@ by running the benchmarks with a custom `BUFFER_SIZE` environment variable:
 $ echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ BUFFER_SIZE=$((768 << 10)) ./profile CC-MAIN-20231005012006-20231005042006-00899.warc  # 768 KiB
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
-38094 records/s, 1081.4 MiB/s, 29.1 KiB/rec (19057 total, 541.0 MiB)
-28996 records/s, 1268.9 MiB/s, 44.8 KiB/rec (33556 total, 1175.5 MiB)
-28979 records/s, 1265.3 MiB/s, 44.7 KiB/rec (48121 total, 1811.4 MiB)
-29380 records/s, 1312.1 MiB/s, 45.7 KiB/rec (62830 total, 2468.3 MiB)
-28245 records/s, 1359.4 MiB/s, 49.3 KiB/rec (77002 total, 3150.4 MiB)
-24893 records/s, 1425.9 MiB/s, 58.7 KiB/rec (89470 total, 3864.6 MiB)
-25105 records/s, 1466.3 MiB/s, 59.8 KiB/rec (102028 total, 4598.0 MiB)
-Summary: 4.0s, 28883 records/s, 1339.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+40202 records/s, 1175.2 MiB/s, 29.9 KiB/rec (20143 total, 588.8 MiB)
+27629 records/s, 1200.7 MiB/s, 44.5 KiB/rec (33982 total, 1190.2 MiB)
+28660 records/s, 1262.2 MiB/s, 45.1 KiB/rec (48312 total, 1821.3 MiB)
+33065 records/s, 1460.5 MiB/s, 45.2 KiB/rec (64846 total, 2551.6 MiB)
+30555 records/s, 1549.1 MiB/s, 51.9 KiB/rec (80176 total, 3328.8 MiB)
+26573 records/s, 1563.3 MiB/s, 60.2 KiB/rec (93463 total, 4110.5 MiB)
+29442 records/s, 1679.8 MiB/s, 58.4 KiB/rec (108202 total, 4951.5 MiB)
+Summary: 3.7s, 30552 records/s, 1416.5 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 ```
 
 To measure the raw parsing throughput without disk latency, you can read the WARC file directly from a tmpfs:
