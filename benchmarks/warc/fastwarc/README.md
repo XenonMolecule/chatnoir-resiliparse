@@ -32,14 +32,13 @@ performance, read buffer size: 1 MiB).
 $ echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
-41941 records/s, 1248.2 MiB/s, 30.5 KiB/rec (20971 total, 624.1 MiB)
-30965 records/s, 1347.8 MiB/s, 44.6 KiB/rec (36454 total, 1298.0 MiB)
-33014 records/s, 1477.2 MiB/s, 45.8 KiB/rec (52978 total, 2037.4 MiB)
-36470 records/s, 1603.1 MiB/s, 45.0 KiB/rec (71257 total, 2840.9 MiB)
-28781 records/s, 1617.0 MiB/s, 57.5 KiB/rec (85648 total, 3649.4 MiB)
-26010 records/s, 1534.9 MiB/s, 60.4 KiB/rec (98707 total, 4420.1 MiB)
-28122 records/s, 1623.4 MiB/s, 59.1 KiB/rec (112807 total, 5234.0 MiB)
-Summary: 3.5s, 32210 records/s, 1493.4 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+40216 records/s, 1175.6 MiB/s, 29.9 KiB/rec (20143 total, 588.8 MiB)
+37786 records/s, 1638.5 MiB/s, 44.4 KiB/rec (39046 total, 1408.5 MiB)
+34980 records/s, 1562.6 MiB/s, 45.7 KiB/rec (56587 total, 2192.0 MiB)
+34982 records/s, 1587.0 MiB/s, 46.5 KiB/rec (74122 total, 2987.5 MiB)
+27994 records/s, 1596.1 MiB/s, 58.4 KiB/rec (88183 total, 3789.2 MiB)
+26794 records/s, 1570.6 MiB/s, 60.0 KiB/rec (101584 total, 4574.8 MiB)
+Summary: 3.4s, 33208 records/s, 1539.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 ```
 
 ### Gzip:
@@ -89,13 +88,13 @@ Summary: 5.1s, 22215 records/s, 1030.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4
 $ echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
-43748 records/s, 1317.9 MiB/s, 30.8 KiB/rec (21897 total, 659.7 MiB)
-34951 records/s, 1530.7 MiB/s, 44.8 KiB/rec (39373 total, 1425.0 MiB)
-35895 records/s, 1597.8 MiB/s, 45.6 KiB/rec (57324 total, 2224.1 MiB)
-34624 records/s, 1581.6 MiB/s, 46.8 KiB/rec (74638 total, 3015.0 MiB)
-30554 records/s, 1757.1 MiB/s, 58.9 KiB/rec (89920 total, 3893.8 MiB)
-28055 records/s, 1620.3 MiB/s, 59.1 KiB/rec (103951 total, 4704.1 MiB)
-Summary: 3.3s, 34226 records/s, 1586.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+44383 records/s, 1349.1 MiB/s, 31.1 KiB/rec (22192 total, 674.6 MiB)
+32023 records/s, 1396.5 MiB/s, 44.7 KiB/rec (38205 total, 1372.9 MiB)
+32411 records/s, 1456.2 MiB/s, 46.0 KiB/rec (54435 total, 2102.1 MiB)
+34762 records/s, 1523.8 MiB/s, 44.9 KiB/rec (71817 total, 2864.1 MiB)
+28576 records/s, 1617.5 MiB/s, 58.0 KiB/rec (86148 total, 3675.2 MiB)
+29627 records/s, 1737.2 MiB/s, 60.0 KiB/rec (100962 total, 4543.9 MiB)
+Summary: 3.4s, 33275 records/s, 1542.8 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 ```
 
 ## Results (RAM)
@@ -108,8 +107,8 @@ These results were measured on an AMD Ryzen Threadripper 2920X 12-Core CPU with 
 ```console
 $ ./profile tmpfs/CC-MAIN-20231005012006-20231005042006-00899.warc
 Reading WARC file: tmpfs/CC-MAIN-20231005012006-20231005042006-00899.warc
-142470 records/s, 5679.6 MiB/s, 40.8 KiB/rec (71239 total, 2839.9 MiB)
-Summary: 0.9s, 130491 records/s, 6050.3 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+148273 records/s, 5979.5 MiB/s, 41.3 KiB/rec (74155 total, 2990.5 MiB)
+Summary: 0.8s, 137433 records/s, 6372.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 ```
 
 ### Gzip:
@@ -154,9 +153,9 @@ Summary: 4.6s, 25031 records/s, 1160.6 MiB/s, 47.5 KiB/rec (114274 total, 5298.4
 ```console
 $ ./profile tmpfs/CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
 Reading WARC file: tmpfs/CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
-60780 records/s, 2059.5 MiB/s, 34.7 KiB/rec (30390 total, 1029.8 MiB)
-49757 records/s, 2209.5 MiB/s, 45.5 KiB/rec (55270 total, 2134.6 MiB)
-46191 records/s, 2178.5 MiB/s, 48.3 KiB/rec (78367 total, 3223.9 MiB)
-38631 records/s, 2281.0 MiB/s, 60.5 KiB/rec (97683 total, 4364.4 MiB)
-Summary: 2.4s, 47117 records/s, 2184.6 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+60694 records/s, 2056.0 MiB/s, 34.7 KiB/rec (30348 total, 1028.0 MiB)
+47878 records/s, 2134.2 MiB/s, 45.6 KiB/rec (54287 total, 2095.1 MiB)
+47802 records/s, 2237.5 MiB/s, 47.9 KiB/rec (78189 total, 3213.9 MiB)
+38473 records/s, 2280.4 MiB/s, 60.7 KiB/rec (97426 total, 4354.1 MiB)
+Summary: 2.4s, 47318 records/s, 2193.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 ```

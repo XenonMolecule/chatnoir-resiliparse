@@ -11,5 +11,5 @@ name = "profile"
 path = "src/main.rs"
 
 [dependencies]
-libflate = "1.4"
+flate2 = "1"
 warc = "0.4"

@@ -1,4 +1,4 @@
-use libflate::gzip::MultiDecoder as GzipReader;
+use flate2::read::MultiGzDecoder;
 use std::fs::File;
 use std::io::BufReader;
 use std::time::{Duration, Instant};
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if path.ends_with(".gz") {
         let file = File::open(path)?;
         let file = BufReader::with_capacity(buffer_size, file);
-        let gzip_stream = GzipReader::new(file)?;
+        let gzip_stream = MultiGzDecoder::new(file);
         profile_reader(WarcReader::new(BufReader::with_capacity(buffer_size, gzip_stream)), start);
     } else {
         let file = File::open(path)?;
