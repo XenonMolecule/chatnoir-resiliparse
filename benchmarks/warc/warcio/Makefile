@@ -8,5 +8,4 @@ profile:
 	chmod +x profile
 
 clean:
-	rm -rf venv
-	rm -f profile
+	rm -rf venv profile
