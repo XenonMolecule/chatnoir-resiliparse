@@ -17,7 +17,7 @@ make
 ## Run the Benchmark
 
 ```bash
-echo 3 | sudo tee /proc/sys/vm/drop_caches
+sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 ./profile WARCFILE.warc
 ```
 
@@ -29,7 +29,7 @@ performance, read buffer size: 1 MiB).
 ### Uncompressed:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc
 13572 records/s, 295.0 MiB/s, 22.3 KiB/rec (6786 total, 147.5 MiB)
 16995 records/s, 461.5 MiB/s, 27.8 KiB/rec (15284 total, 378.3 MiB)

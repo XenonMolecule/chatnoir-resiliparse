@@ -35,7 +35,7 @@ moment, FastWARC and `libarchive` are the only parsers that also (fully) support
 incomplete and buggy.
 
 **IMPORTANT:** Before running a benchmark, you should drop the page cache with
-`echo 3 | sudo tee /proc/sys/vm/drop_caches` for more realistic results.
+`sync && echo 3 | sudo tee /proc/sys/vm/drop_caches` for more realistic results (`sync && sudo drop` on macOS).
 
 ### Build a benchmark:
 
@@ -52,7 +52,7 @@ cargo build --release
 ### Run a benchmark:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
 40216 records/s, 1175.6 MiB/s, 29.9 KiB/rec (20143 total, 588.8 MiB)
@@ -70,7 +70,7 @@ completely on your SSD and CPU. By default, all benchmarks use an input buffer o
 by running the benchmarks with a custom `BUFFER_SIZE` environment variable:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ BUFFER_SIZE=$((768 << 10)) ./profile CC-MAIN-20231005012006-20231005042006-00899.warc  # 768 KiB
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
 40202 records/s, 1175.2 MiB/s, 29.9 KiB/rec (20143 total, 588.8 MiB)

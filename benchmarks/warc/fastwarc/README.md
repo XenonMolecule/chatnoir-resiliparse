@@ -17,7 +17,7 @@ make
 ## Run the Benchmark
 
 ```bash
-echo 3 | sudo tee /proc/sys/vm/drop_caches
+sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 ./profile WARCFILE.warc
 ```
 
@@ -29,7 +29,7 @@ performance, read buffer size: 1 MiB).
 ### Uncompressed:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc
 40216 records/s, 1175.6 MiB/s, 29.9 KiB/rec (20143 total, 588.8 MiB)
@@ -44,7 +44,7 @@ Summary: 3.4s, 33208 records/s, 1539.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4
 ### Gzip:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc.gz
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc.gz
 27509 records/s, 634.0 MiB/s, 23.6 KiB/rec (13758 total, 317.1 MiB)
@@ -66,7 +66,7 @@ Summary: 6.6s, 17190 records/s, 797.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 
 ### Zstandard:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc.zst
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc.zst
 33969 records/s, 902.4 MiB/s, 27.2 KiB/rec (16990 total, 451.4 MiB)
@@ -85,7 +85,7 @@ Summary: 5.1s, 22215 records/s, 1030.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4
 ### LZ4:
 
 ```console
-$ echo 3 | sudo tee /proc/sys/vm/drop_caches
+$ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 $ ./profile CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
 Reading WARC file: CC-MAIN-20231005012006-20231005042006-00899.warc.lz4
 44383 records/s, 1349.1 MiB/s, 31.1 KiB/rec (22192 total, 674.6 MiB)
