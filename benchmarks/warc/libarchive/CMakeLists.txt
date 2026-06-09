@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
 include(FetchContent)
+find_package(Git REQUIRED)
 
 set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
 set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
@@ -32,17 +33,37 @@ if(NOT libarchive_POPULATED)
     FetchContent_Populate(libarchive)
 endif()
 
-set(LIBARCHIVE_WARC_READER
-    "${libarchive_SOURCE_DIR}/libarchive/archive_read_support_format_warc.c"
-)
-file(READ "${LIBARCHIVE_WARC_READER}" LIBARCHIVE_WARC_READER_SOURCE)
-string(REPLACE
-    "#define HDR_PROBE_LEN\t\t(12U)"
-    "#define HDR_PROBE_LEN\t\t(4096U)"
-    LIBARCHIVE_WARC_READER_SOURCE
-    "${LIBARCHIVE_WARC_READER_SOURCE}"
-)
-file(WRITE "${LIBARCHIVE_WARC_READER}" "${LIBARCHIVE_WARC_READER_SOURCE}")
+function(apply_libarchive_patch patch_file)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" apply --check "${patch_file}"
+        WORKING_DIRECTORY "${libarchive_SOURCE_DIR}"
+        RESULT_VARIABLE patch_check_result
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(patch_check_result EQUAL 0)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" apply "${patch_file}"
+            WORKING_DIRECTORY "${libarchive_SOURCE_DIR}"
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+    else()
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" apply --reverse --check "${patch_file}"
+            WORKING_DIRECTORY "${libarchive_SOURCE_DIR}"
+            RESULT_VARIABLE patch_reverse_check_result
+            OUTPUT_QUIET
+            ERROR_VARIABLE patch_error
+        )
+        if(NOT patch_reverse_check_result EQUAL 0)
+            message(FATAL_ERROR "Cannot apply patch ${patch_file}: ${patch_error}")
+        endif()
+    endif()
+endfunction()
+
+# By default, libarchive skips non-file records, such as requests and metadata.
+# Patch it to emit all records.
+apply_libarchive_patch("${CMAKE_CURRENT_LIST_DIR}/emit-all-warc-records.patch")
 
 add_subdirectory("${libarchive_SOURCE_DIR}" "${libarchive_BINARY_DIR}" EXCLUDE_FROM_ALL)
 

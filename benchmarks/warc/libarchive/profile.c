@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s WARCFILE\n", argv[0]);
-        return 2;
+        return 1;
     }
 
     const char* path = argv[1];
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 
     struct archive* archive = archive_read_new();
     if (archive == NULL) {
-        fprintf(stderr, "failed to allocate archive reader\n");
+        fprintf(stderr, "Failed to allocate archive reader\n");
         return 1;
     }
 
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
 
     int result = archive_read_open_filename(archive, path, buffer_size_value);
     if (result != ARCHIVE_OK) {
-        fprintf(stderr, "failed to open WARC file: %s\n", archive_error_string(archive));
+        fprintf(stderr, "Failed to open WARC file: %s\n", archive_error_string(archive));
         archive_read_free(archive);
         return 1;
     }
@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 
         result = archive_read_data_skip(archive);
         if (result != ARCHIVE_OK && result != ARCHIVE_WARN) {
-            fprintf(stderr, "failed to skip entry data: %s\n", archive_error_string(archive));
+            fprintf(stderr, "Failed to skip entry data: %s\n", archive_error_string(archive));
             archive_read_free(archive);
             return 1;
         }
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
 
     if (result != ARCHIVE_EOF) {
         fprintf(stderr,
-            "error while reading archive after %zu records at offset %lld: %s\n",
+            "Error while reading archive after %zu records at offset %lld: %s\n",
             total_count,
             (long long)archive_filter_bytes(archive, 0),
             archive_error_string(archive));

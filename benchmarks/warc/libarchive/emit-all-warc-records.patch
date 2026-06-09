@@ -1,0 +1,61 @@
+diff --git i/libarchive/archive_read_support_format_warc.c w/libarchive/archive_read_support_format_warc.c
+index d8f188cf..10369048 100644
+--- i/libarchive/archive_read_support_format_warc.c
++++ w/libarchive/archive_read_support_format_warc.c
+@@ -209,7 +209,7 @@ _warc_bid(struct archive_read *a, int best_bid)
+ static int
+ _warc_rdhdr(struct archive_read *a, struct archive_entry *entry)
+ {
+-#define HDR_PROBE_LEN		(12U)
++#define HDR_PROBE_LEN		(4096U)
+ 	struct warc_s *w = a->format->data;
+ 	unsigned int ver;
+ 	const char *buf;
+@@ -361,35 +361,19 @@ start_over:
+ 	/* now eat some of those delicious buffer bits */
+ 	__archive_read_consume(a, eoh - buf);
+ 
+-	switch (ftyp) {
+-	case WT_RSRC:
+-	case WT_RSP:
+-		if (fnam.len > 0U) {
+-			/* populate entry object */
+-			archive_entry_set_filetype(entry, AE_IFREG);
+-			archive_entry_copy_pathname(entry, fnam.str);
+-			archive_entry_set_size(entry, cntlen);
+-			archive_entry_set_perm(entry, 0644);
+-			/* rtime is the new ctime, mtime stays mtime */
+-			archive_entry_set_ctime(entry, rtime, 0L);
+-			archive_entry_set_mtime(entry, mtime, 0L);
+-			break;
+-		}
+-		/* FALLTHROUGH */
+-	case WT_NONE:
+-	case WT_INFO:
+-	case WT_META:
+-	case WT_REQ:
+-	case WT_RVIS:
+-	case WT_CONV:
+-	case WT_CONT:
+-	case LAST_WT:
+-	default:
+-		/* consume the content and start over */
+-		if (_warc_skip(a) < 0)
+-			return (ARCHIVE_FATAL);
+-		goto start_over;
++	(void)ftyp;
++	if (fnam.len > 0U) {
++		archive_entry_copy_pathname(entry, fnam.str);
++	} else {
++		archive_entry_set_pathname(entry, "warc-record");
+ 	}
++	/* populate entry object */
++	archive_entry_set_filetype(entry, AE_IFREG);
++	archive_entry_set_size(entry, cntlen);
++	archive_entry_set_perm(entry, 0644);
++	/* rtime is the new ctime, mtime stays mtime */
++	archive_entry_set_ctime(entry, rtime, 0L);
++	archive_entry_set_mtime(entry, mtime, 0L);
+ 	return (ARCHIVE_OK);
+ }
+ 

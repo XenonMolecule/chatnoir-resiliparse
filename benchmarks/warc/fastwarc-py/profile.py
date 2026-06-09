@@ -29,7 +29,7 @@ def main():
     total_count = 0
     total_bytes = 0
 
-    print(f"Reading WARC file: {path}")
+    print(f'Reading WARC file: {path}')
     for record in ArchiveIterator(path, parse_http=False, buffer_size=buffer_size()):
         content_length = record.content_length
         last_count += 1
@@ -41,11 +41,11 @@ def main():
         elapsed = now - last_timer
         if elapsed >= 0.5:
             print(
-                f"{last_count / elapsed:.0f} records/s, "
-                f"{last_bytes / elapsed / 1024 / 1024:.1f} MiB/s, "
-                f"{last_bytes / max(last_count, 1) / 1024:.1f} KiB/rec "
-                f"({total_count} total, "
-                f"{total_bytes / 1024 / 1024:.1f} MiB)"
+                f'{last_count / elapsed:.0f} records/s, '
+                f'{last_bytes / elapsed / 1024 / 1024:.1f} MiB/s, '
+                f'{last_bytes / max(last_count, 1) / 1024:.1f} KiB/rec '
+                f'({total_count} total, '
+                f'{total_bytes / 1024 / 1024:.1f} MiB)'
             )
 
             last_count = 0
@@ -54,13 +54,13 @@ def main():
 
     total_elapsed = time.perf_counter() - start
     print(
-        f"Summary: {total_elapsed:.1f}s, "
-        f"{total_count / total_elapsed:.0f} records/s, "
-        f"{total_bytes / total_elapsed / 1024 / 1024:.1f} MiB/s, "
-        f"{total_bytes / max(total_count, 1) / 1024:.1f} KiB/rec "
-        f"({total_count} total, {total_bytes / 1024 / 1024:.1f} MiB)"
+        f'Summary: {total_elapsed:.1f}s, '
+        f'{total_count / total_elapsed:.0f} records/s, '
+        f'{total_bytes / total_elapsed / 1024 / 1024:.1f} MiB/s, '
+        f'{total_bytes / max(total_count, 1) / 1024:.1f} KiB/rec '
+        f'({total_count} total, {total_bytes / 1024 / 1024:.1f} MiB)'
     )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
