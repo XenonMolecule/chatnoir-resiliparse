@@ -311,7 +311,7 @@ Benchmarks
 ----------
 Depending on your CPU, memory architecture, storage speed, and the WARC compression algorithm, you can typically expect speedups between 1.5x and 5x and in extreme cases even up to 13x over WARCIO.
 
-Read directly from DDR4-DRAM, FastWARC can achieve throughputs for uncompressed WARC files of more than 6.4 GiB/s on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s. Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (compression level 3) and LZ4 around 1.6 GiB/s.
+Read directly from DDR4-DRAM, FastWARC can achieve a throughput for uncompressed WARC files of more than 6.4 GiB/s on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s. Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (compression level 3) and LZ4 at around 1.6 GiB/s.
 
 The FastWARC GitHub repository contains a `comprehensive suite of benchmarks <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ of FastWARC (both Rust native and Python), as well as several other popular open source WARC reading libraries.
 
@@ -339,4 +339,4 @@ The following times were benchmarked on a Threadripper 2920X 12-Core CPU with a 
   FastWARC: 6.9s, 16470 records/s, 763.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
   WARCIO: 25.9s, 4419 records/s, 204.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-For more detailed information and benchmarking results, checkout the `benchmarking folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ in the GitHub repository.
+For more detailed information and benchmarking results, checkout the `benchmarks folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ in the GitHub repository.
