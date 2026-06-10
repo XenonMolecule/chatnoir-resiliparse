@@ -23,6 +23,7 @@ This is the full table of contents for this documentation:
    man/itertools
    man/beam
    man/fastwarc
+   FastWARC (Rust) <https://docs.rs/fastwarc/latest/fastwarc/>
 
 
 .. toctree::
@@ -35,7 +36,7 @@ This is the full table of contents for this documentation:
    api/itertools
    api/beam
    api/fastwarc
-   FastWARC (Rust) <https://docs.rs/fastwarc/latest/fastwarc/>
+   FastWARC (Rust) <https://docs.rs/fastwarc/latest/fastwarc/all.html>
 
 
 .. toctree::
