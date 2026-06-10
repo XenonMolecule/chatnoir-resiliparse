@@ -482,7 +482,7 @@ impl LimitedBufReader {
         self.inner.stream_position()
     }
 
-    /// Unwrap this [`LimitedBufReadSeek`], returning the underlying reader.
+    /// Unwrap this [`LimitedBufReader`], returning the underlying reader.
     ///
     /// Discards input buffers, so continued reads on the unwrapped stream may fail.
     #[inline]

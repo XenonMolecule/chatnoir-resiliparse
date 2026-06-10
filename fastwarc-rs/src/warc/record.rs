@@ -921,7 +921,7 @@ impl WarcRecord {
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
     /// If the HTTP payload is still transfer- or content-encoded, use [`Self::parse_http_with_opts()`]
-    /// to automatically wrap the payload reader in the required [`WarcReader(s)`](WarcReader).
+    /// to automatically wrap the payload reader in the required [`WarcRead`] implementation.
     /// Usually, web archivers already decode the contents, so in most cases, this shouldn't be necessary.
     ///
     /// Returns an error if a header exceeds 32 KiB in size. Use [`Self::parse_http_with_opts()`] if you
@@ -936,7 +936,7 @@ impl WarcRecord {
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
     /// If `auto_decode` is not `None` and the HTTP payload is still transfer- or content-encoded,
-    /// the payload reader is wrapped automatically in the required [`WarcReader(s)`](WarcReader).
+    /// the payload reader is wrapped automatically in the required [`WarcRead`] implementation.
     /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
     /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
     ///
@@ -952,7 +952,7 @@ impl WarcRecord {
     /// It is safe to call this method multiple times, even if the record is not an HTTP record.
     ///
     /// If `auto_decode` is not `None` and the HTTP payload is still transfer- or content-encoded,
-    /// the payload reader is wrapped automatically in the required [`WarcReader(s)`](WarcReader).
+    /// the payload reader is wrapped automatically in the required [`WarcRead`] implementation.
     /// Auto-decoding relies on the `Transfer-Encoding` and `Content-Encoding` headers to be present.
     /// Usually, web archivers already decode the contents and rename the headers to prevent double-decoding,
     ///
@@ -1087,8 +1087,8 @@ impl WarcRecord {
     /// Use [`Self::write_with_block_size`] or [`Self::write_with_block_size_checksum`] for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
+    /// [`crate::stream_io::traits::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::traits::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1107,8 +1107,8 @@ impl WarcRecord {
     /// `write_with_checksum_block_size` for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
+    /// [`crate::stream_io::traits::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::traits::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///
@@ -1129,8 +1129,8 @@ impl WarcRecord {
     /// for more control.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
+    /// [`crate::stream_io::traits::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::traits::WarcWrite::finish()`] afterwards.
     /// # Arguments
     ///
     /// * `writer` - Output stream
@@ -1145,8 +1145,8 @@ impl WarcRecord {
     /// Write WARC record onto a stream with a given block size and calculate SHA-1 record checksums.
     ///
     /// Does not explicitly start or end compression members. If you are writing into a
-    /// [`crate::stream_io::WarcWrite`] that supports multi-member streams, it's up to the
-    /// user to call [`crate::stream_io::WarcWrite::finish()`] afterwards.
+    /// [`crate::stream_io::traits::WarcWrite`] that supports multi-member streams, it's up to the
+    /// user to call [`crate::stream_io::traits::WarcWrite::finish()`] afterwards.
     ///
     /// # Arguments
     ///

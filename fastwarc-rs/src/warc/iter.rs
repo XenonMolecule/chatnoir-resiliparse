@@ -117,7 +117,7 @@ pub trait SharedWarcRecord: Clone {
 
     /// Execute the closure with a mutable reference to the held record.
     /// This is to abstract from the individual accessors of the underlying reference
-    /// counting mechanism ([`Rc::borrow_mut()`] vs. [`Mutex::lock()::unwrap()`](Mutex::lock()).
+    /// counting mechanism ([`RefCell::borrow_mut()`] vs. [`Mutex::lock()::unwrap()`](Mutex::lock()).
     fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R;
 }
 
@@ -436,7 +436,7 @@ where
 pub type FilteredArchiveIterator<F> = FilteredArchiveIteratorImpl<Rc<RefCell<WarcRecord>>, F>;
 
 /// Filtered wrapper for [`ArchiveIteratorThreadSafe`] that filters records based on a predicate.
-/// Use [`FilteredArchiveIteratorThreadSafe::with_filter()`] to construct a [`FilteredArchiveIteratorThreadSafe`].
+/// Use [`ArchiveIteratorThreadSafe::with_filter()`] to construct a [`FilteredArchiveIteratorThreadSafe`].
 ///
 /// This is a thread-safe variant of [`FilteredArchiveIterator`].
 pub type FilteredArchiveIteratorThreadSafe<F> = FilteredArchiveIteratorImpl<Arc<Mutex<WarcRecord>>, F>;
