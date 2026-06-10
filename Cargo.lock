@@ -254,7 +254,7 @@ checksum = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 
 [[package]]
 name = "fastwarc"
-version = "1.0.5"
+version = "1.0.6"
 dependencies = [
  "brotli",
  "data-encoding",
@@ -623,7 +623,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "resiliparse"
-version = "1.0.5"
+version = "1.0.6"
 dependencies = [
  "bindgen",
  "parking_lot",
