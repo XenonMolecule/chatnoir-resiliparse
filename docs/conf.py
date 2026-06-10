@@ -129,7 +129,7 @@ def _hydrate_member_docstrings(dst, src):
 
     dst_dict = getattr(dst, '__dict__', None)
     src_dict = getattr(src, '__dict__', None)
-    if not isinstance(dst_dict, dict) or not isinstance(src_dict, dict):
+    if dst_dict is None or src_dict is None:
         return
 
     for name, dst_member in dst_dict.items():
