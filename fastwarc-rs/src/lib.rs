@@ -248,6 +248,7 @@
 //!
 //!         // Consume and return the remaining record bytes.
 //!         body.truncate(n);
+//!         body.reserve(r.content_length() - n);
 //!         r.reader_mut().unwrap().read_to_end(&mut body)?;
 //!
 //!         // Or: Consume the rest of stream without allocating a buffer for it (i.e., skip over).
