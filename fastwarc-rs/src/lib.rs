@@ -249,7 +249,9 @@
 //!
 //!         // Consume and return the remaining record bytes.
 //!         buf.truncate(n);
-//!         buf.reserve(r.content_length() as usize - n);
+//!         if buf.capacity() < r.content_length() as usize {
+//!             buf.reserve(r.content_length() as usize - buf.capacity());
+//!         }
 //!         r.reader_mut().unwrap().read_to_end(&mut buf)?;
 //!
 //!         // Or: Consume the rest of stream without allocating a buffer for it (i.e., skip over).
