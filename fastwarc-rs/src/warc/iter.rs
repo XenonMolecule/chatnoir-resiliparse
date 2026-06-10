@@ -200,6 +200,8 @@ where
     /// or `.lz4`, the correct decompressor will automatically be chosen.
     /// No further autodetection based on magic bytes will be performed after that.
     ///
+    /// Local files are opened with a buffer size of 1 MiB.
+    ///
     /// # Arguments
     ///
     /// * `path` - path to WARC file.
@@ -208,7 +210,7 @@ where
         path: impl AsRef<std::path::Path>,
         mut options: ArchiveIteratorOptions,
     ) -> io::Result<Self> {
-        let reader = BufReader::with_capacity(4096 << 10, std::fs::File::open(&path)?);
+        let reader = BufReader::with_capacity(1024 << 10, std::fs::File::open(&path)?);
         if options.stream_detect {
             let reader: Box<dyn WarcRead> = match path.as_ref().extension().and_then(|e| e.to_str()) {
                 Some("gz") => GzipReader::new(reader).into_warc_reader(),
