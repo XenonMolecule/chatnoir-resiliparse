@@ -261,6 +261,14 @@ The :class:`.ArchiveIterator` returns objects of type :class:`.WarcRecord`, whic
 
 As you can see, HTTP request and response records are parsed automatically for convenience. If not needed, you can disable this behaviour by passing ``parse_http=False`` to the :class:`.ArchiveIterator` constructor to avoid unnecessary processing. :attr:`record.reader <.WarcRecord.reader>` will then start at the beginning of the HTTP header block instead of the HTTP body. You can parse HTTP headers later on a per-record basis by calling :meth:`record.parse_http() <.WarcRecord.parse_http>` as long as the :class:`.BufferedReader` hasn't been consumed at that point.
 
+.. _freezing-records:
+
+Freezing Records
+----------------
+
+By default, :attr:`.WarcRecord.reader` returns a live reader on the WARC input stream. This means that when the iterator returns the :class:`.WarcRecord` instance, no content bytes have been consumed yet and no buffer has been allocated for them. This is very efficient, and it also prevents large records inadvertently consuming too much memory. However, that also means that once the content bytes have been read or once the iterator moves to the next record, there is no way to read them again. Also, if the input stream is compressed, you cannot seek backwards in the stream, even if you still hold a reference to the :class:`.WarcRecord` instance.
+
+To work around this, you can freeze the record by calling :meth:`.WarcRecord.freeze`. This will consume the record payload reader and store the bytes in an internal buffer, and detach the record from the input stream. The reader returned by :attr:`.WarcRecord.reader` then no longer points to the input stream, but to the frozen byte buffer. Frozen records can be used indefinitely, and seeking on their payload reader is supported both in the forward and in the backward direction.
 
 .. _verifying-record-digests:
 
