@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// WARC or HTTP header map.
 pub mod header;
+
+/// Archive iterators and filters.
 pub mod iter;
+
+/// WARC record.
 pub mod record;
 
 // ===========================================================

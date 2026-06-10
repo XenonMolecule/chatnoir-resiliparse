@@ -19,12 +19,25 @@ use std::io;
 // Submodules
 // ===========================================================
 
+/// Brotli reader and writer (for encoded HTTP payloads).
 pub mod brotli;
+
+/// Specialised buffered reader implementations.
 pub mod bufread;
+
+/// Chunked reader and writer (for encoded HTTP payloads).
 pub mod chunked;
+
+/// Gzip reader and writer.
 pub mod gzip;
+
+/// LZ4 reader and writer.
 pub mod lz4;
+
+/// Common reader and writer traits.
 pub mod traits;
+
+/// Zstandard reader and writer.
 pub mod zstd;
 
 // ===========================================================

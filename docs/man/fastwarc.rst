@@ -347,4 +347,4 @@ The following times were benchmarked on a Threadripper 2920X 12-Core CPU with a 
   FastWARC: 6.9s, 16470 records/s, 763.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
   WARCIO: 25.9s, 4419 records/s, 204.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-For more detailed information and benchmarking results, checkout the `benchmarks folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ in the GitHub repository.
+For more detailed information and benchmarking results, checkout the `benchmarks folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc>`__ in the GitHub repository.
