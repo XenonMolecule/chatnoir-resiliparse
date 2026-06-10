@@ -19,10 +19,13 @@ use crate::warc::header::{CowHeaderValue, HeaderEncoding, HeaderMap};
 use digest::{Digest, DynDigest};
 use sha2::digest;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{self, BufRead, Read, Seek};
 use std::ops::{BitAnd, BitOr, BitXor, Not};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use time::OffsetDateTime;
 use time::format_description::well_known::Iso8601;
 use uuid::Uuid;
@@ -1413,6 +1416,52 @@ impl Iterator for WarcRecord {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.next_impl(32 << 10)
+    }
+}
+
+/// Reference-counted handle for holding [`WarcRecord`] instances.
+///
+/// This is a common accessor trait for the two reference-counted types
+/// `Rc<RefCell<WarcRecord>>` and `Arc<Mutex<WarcRecord>>` used by [`super::iter::ArchiveIterator`]
+/// and [`super::iter::ArchiveIteratorThreadSafe`], respectively.
+pub trait SharedWarcRecord: Clone {
+    /// Create a new reference-counted [`WarcRecord`] handle.
+    fn new(record: WarcRecord) -> Self;
+
+    /// Replace the currently held [`WarcRecord`] with another one.
+    fn replace(&self, record: WarcRecord);
+
+    /// Execute the closure with a mutable reference to the held record.
+    /// This is to abstract from the individual accessors of the underlying reference
+    /// counting mechanism ([`RefCell::borrow_mut()`] vs. [`Mutex::lock()::unwrap()`](Mutex::lock()).
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R;
+}
+
+impl SharedWarcRecord for Rc<RefCell<WarcRecord>> {
+    fn new(record: WarcRecord) -> Self {
+        Rc::new(RefCell::new(record))
+    }
+
+    fn replace(&self, record: WarcRecord) {
+        *self.borrow_mut() = record;
+    }
+
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
+        f(&mut self.borrow_mut())
+    }
+}
+
+impl SharedWarcRecord for Arc<Mutex<WarcRecord>> {
+    fn new(record: WarcRecord) -> Self {
+        Arc::new(Mutex::new(record))
+    }
+
+    fn replace(&self, record: WarcRecord) {
+        *self.lock().unwrap() = record;
+    }
+
+    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
+        f(&mut self.lock().unwrap())
     }
 }
 

@@ -17,7 +17,7 @@ use crate::stream_io::gzip::GzipReader;
 use crate::stream_io::lz4::Lz4Reader;
 use crate::stream_io::traits::{IntoWarcReader, WarcRead};
 use crate::stream_io::zstd::ZstdReader;
-use crate::warc::record::{AutoDecode, ReaderType, WarcRecord};
+use crate::warc::record::{AutoDecode, ReaderType, SharedWarcRecord, WarcRecord};
 use std::cell::RefCell;
 use std::io::BufRead;
 use std::io::{self, BufReader};
@@ -102,52 +102,6 @@ pub type ArchiveIterator = ArchiveIteratorImpl<Rc<RefCell<WarcRecord>>>;
 /// iterator instance. This enables the usage within loops and allows applying map functions
 /// to multiple records in a row.
 pub type ArchiveIteratorThreadSafe = ArchiveIteratorImpl<Arc<Mutex<WarcRecord>>>;
-
-/// Reference-counted handle for holding [`WarcRecord`] instances.
-///
-/// This is a common accessor trait for the two reference-counted types
-/// `Rc<RefCell<WarcRecord>>` and `Arc<Mutex<WarcRecord>>` used by [`ArchiveIterator`]
-/// and [`ArchiveIteratorThreadSafe`], respectively.
-pub trait SharedWarcRecord: Clone {
-    /// Create a new reference-counted [`WarcRecord`] handle.
-    fn new(record: WarcRecord) -> Self;
-
-    /// Replace the currently held [`WarcRecord`] with another one.
-    fn replace(&self, record: WarcRecord);
-
-    /// Execute the closure with a mutable reference to the held record.
-    /// This is to abstract from the individual accessors of the underlying reference
-    /// counting mechanism ([`RefCell::borrow_mut()`] vs. [`Mutex::lock()::unwrap()`](Mutex::lock()).
-    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R;
-}
-
-impl SharedWarcRecord for Rc<RefCell<WarcRecord>> {
-    fn new(record: WarcRecord) -> Self {
-        Rc::new(RefCell::new(record))
-    }
-
-    fn replace(&self, record: WarcRecord) {
-        *self.borrow_mut() = record;
-    }
-
-    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
-        f(&mut self.borrow_mut())
-    }
-}
-
-impl SharedWarcRecord for Arc<Mutex<WarcRecord>> {
-    fn new(record: WarcRecord) -> Self {
-        Arc::new(Mutex::new(record))
-    }
-
-    fn replace(&self, record: WarcRecord) {
-        *self.lock().unwrap() = record;
-    }
-
-    fn with_mut<R>(&self, f: impl FnOnce(&mut WarcRecord) -> R) -> R {
-        f(&mut self.lock().unwrap())
-    }
-}
 
 impl<R> ArchiveIteratorImpl<R>
 where

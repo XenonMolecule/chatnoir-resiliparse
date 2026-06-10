@@ -15,7 +15,7 @@
 use super::*;
 use crate::stream_io::bufread::LimitedBufReader;
 use crate::warc::header::{HeaderEncoding, HeaderMap};
-use crate::warc::iter::{ArchiveIterator, SharedWarcRecord};
+use crate::warc::iter::ArchiveIterator;
 use crate::warc::mod_test::*;
 use data_encoding::{BASE32, HEXLOWER};
 use md5::Md5;
