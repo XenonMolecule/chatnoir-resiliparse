@@ -216,17 +216,19 @@
 //! ```
 //! # use fastwarc::warc::iter::ArchiveIterator;
 //! # use fastwarc::warc::record::WarcRecord;
+//! # let in_file = io::Cursor::new(Vec::new());
 //! use fastwarc::warc::record::SharedWarcRecord;
 //! use std::io::{self, Read};
 //!
-//! # let in_file = io::Cursor::new(Vec::new());
+//! let mut buf = vec![0u8; 1024];
+//!
 //! for record in ArchiveIterator::new(in_file) {
 //!     let record = match record {
 //!         Ok(r) => r,
 //!         Err(e) => panic!("Error reading record: {}", e),
 //!     };
 //!
-//!     let body = record.with_mut(|r| -> io::Result<Vec<u8>> {
+//!     let body = record.with_mut(|r| -> io::Result<&[u8]> {
 //!         r.headers();            // Map-like object containing the WARC headers.
 //!         r.headers_mut();        // Mutable reference to the WARC headers.
 //!         r.record_id();          // Shorthand for record.headers().get("WARC-Record-ID").
@@ -243,18 +245,17 @@
 //!         r.reader_mut();         // A BufReader for the record content.
 //!
 //!         // Read and return up to 1024 bytes from the record stream.
-//!         let mut body = vec![0u8; 1024];
-//!         let n = r.reader_mut().unwrap().read(&mut body)?;
+//!         let n = r.reader_mut().unwrap().read(&mut buf)?;
 //!
 //!         // Consume and return the remaining record bytes.
-//!         body.truncate(n);
-//!         body.reserve(r.content_length() - n);
-//!         r.reader_mut().unwrap().read_to_end(&mut body)?;
+//!         buf.truncate(n);
+//!         buf.reserve(r.content_length() as usize - n);
+//!         r.reader_mut().unwrap().read_to_end(&mut buf)?;
 //!
 //!         // Or: Consume the rest of stream without allocating a buffer for it (i.e., skip over).
 //!         r.consume()?;
 //!
-//!         Ok(body)
+//!         Ok(&buf)
 //!     });
 //!
 //!     if let Err(e) = body {
