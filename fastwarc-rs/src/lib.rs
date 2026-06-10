@@ -418,5 +418,5 @@
 /// Readers and writers for (compressed) WARC streams.
 pub mod stream_io;
 
-/// WARC records and archive iterators.
+/// WARC record and archive iterators.
 pub mod warc;
