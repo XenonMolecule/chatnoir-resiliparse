@@ -743,7 +743,7 @@ impl WarcRecord {
 
         bytes_read += self
             .headers
-            .parse_with_with_opts(reader, false, max_header_len, quirks_mode)?;
+            .parse_with_opts(reader, false, max_header_len, quirks_mode)?;
         self.headers.status_line = status_line;
 
         let mut parse_count = 0;
@@ -980,7 +980,7 @@ impl WarcRecord {
 
         let mut http_headers = HeaderMap::new(HeaderEncoding::Latin1);
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
-        let bytes_consumed = http_headers.parse_with_with_opts(reader, true, max_header_len, quirks_mode)?;
+        let bytes_consumed = http_headers.parse_with_opts(reader, true, max_header_len, quirks_mode)?;
 
         // Parse charset if present
         if let Some(content_type) = http_headers.get("Content-Type").map(|c| c.to_ascii_lowercase()) {

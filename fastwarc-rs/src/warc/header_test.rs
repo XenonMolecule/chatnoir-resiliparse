@@ -239,7 +239,7 @@ fn parse_headers_with_split_eoh_marker() -> io::Result<()> {
         let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
         let mut reader = io::BufReader::with_capacity(1, io::Cursor::new(http_data));
         let quirks_mode = sep == "\n";
-        let bytes_read = headers.parse_with_with_opts(&mut reader, true, 8192, quirks_mode)?;
+        let bytes_read = headers.parse_with_opts(&mut reader, true, 8192, quirks_mode)?;
 
         assert_eq!(bytes_read, http_headers.len());
         assert_eq!(headers.status_line().as_deref(), Some("HTTP/1.1 200 OK"));
@@ -282,7 +282,7 @@ fn parse_headers_with_lf_line_endings_in_quirks_mode() -> io::Result<()> {
 
     let mut strict_headers = HeaderMap::new(HeaderEncoding::Latin1);
     let mut strict_reader = io::Cursor::new(http_data.clone());
-    strict_headers.parse_with_with_opts(&mut strict_reader, true, 8192, false)?;
+    strict_headers.parse_with_opts(&mut strict_reader, true, 8192, false)?;
     // Incorrect status line split, only Content-Encoding separated with CRLF.
     assert!(strict_headers.status_line().as_deref().unwrap().ends_with("text/plain"));
     assert!(strict_headers.get("Content-Length").is_none());
@@ -291,7 +291,7 @@ fn parse_headers_with_lf_line_endings_in_quirks_mode() -> io::Result<()> {
 
     let mut quirks_headers = HeaderMap::new(HeaderEncoding::Latin1);
     let mut quirks_reader = io::Cursor::new(http_data.clone());
-    let bytes_read = quirks_headers.parse_with_with_opts(&mut quirks_reader, true, 8192, true)?;
+    let bytes_read = quirks_headers.parse_with_opts(&mut quirks_reader, true, 8192, true)?;
 
     assert_eq!(bytes_read, http_headers.len());
     assert_eq!(quirks_headers.status_line().as_deref(), Some("HTTP/1.1 200 OK"));

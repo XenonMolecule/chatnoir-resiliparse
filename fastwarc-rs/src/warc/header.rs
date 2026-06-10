@@ -244,7 +244,7 @@ impl HeaderMap {
     /// Parse a WARC or HTTP header block from a stream and populate the header map.
     ///
     /// The default maximum accepted header length is 32 KiB. If headers are longer, an error is returned.
-    /// Use [`Self::parse_with_with_opts()`] to set a different maximum.
+    /// Use [`Self::parse_with_opts()`] to set a different maximum.
     ///
     /// # Arguments
     ///
@@ -256,7 +256,7 @@ impl HeaderMap {
     /// Number of bytes read from the reader or IO error
     #[inline]
     pub fn parse(&mut self, reader: &mut dyn BufReadSeek, has_status_line: bool) -> Result<usize, io::Error> {
-        self.parse_with_with_opts(reader, has_status_line, 32 << 10, false)
+        self.parse_with_opts(reader, has_status_line, 32 << 10, false)
     }
 
     /// Internal: Split a header line at the first colon and push the offsets to the header list.
@@ -322,7 +322,7 @@ impl HeaderMap {
     /// # Returns
     ///
     /// Number of bytes read from the reader or IO error
-    pub fn parse_with_with_opts(
+    pub fn parse_with_opts(
         &mut self,
         reader: &mut dyn BufReadSeek,
         has_status_line: bool,
