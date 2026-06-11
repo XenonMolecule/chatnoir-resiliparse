@@ -93,7 +93,7 @@ def test_warc_record_type_binary_operators():
         ("revisit", 64),
         ("conversion", 128),
         ("continuation", 256),
-        ("unknown", 512),
+        ("unknown", 32768),
         ("any_type", 65535),
         ("no_type", 0),
     ],
