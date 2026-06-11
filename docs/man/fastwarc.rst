@@ -3,15 +3,16 @@
 FastWARC (Python)
 =================
 
-FastWARC is a high-performance WARC parsing library written in Rust with bindings available for Python. The API is inspired in large parts by `WARCIO <https://github.com/webrecorder/warcio>`__, but does not aim at being a drop-in replacement.  FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip, Zstd, and LZ4.
+FastWARC is a high-performance WARC parsing library written in Rust with bindings available for Python. Its design goals are high speed, a low and fixed memory footprint, ease of use, and byte-level content preservation. FastWARC supports compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Supported compression algorithms are Gzip, Zstd, and LZ4.
 
 FastWARC belongs to the :ref:`ChatNoir Resiliparse toolkit <resiliparse-docs-index>` for fast and robust web data processing.
 
 Why FastWARC and not WARCIO?
 ----------------------------
-WARCIO is a fantastic tool for reading and writing WARCs, but it is implemented entirely in Python and thus becomes rather inefficient for large web crawls at the tera- or petabyte scale where a few seconds of additional processing time add up quickly. FastWARC solves these performance issues by being written in efficient, low-level Rust. We also took the opportunity to add support for Zstandard (Zstd) as a new compression option (which has been `proposed as a new standard <https://iipc.github.io/warc-specifications/specifications/warc-zstd/>`__ besides Gzip) and LZ4, a much, much (!) faster compression algorithm than Gzip.
 
-FastWARC's design goals are high speed, a low and fixed memory footprint, and simplicity. For the latter reason, we decided against adding support for the legacy ARC format. If you need that kind of backwards compatibility, use WARCIO instead.
+`WARCIO <https://github.com/webrecorder/warcio>`__ is a fantastic tool for reading and writing WARCs, but it is implemented entirely in Python and thus rather inefficient for large web crawls at the tera- or petabyte scale where a few seconds of additional processing time add up quickly. FastWARC, on the other hand, is written in efficient, low-level Rust. WARCIO is also known to `mangle <https://github.com/webrecorder/warcio/issues/128>`__ `headers <https://github.com/webrecorder/warcio/issues/129>`__ in certain situations, whereas FastWARC always tries to preserve the exact byte contents of a record. FastWARC also supports more compression options with Zstandard (Zstd), which has been `proposed as a new standard <https://iipc.github.io/warc-specifications/specifications/warc-zstd/>`__, and LZ4, a much faster compression algorithm than Gzip.
+
+FastWARC's API is inspired by WARCIO, but the goal was never to be a drop-in replacement. The API has also diverged further over the years as new features were added. One notable difference is that we decided against adding support for the legacy ARC format. If you need that kind of backwards compatibility, use WARCIO instead.
 
 
 .. _fastwarc-installation:
@@ -26,35 +27,18 @@ Pre-built FastWARC binaries for Python can be installed from `PyPi <https://pypi
 
 Building FastWARC From Source
 -----------------------------
+.. note::
 
-To build FastWARC from the `source repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`__, you need Rust and Cargo installed. If that is not the case, install ``rustup`` first and follow the
-instructions:
+    If you just want to use FastWARC in Python, building the bindings from source is usually necessary, unless there are no pre-built binaries for your platform.
 
-.. code-block:: bash
+To build FastWARC from the `source repository <https://github.com/chatnoir-eu/chatnoir-resiliparse>`__, you need Rust and Cargo installed. If that is not the case, do that first:
 
+.. code:: bash
+
+  # Install Rust toolchain (if not already installed)
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-To build FastWARC, simply run ``cargo build`` from the root of this repository.
-
-Using FastWARC as a Library
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To use FastWARC in your Rust project, add it as a dependency to your ``Cargo.toml``:
-
-.. code-block:: toml
-  :substitutions:
-
-  [dependencies]
-  fastwarc = "|project_release_minor|"
-
-Then build your project like normal with ``cargo build``.
-
-Building Python Bindings From Source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Note:** If you just want to use FastWARC in Python, building the bindings from source is usually necessary, unless there are no pre-built binaries for your platform.
-
-To be able to build FastWARC, you need the Rust toolchain installed (see above). Then to build directly from the GitHub repository, follow these steps:
+Afterwards, follow these steps to build FastWARC from the GitHub repository:
 
 .. code:: bash
 
@@ -62,16 +46,13 @@ To be able to build FastWARC, you need the Rust toolchain installed (see above).
   git clone https://github.com/chatnoir-eu/chatnoir-resiliparse.git
   cd chatnoir-resiliparse
 
-  # Install Rust toolchain (if not already installed)
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
   # Create a fresh venv first (recommended)
   python3 -m venv venv && source venv/bin/activate
 
   # Option 1: Build and install in editable mode (best for development)
   python3 -m pip install -e ./fastwarc-py
 
-  # Option 2 (alternative): Build and install wheels in separate steps (best for redistribution)
+  # Option 2: Build and install wheels in separate steps (best for redistribution)
   python3 -m pip wheel -w build ./fastwarc-py
   ls ./build/*.whl | xargs python3 -m pip install
 
@@ -80,7 +61,7 @@ Iterating WARC Files
 
 .. important::
 
-  With the Rust port in version 1.0, the Python API has changed slightly. The old names (e.g. ``GZipStream`` instead of ``GzipReader``) still mostly work through compatibility shims, but will eventually be removed. So please make sure you update your scripts! If you run into deeper issues, the old Cython bindings are still available as a submodule named ``fastwarc.legacy``.
+  With the Rust port in version 1.0, the Python API has changed slightly. The old names (e.g., ``GZipStream`` instead of ``GzipReader``) still mostly work through compatibility shims, but will eventually be removed. So please make sure you update your scripts! If you run into deeper issues, the old Cython bindings are still available as a submodule named ``fastwarc.legacy``.
 
 
 The central class for stream-processing WARC files is :class:`.ArchiveIterator`:
@@ -94,7 +75,7 @@ The central class for stream-processing WARC files is :class:`.ArchiveIterator`:
       for record in ArchiveIterator(f):
           print(record.record_id)
 
-  # File path
+  # File path (more efficient for local files)
   for record in ArchiveIterator('warcfile.warc.gz'):
       print(record.record_id)
 
@@ -113,7 +94,7 @@ This will iterate over all records in the file and print out their IDs. You can 
   # LZ4:
   stream = LZ4Reader('warcfile.warc.lz4')
 
-Instead of a filename, you can also pass any kind of file-like object:
+Instead of a filename, you can also use any kind of file-like object:
 
 .. code-block:: python
 
@@ -125,7 +106,7 @@ If `fsspec <https://filesystem-spec.readthedocs.io/>`__ is installed (which is a
 
   from fastwarc.warc import ArchiveIterator
 
-  # Read remote S3 object (with optional credentials, needs s3fs installed)
+  # Read remote S3 object (with optional credentials)
   creds = {'key': '...',
            'secret': '...',
            'endpoint_url': '...'}
@@ -173,7 +154,7 @@ You can automatically skip any records whose ``Content-Length`` exceeds or is lo
   from fastwarc import ArchiveIterator
 
   # Skip all records that are larger than 500 KiB
-  for record in ArchiveIterator(stream, max_content_length=512000):
+  for record in ArchiveIterator(stream, max_content_length=512 << 10):
       pass
 
   # Skip all records that are smaller than 128 bytes
@@ -181,9 +162,9 @@ You can automatically skip any records whose ``Content-Length`` exceeds or is lo
       pass
 
 
-Function Filter
-^^^^^^^^^^^^^^^
-If the above-mentioned filter mechanisms are not sufficient, you can pass a function object that accepts as its only parameter a :class:`.WarcRecord` and returns a ``bool`` value as a filter predicate. This filter type is much slower than the previous filters, but probably still more efficient than checking the same thing later on in the loop. Be aware that since the record body hasn't been seen yet, you cannot access any information beyond what is in the record headers.
+Function Filters
+^^^^^^^^^^^^^^^^
+If the above-mentioned filter mechanisms are not sufficient, you can pass a function object that accepts as its only parameter a :class:`.WarcRecord` and returns a ``bool`` value as a filter predicate. This filter type is slower than the previous filters, but still more efficient than checking the same thing later on in the loop (especially when you use the native predicate functions provided by FastWARC, see below).
 
 FastWARC comes with a handful of existing filters that you can use:
 
@@ -195,7 +176,7 @@ FastWARC comes with a handful of existing filters that you can use:
   for record in ArchiveIterator(stream, func_filter=is_http):
       pass
 
-  # Skip records without a block digest
+  # Skip records without a block digest (without verifying it)
   for record in ArchiveIterator(stream, func_filter=has_block_digest):
       pass
 
@@ -203,21 +184,33 @@ FastWARC comes with a handful of existing filters that you can use:
   for record in ArchiveIterator(stream, func_filter=is_warc_11):
       pass
 
-The full list of pre-defined function filters is: :func:`.is_warc_10`, :func:`.is_warc_11`, :func:`.has_block_digest`, :func:`.has_valid_block_digest`, :func:`.has_payload_digest`, :func:`.has_valid_payload_digest`, :func:`.is_http`, :func:`.is_concurrent`. Besides these, you can pass any Python callable that accepts a :class:`.WarcRecord` and returns a ``bool``:
+Other Function Filters
+^^^^^^^^^^^^^^^^^^^^^^
+The full list of pre-defined function filters is:
+
+- :func:`.is_warc_10`
+- :func:`.is_warc_11`
+- :func:`.has_block_digest`
+- :func:`.has_valid_block_digest`
+- :func:`.has_payload_digest`
+- :func:`.has_valid_payload_digest`
+- :func:`.is_http`
+- :func:`.is_concurrent`
+
+Besides these, you can pass any Python callable that accepts a :class:`.WarcRecord` and returns a ``bool``:
 
 .. code-block:: python
 
   # Skip records which haven't been identified as HTML pages
-  for record in ArchiveIterator(stream, func_filter=lambda r: r.headers.get('WARC-Identified-Payload-Type') == 'text/html'):
+  for record in ArchiveIterator(stream,
+        func_filter=lambda r: r.headers.get('WARC-Identified-Payload-Type') == 'text/html'):
       pass
 
-  # Skip records without any sort of digest header
-  for record in ArchiveIterator(stream, func_filter=lambda r: has_block_digest(r) and has_payload_digest(r)):
-      pass
+Pure Python functions are less efficient than FastWARC's provided function filters, so try to keep them minimal.
 
-Digest Filter
-^^^^^^^^^^^^^
-Unlike all the other filter predicates, :func:`has_valid_block_digest` and :func:`has_valid_payload_digest` are executed only *after* the content is available, which is needed for the digest calculation. These filters will skip records without or with an invalid block or payload digest. You can also set ``verify_digests=True`` as a shorthand for ``func_filter=has_valid_block_digest``:
+Digest Filters
+^^^^^^^^^^^^^^
+You can skip all records with an invalid ``WARC-Block-Digest`` or ``WARC-Payload-Digest`` header. Unlike other filter predicates, :func:`has_valid_block_digest` and :func:`has_valid_payload_digest` are executed only *after* the content is available, which is needed for the digest calculation. These filters will skip records without or with an invalid block or payload digest. You can also set ``verify_digests=True`` as a shorthand for specifying explicit digest filters for both types of digests.
 
 .. code-block:: python
 
@@ -227,6 +220,18 @@ Unlike all the other filter predicates, :func:`has_valid_block_digest` and :func
 .. warning::
 
   These are the most expensive filters of all, as they will create an in-memory copy of the whole record. See :ref:`verifying-record-digests` for more information on how digest verification works.
+
+Combining Filters
+^^^^^^^^^^^^^^^^^
+Multiple filters can be combined with a custom function or lambda:
+
+.. code-block:: python
+
+  # Skip records without any sort of digest header
+  for record in ArchiveIterator(stream,
+        func_filter=lambda r: has_block_digest(r) and has_payload_digest(r)):
+      pass
+
 
 Record Properties
 -----------------
@@ -248,18 +253,18 @@ The :class:`.ArchiveIterator` returns objects of type :class:`.WarcRecord`, whic
       record.http_charset         # HTTP charset from the Content-Type header (if any)
       record.http_date            # Parsed HTTP Date header
       record.http_last_modified   # Parsed HTTP Last-Modified header
-      record.reader               # A BufferedReader for the record content
+      record.reader               # A WarcRecordPayloadReader for the record content
 
-      # Read and return up to 1024 bytes from the record stream
+      # Read up to 1024 bytes from the record stream
       body = record.reader.read(1024)
 
-      # Consume and return the remaining record bytes
+      # Read the remaining record bytes
       body += record.reader.read()
 
-      # Or: Consume rest of stream without allocating a buffer for it (i.e., skip over)
+      # Or: consume rest of stream without allocating a buffer for it (i.e., skip over)
       record.reader.consume()
 
-As you can see, HTTP request and response records are parsed automatically for convenience. If not needed, you can disable this behaviour by passing ``parse_http=False`` to the :class:`.ArchiveIterator` constructor to avoid unnecessary processing. :attr:`record.reader <.WarcRecord.reader>` will then start at the beginning of the HTTP header block instead of the HTTP body. You can parse HTTP headers later on a per-record basis by calling :meth:`record.parse_http() <.WarcRecord.parse_http>` as long as the :class:`.BufferedReader` hasn't been consumed at that point.
+HTTP request and response records are parsed automatically for convenience. If not needed (or wanted), you can disable this behaviour by passing ``parse_http=False`` to the :class:`.ArchiveIterator` constructor to avoid unnecessary processing. :attr:`record.reader <.WarcRecord.reader>` will then start at the beginning of the HTTP header block instead of the HTTP body. You can parse HTTP headers later on a per-record basis by calling :meth:`record.parse_http() <.WarcRecord.parse_http>` as long as the :class:`.WarcRecordPayloadReader` hasn't been consumed at that point.
 
 .. _freezing-records:
 
@@ -268,7 +273,7 @@ Freezing Records
 
 By default, :attr:`.WarcRecord.reader` returns a live reader on the WARC input stream. This means that when the iterator returns the :class:`.WarcRecord` instance, no content bytes have been consumed yet and no buffer has been allocated for them. This is very efficient, and it also prevents large records inadvertently consuming too much memory. However, that also means that once the content bytes have been read or once the iterator moves to the next record, there is no way to read them again. Also, if the input stream is compressed, you cannot seek backwards in the stream, even if you still hold a reference to the :class:`.WarcRecord` instance.
 
-To work around this, you can freeze the record by calling :meth:`.WarcRecord.freeze`. This will consume the record payload reader and store the bytes in an internal buffer, and detach the record from the input stream. The reader returned by :attr:`.WarcRecord.reader` then no longer points to the input stream, but to the frozen byte buffer. Frozen records can be used indefinitely, and seeking on their payload reader is supported both in the forward and in the backward direction.
+To work around this, you can freeze a record by calling :meth:`.WarcRecord.freeze`. This will consume the record payload reader, store the bytes in an internal buffer, and detach the record from the input stream. The reader returned by :attr:`.WarcRecord.reader` then no longer points to the input stream, but to the frozen byte buffer. Frozen records can be used indefinitely, and seeking on their payload reader is supported both in the forward and in the backward direction.
 
 .. _verifying-record-digests:
 
@@ -280,26 +285,27 @@ If a record has digest headers, you can verify the consistency of the record con
 
   for record in ArchiveIterator(stream, parse_http=False):
       if 'WARC-Block-Digest' in record.headers:
-          print('Block digest OK:', record.verify_block_digest())
+          print('Block digest OK:', record.verify_block_digest(consume=False))
 
       if 'WARC-Payload-Digest' in record.headers:
-          record.parse_http()    # It's safe to call this even if the record has no HTTP payload
-          print('Payload digest OK:', record.verify_payload_digest())
+          # It's safe to call this even if the record has no HTTP payload
+          record.parse_http()
+          print('Payload digest OK:', record.verify_payload_digest(consume=False))
 
-Note that both :meth:`~.WarcRecord.verify_block_digest` and :meth:`~.WarcRecord.verify_payload_digest` will simply return ``False`` if the headers do not exist, so check that first. Also keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic HTTP parsing has to be turned off for this to work.
+Note that :meth:`~.WarcRecord.verify_block_digest` and :meth:`~.WarcRecord.verify_payload_digest` will simply return ``False`` and not throw an error if the headers do not exist, so check that first. Keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic HTTP parsing has to be turned off for this to work.
 
 .. warning::
 
-  Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its contents for further processing (that's why verifying the HTTP payload digest after verifying the block digest worked in the first place).
+  Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its contents for further processing if ``consume=False`` (that's why verifying the HTTP payload digest after verifying the block digest worked in the first place). If your records are very large, you need to ensure that they fit into memory entirely (e.g. by checking :attr:`record.content_length <.WarcRecord.content_length>`).
 
-If your records are very large, you need to ensure that they fit into memory entirely (e.g. by checking :attr:`record.content_length <.WarcRecord.content_length>`). If you do not want to preserve the stream contents, you can set ``consume=True`` as a parameter. This will avoid the creation of a stream copy altogether and fully consume the rest of the record instead.
+If you do not need to preserve the stream contents, you can set ``consume=True``. This will avoid the creation of a stream copy altogether and fully consume the rest of the record instead. However, that also means that the payload is lost after verifying the digests.
 
 
 .. _fastwarc-clueweb:
 
 ClueWeb Notes
 -------------
-FastWARC is a standards-compliant WARC parser. Unfortunately, the `ClueWeb <https://lemurproject.org/>`__ authors were somewhat creative with the standard. If you work with these datasets, you will inevitably notice certain defects in the files that result in premature stream aborts. This applies to both the old ClueWeb09 as well as the new ClueWeb22. Following is a list of known ClueWeb WARC defects and how to work around them:
+FastWARC is a standards-compliant WARC parser. Unfortunately, the `ClueWeb <https://lemurproject.org/>`__ authors were somewhat creative with the standard. If you work with these datasets, you will inevitably notice certain defects in the files that result in premature stream aborts. This applies to both the old ClueWeb09, as well as the new ClueWeb22. Following is a list of known ClueWeb WARC defects and how to work around them:
 
 ClueWeb09
 ^^^^^^^^^
@@ -309,7 +315,7 @@ ClueWeb22
 ^^^^^^^^^
 `ClueWeb22 <https://lemurproject.org/clueweb22.php/>`__ WARCs are a bit more predictable than ClueWeb09 WARCs, but have non-trivial defects nonetheless.
 
-*First*, the initial ``warcinfo`` records are missing the required ``Content-Length`` header, so we have to rely on heuristics to determine where the record ends. If ``strict_mode=False`` is set and the WARC is read from a Gzip-compressed stream, FastWARC will attempt to use the internal buffer boundaries for determining the record end. If you are reading the WARC as an uncompressed file, FastWARC has to seek forward to the next valid ``WARC/1.1`` version line. In this case the record body will be skipped as empty. Without ``quirks_mode=True``, FastWARC will stop after the first header block.
+*First*, the initial ``warcinfo`` records are missing the required ``Content-Length`` header, so we have to rely on heuristics to determine where the record ends. If ``quirks_mode=True`` is set and the WARC is read from a Gzip-compressed stream, FastWARC will attempt to use the internal buffer boundaries for determining the record end. If you are reading the WARC as an uncompressed file, FastWARC has to seek forward to the next valid ``WARC/1.1`` version line. In this case, the record body will be skipped as empty. Without ``quirks_mode=True``, FastWARC will stop after the first header block.
 
 *Second*, all records are of type ``response`` with ``Content-Type: application/http; msgtype=response``, yet they contain only the HTML body and not the full HTTP response (the correct record type would be ``resource`` with ``Content-Type: text/html``). This incorrect type description will trigger FastWARC's automatic HTTP parsing, which will result in empty or incomplete record bodies. To avoid this, explicitly set ``parse_http=False``.
 
@@ -319,7 +325,7 @@ Benchmarks
 ----------
 Depending on your CPU, memory architecture, storage speed, and the WARC compression algorithm, you can typically expect speedups between 1.5x and 5x and in extreme cases even up to 13x over WARCIO.
 
-Read directly from DDR4-DRAM, FastWARC can achieve a throughput for uncompressed WARC files of more than 6.4 GiB/s on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s. Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (compression level 3) and LZ4 at around 1.6 GiB/s.
+Read directly from DDR4-DRAM, FastWARC can achieve throughput for uncompressed WARC files of more than 6.4 GiB/s on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s. Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (with compression level 3) and LZ4 at around 1.6 GiB/s.
 
 The FastWARC GitHub repository contains a `comprehensive suite of benchmarks <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc#readme>`__ of FastWARC (both Rust native and Python), as well as several other popular open source WARC reading libraries.
 

@@ -13,14 +13,15 @@
 // limitations under the License.
 
 //! FastWARC is a high-performance WARC parsing library written in Rust with bindings available for Python.
-//! FastWARC's design goals are high speed, a low and fixed memory footprint, and simplicity. Supported are compressed
-//! and uncompressed WARC/1.0 and WARC/1.1 streams. Available compression algorithms are Gzip, Zstd, and LZ4.
+//! FastWARC's design goals are high speed, a low and fixed memory footprint, ease of use, and byte-level content
+//! preservation. Supported are compressed and uncompressed WARC/1.0 and WARC/1.1 streams. Available compression
+//! algorithms are Gzip, Zstd, and LZ4.
 //!
 //! FastWARC belongs to the [ChatNoir Resiliparse toolkit](https://resiliparse.chatnoir.eu/en/stable/index.html)
 //! for fast and robust web data processing.
 //!
 //! # Installing FastWARC
-//! To use FastWARC in your Rust project, simply add it as a dependency to your `Cargo.toml` to install it directly
+//! To use FastWARC in your Rust project, add it as a dependency to your `Cargo.toml` to install it directly
 //! from [crates.io](https://crates.io/crates/fastwarc):
 //!
 //! ```toml
@@ -28,14 +29,15 @@
 //! fastwarc = "1"    # Use correct version here
 //! ```
 //!
-//! To build FastWARC as a standalone library, simply run `cargo build` from the root of this repository.
+//! To build FastWARC as a standalone library, run `cargo build` from the root of this repository.
 //!
+//! ## FastWARC for Python
 //! Pre-build wheels with PyO3 bindings are also available for Python. See
 //! [Python docs](https://resiliparse.chatnoir.eu/en/stable/man/fastwarc.html) for usage instructions and API
 //! documentation. You can install the wheels from [PyPi](https://pypi.org/project/FastWARC/) using `pip`:
 //!
-//! ```console
-//! $ pip install fastwarc
+//! ```bash
+//! pip install fastwarc
 //! ```
 //!
 //! # Iterating WARC Files
@@ -46,8 +48,7 @@
 //! use std::fs::File;
 //! use std::io::BufReader;
 //!
-//! let in_file = BufReader::new(
-//!     File::open("warcfile.warc.gz").expect("File error"));
+//! let in_file = BufReader::new(File::open("warcfile.warc.gz").expect("File error"));
 //! for record in ArchiveIterator::new(in_file) {
 //!     match record {
 //!         Ok(r) => println!("Record ID: {}", r.borrow().record_id().expect("No record ID")),
@@ -56,7 +57,7 @@
 //! }
 //! ```
 //! This will iterate over all records in the file and print out their IDs. The [`ArchiveIterator`](warc::iter::ArchiveIterator)
-//! will automatically try to detect whether the input is a compressed Gzip-, Zstd-, or LZ4 stream. However, you can also
+//! automatically tries to detect whether the input is a compressed Gzip-, Zstd-, or LZ4 stream. If you need, you can also
 //! make the stream type explicit by using a reader wrapper from [`stream_io`] (e.g.,
 //! [`GzipReader`](stream_io::gzip::GzipReader) or [`ZstdReader`](stream_io::zstd::ZstdReader)).
 //!
@@ -69,11 +70,19 @@
 //! let in_file = GzipReader::new(BufReader::new(
 //!     File::open("warcfile.warc.gz").expect("File error")));
 //!
-//! // Or construct a GzipReader directly from a path (PathBuf or str):
-//! let in_file = GzipReader::from_path("warcfile.warc");
+//! // Or construct a GzipReader from a path (PathBuf or str):
+//! let in_file = GzipReader::from_path("warcfile.warc.gz");
 //! ```
 //!
-//! You can also construct the [`ArchiveIterator`](warc::iter::ArchiveIterator) directly from a file path.
+//! In general, any reader that implements [`std::io::BufRead`] and [`std::io::Seek`] can be used as an input stream, as
+//! long as it also implements [`stream_io::traits::IntoWarcReader`]. For some common reader sources, this is already
+//! covered by a blanket implementation.
+//!
+//! > **Note:** If you plan to implement a custom reader, you should better implement [`stream_io::traits::WarcRead`]
+//! > directly instead of [`stream_io::traits::IntoWarcReader`]. That ensures that correct stream offsets are reported
+//! > even for compressed streams, which is essential if you want to index a WARC file.
+//!
+//! You can also construct an [`ArchiveIterator`](warc::iter::ArchiveIterator) directly from a file path.
 //! ```no_run
 //! # use fastwarc::warc;
 //! use fastwarc::warc::iter::ArchiveIterator;
@@ -81,7 +90,7 @@
 //!     // ...
 //! }
 //! ```
-//! The compression type of the file is automatically determined based on the file extension in this case.
+//! The compression type of the file is determined automatically based on the file extension in this case.
 //!
 //! Since calling `borrow()` on the record can get tedious (and archive iterators can also return
 //! [other types of shared record references](warc::record::SharedWarcRecord), such as when using
@@ -95,8 +104,7 @@
 //!
 //! # let in_file = std::io::Cursor::new(Vec::new());
 //! for record in ArchiveIterator::new(in_file) {
-//!     record.unwrap().with_mut(|r|
-//!         println!("Record ID: {}", r.record_id().unwrap()));
+//!     record.unwrap().with_mut(|r| println!("Record ID: {}", r.record_id().unwrap()));
 //! }
 //! ```
 //!
@@ -105,12 +113,12 @@
 //! FastWARC provides several ways in which you can filter and efficiently skip records you are not interested in.
 //! These filters are checked very early in the parsing process, right after the WARC header block has been read.
 //! Multiple types of filters can be combined. [`ArchiveIterator::with_filter()`](warc::iter::ArchiveIterator::with_filter)
-//! accepts any predicate function that takes a mutable [`warc::record::WarcRecord`] reference and returns a ``bool``.
-//! Several such predicate functions are already pre-defined:
+//! accepts any predicate function that takes a mutable [`warc::record::WarcRecord`] reference and returns a `bool`.
+//! FastWARC already provides several predicate functions out of the box:
 //!
 //! ## Record Type Filter
 //! If you want only records of a certain type, you can skip all other records efficiently by specifying the desired
-//! record type or a bitmask of multiple such types:
+//! record type or a bitmask of multiple types:
 //!
 //! ```
 //! # use fastwarc::warc::iter::ArchiveIterator;
@@ -124,6 +132,7 @@
 //!     // ...
 //! }
 //! ```
+//!
 //! This will skip all records with a `WARC-Type` other than `"request"` or `"response"`.
 //!
 //! ## Content-Length Filter
@@ -141,10 +150,11 @@
 //!     // ...
 //! }
 //! ```
+//!
 //! This will skip all records larger than 4 MiB.
 //!
 //! ## Content Filters
-//! Several more filters for the type of content exist:
+//! Several filters for the type of content exist:
 //!
 //! ```
 //! # use fastwarc::warc::iter::ArchiveIterator;
@@ -169,13 +179,13 @@
 //! }
 //! ```
 //!
-//! ## Digest Filter
+//! ## Digest Filters
 //! You can skip all records with an invalid `WARC-Block-Digest` or `WARC-Payload-Digest` header. Unlike all the other
 //! filter predicates, [`has_valid_block_digest`](warc::iter::filter::has_valid_block_digest) and
 //! [`has_valid_payload_digest`](warc::iter::filter::has_valid_payload_digest) are executed only *after* the content is
 //! available, which is needed for the digest calculation. These filters will skip records without or with an invalid
 //! block or payload digest. You can also use [`ArchiveIterator::with_verify_digests()`](warc::iter::ArchiveIterator::with_verify_digests())
-//! as a shorthand for specifying an explicit digest filter.
+//! as a shorthand for specifying explicit digest filters for both types of digests.
 //
 //! ```
 //! # use fastwarc::warc::iter::ArchiveIterator;
@@ -185,9 +195,9 @@
 //!     // ...
 //! }
 //! ```
-//! These are the most expensive filters of all, as they will create an in-memory copy of the whole record and
-//! calculate a digest of it. See [Verifying Record Digests](#verifying-record-digests) for more information on how
-//! digest verification works.
+//! > **Warning:** These are the most expensive filters of all, as they will create an in-memory copy of the whole record and
+//! > calculate a digest of it. See [Verifying Record Digests](#verifying-record-digests) for more information on how
+//! > digest verification works.
 //
 //! ## Other Filters
 //! The full list of pre-defined filter predicates is:
@@ -204,8 +214,25 @@
 //! * [`filter::has_content_length_lte(...)`](warc::iter::filter::has_content_length_lte)
 //! * [`filter::has_content_length_gte(...)`](warc::iter::filter::has_content_length_gte)
 //!
-//! Besides these, you can pass any function that accepts a mutable [`warc::record::WarcRecord`] reference and returns
-//! a `bool`. This is also how you can combine multiple filters.
+//! Besides these, you can use any function that accepts a mutable [`warc::record::WarcRecord`] reference and returns
+//! a `bool`.
+//!
+//! ## Combining Filters
+//! Multiple filters can be combined with a custom closure:
+//!
+//! ```
+//! # use fastwarc::warc::iter::ArchiveIterator;
+//! # use fastwarc::warc::iter::filter::*;
+//! # let in_file = std::io::Cursor::new(Vec::new());
+//! // Filter for records with a block AND a payload digest.
+//! for record in ArchiveIterator::new(in_file)
+//!     .with_filter(|r| has_block_digest(r) && has_payload_digest(r)) {
+//!     // ...
+//! }
+//! ```
+//!
+//! Chaining [`ArchiveIterator::with_filter()`](warc::iter::ArchiveIterator::with_filter) to create conjunctions is also
+//! possible, but not recommended, since it will create multiple indirection layers.
 //!
 //!
 //! # Record Properties
@@ -244,17 +271,17 @@
 //!         r.http_charset();       // HTTP charset from the Content-Type header (if any).
 //!         r.reader_mut();         // A BufReader for the record content.
 //!
-//!         // Read and return up to 1024 bytes from the record stream.
+//!         // Read up to 1024 bytes from the record stream.
 //!         let n = r.reader_mut().unwrap().read(&mut buf)?;
 //!
-//!         // Consume and return the remaining record bytes.
+//!         // Read the remaining record bytes.
 //!         buf.truncate(n);
 //!         if buf.capacity() < r.content_length() as usize {
 //!             buf.reserve(r.content_length() as usize - buf.capacity());
 //!         }
 //!         r.reader_mut().unwrap().read_to_end(&mut buf)?;
 //!
-//!         // Or: Consume the rest of stream without allocating a buffer for it (i.e., skip over).
+//!         // Or: consume the rest of stream without allocating a buffer for it (i.e., skip over).
 //!         r.consume()?;
 //!
 //!         Ok(&buf)
@@ -266,9 +293,9 @@
 //! }
 //! ```
 //!
-//! HTTP request and response records are parsed automatically for convenience. If not needed, you can disable this
-//! behaviour by using [`ArchiveIterator::with_parse_http(false)`](warc::iter::ArchiveIterator::with_parse_http) (or
-//! [`ArchiveIterator::set_parse_http(false)`](warc::iter::ArchiveIterator::set_parse_http)) to avoid unnecessary
+//! HTTP request and response records are parsed automatically for convenience. If not needed (or wanted), you can disable
+//! this behaviour by using [`ArchiveIterator::with_parse_http(false)`](warc::iter::ArchiveIterator::with_parse_http)
+//! (or [`ArchiveIterator::set_parse_http(false)`](warc::iter::ArchiveIterator::set_parse_http)) to avoid unnecessary
 //! processing. [`WarcRecord::reader_mut()`](warc::record::WarcRecord::reader_mut) will then start at the beginning of
 //! the HTTP header block instead of the HTTP body. You can parse HTTP headers later on a per-record basis by calling
 //! [`WarcRecord::parse_http()`](warc::record::WarcRecord::parse_http) as long as the reader hasn't been consumed at
@@ -284,8 +311,8 @@
 //! Also, if the input stream is compressed, you cannot seek backwards in the stream, even if you still hold a reference
 //! to the [`WarcRecord`](warc::record::WarcRecord) instance.
 //!
-//! To work around this, you can freeze the record by calling [`WarcRecord::freeze()`](warc::record::WarcRecord::freeze).
-//! This will consume the record payload reader and store the bytes in an internal buffer, and detach the record from
+//! To work around this, you can freeze a record by calling [`WarcRecord::freeze()`](warc::record::WarcRecord::freeze).
+//! This will consume the record payload reader, store the bytes in an internal buffer, and detach the record from
 //! the input stream. The reader returned by [`WarcRecord::reader_mut()`](warc::record::WarcRecord::reader_mut) then
 //! no longer points to the input stream, but to the frozen byte buffer. Frozen records can be used indefinitely,
 //! and seeking on their payload reader is supported both in the forward and in the backward direction.
@@ -324,17 +351,16 @@
 //! Both [`verify_block_digest`](warc::record::WarcRecord::verify_block_digest) and
 //! [`verify_payload_digest`](warc::record::WarcRecord::verify_payload_digest) return a [`DigestError`](warc::record::DigestError)
 //! if the headers do not exist, contain unsupported digest types, are incorrectly formatted, or are otherwise unsupported.
-//! Also keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic
+//! Keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic
 //! HTTP parsing has to be turned off for this to work.
 //!
-//! **WARNING:**
-//! Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its
-//! contents for further processing if the `consume` parameter is set to `false` (that's why verifying the HTTP payload
-//! digest after verifying the block digest worked in the first place). If your records are very large, you need to ensure
-//! that they fit into memory entirely (e.g., by checking
-//! [`WarcRecord::content_length()`](warc::record::WarcRecord::content_length) first.
+//! > **Warning:** Calling either of these two methods will create an in-memory copy of the remaining record stream to
+//! > preserve its contents for further processing if the `consume` parameter is set to `false` (that's why verifying the
+//! > HTTP payload digest after verifying the block digest worked in the first place). If your records are very large, you
+//! > need to ensure that they fit into memory entirely (e.g., by checking
+//! > [`WarcRecord::content_length()`](warc::record::WarcRecord::content_length) first.
 //!
-//! If you do not need to preserve the stream contents, you can set ``consume = true``. This will avoid the allocation of
+//! If you do not need to preserve the stream contents, you can set `consume = true`. This will avoid the allocation of
 //! a payload buffer and fully consume the rest of the record instead. However, that also means that the payload is
 //! lost after verifying the digests.
 //!
@@ -343,7 +369,7 @@
 //!
 //! FastWARC is a standards-compliant WARC parser. Unfortunately, the [ClueWeb](https://lemurproject.org/) authors were
 //! somewhat creative with the standard. If you work with these datasets, you will inevitably notice certain defects in
-//! the files that result in premature stream aborts. This applies to both the old ClueWeb09 as well as the new
+//! the files that result in premature stream aborts. This applies to both the old ClueWeb09, as well as the new
 //! ClueWeb22. Following is a list of known ClueWeb WARC defects and how to work around them:
 //!
 //! ## ClueWeb09
@@ -355,17 +381,18 @@
 //! ## ClueWeb22
 //! [ClueWeb22](https://lemurproject.org/clueweb22.php/) WARCs are a bit more predictable than ClueWeb09 WARCs, but
 //! have non-trivial defects nonetheless.
+//!
 //! *First*, the initial `warcinfo` records are missing the required `Content-Length` header, so we have to rely on
-//! heuristics to determine where the record ends. If quirks mode is an and the WARC is read from a Gzip-compressed
+//! heuristics to determine where the record ends. If quirks mode is on and the WARC is read from a Gzip-compressed
 //! stream, FastWARC will attempt to use the internal buffer boundaries for determining the record end. If you are
 //! reading the WARC as an uncompressed file, FastWARC has to seek forward to the next valid `WARC/1.1` version line.
-//! In this case the record body will be skipped as empty. Without quirks mode, FastWARC will stop after the first
+//! In this case, the record body will be skipped as empty. Without quirks mode, FastWARC will stop after the first
 //! header block.
 //!
 //! *Second*, all records are of type `response` with `Content-Type: application/http; msgtype=response`, yet they
 //! contain only the HTML body and not the full HTTP response (the correct record type would be `resource` with
-//! `Content-Type: text/html`). This incorrect type description will trigger FastWARC's automatic HTTP parsing, which
-//! will result in empty or incomplete record bodies. To avoid this, explicitly use
+//! `Content-Type: text/html`). This incorrect type description triggers FastWARC's automatic HTTP parsing, which
+//! will result in empty or incomplete record bodies. To avoid this, explicitly set
 //! [`ArchiveIterator::with_parse_http(false)`](warc::iter::ArchiveIterator::with_parse_http).
 //!
 //!
@@ -377,9 +404,9 @@
 //! [warcio](https://github.com/webrecorder/warcio) is typically between 1.5x and 5x and in extreme cases up to 13x.
 //! Especially for Gzip-compressed WARCs, FastWARC is often much faster than other parsers.
 //!
-//! Read directly from DDR4-DRAM, FastWARC can achieve a throughput for uncompressed WARC files of more than 6.4 GiB/s
+//! Read directly from DDR4-DRAM, FastWARC can achieve throughput for uncompressed WARC files of more than 6.4 GiB/s
 //! on a single core. In more realistic scenarios, the throughput is usually in the order of 1.5--2.5 GiB/s.
-//! Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (compression level 3)
+//! Gzip-compressed WARCs cap out at around 850-900 MiB/s. Zstd WARCS come at around 1 GiB/s (with compression level 3)
 //! and LZ4 at around 1.6 GiB/s.
 //!
 //! The FastWARC GitHub repository contains a
