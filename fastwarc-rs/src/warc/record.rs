@@ -45,7 +45,7 @@ pub enum WarcRecordType {
     Revisit = 64,
     Conversion = 128,
     Continuation = 256,
-    Unknown = 512,
+    Unknown = 32768,
     AnyType = 65535,
     #[default]
     NoType = 0,
@@ -84,7 +84,6 @@ impl TryFrom<u16> for WarcRecordType {
             64 => Ok(WarcRecordType::Revisit),
             128 => Ok(WarcRecordType::Conversion),
             256 => Ok(WarcRecordType::Continuation),
-            512 => Ok(WarcRecordType::Unknown),
             65535 => Ok(WarcRecordType::AnyType),
             0 => Ok(WarcRecordType::NoType),
             _ => Err("Invalid enum value."),
@@ -894,16 +893,15 @@ impl WarcRecord {
     ///
     /// * `record_type` - WARC-Type
     /// * `record_urn` - WARC-Record-ID as URN without `'<urn:'`, `'>'` (if unset, a random URN will be generated)
-    pub fn init_headers(&mut self, record_type: Option<WarcRecordType>, record_urn: Option<&[u8]>) {
+    pub fn init_headers(&mut self, record_type: WarcRecordType, record_urn: Option<&[u8]>) {
         let urn = match record_urn {
             Some(urn) => urn.to_vec(),
             None => format!("uuid:{}", Uuid::new_v4()).into_bytes(),
         };
 
         self.record_type = match record_type {
-            Some(WarcRecordType::AnyType) | Some(WarcRecordType::NoType) => WarcRecordType::Unknown,
-            Some(record_type) => record_type,
-            _ => WarcRecordType::NoType,
+            WarcRecordType::AnyType => WarcRecordType::Unknown,
+            record_type => record_type,
         };
 
         self.headers.clear();

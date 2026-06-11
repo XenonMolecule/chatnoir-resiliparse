@@ -52,7 +52,7 @@ pub enum WarcRecordTypePy {
     revisit = 64,
     conversion = 128,
     continuation = 256,
-    unknown = 512,
+    unknown = 32768,
     any_type = 65535,
     #[default]
     no_type = 0,
@@ -1020,7 +1020,7 @@ impl WarcRecordPy {
         content_length: Option<u64>, // deprecated
     ) {
         _ = content_length;
-        self.lock().init_headers(Some(record_type.into()), record_urn);
+        self.lock().init_headers(record_type.into(), record_urn);
     }
 
     /// Freeze the record payload.

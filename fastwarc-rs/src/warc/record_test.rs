@@ -69,7 +69,6 @@ fn record_type_conversions() {
         (WarcRecordType::Revisit, 64u16, "revisit"),
         (WarcRecordType::Conversion, 128u16, "conversion"),
         (WarcRecordType::Continuation, 256u16, "continuation"),
-        (WarcRecordType::Unknown, 512u16, "unknown"),
     ];
 
     for (record_type, value, name) in named_types {
@@ -382,10 +381,10 @@ X-Multiline-Header: Hello\r\n\
 Barbaz\n";
 
     let mut src_record = WarcRecord::new();
-    src_record.init_headers(Some(WarcRecordType::Unknown), None);
+    src_record.init_headers(WarcRecordType::NoType, None);
     assert_eq!(src_record.headers().status_line().as_deref(), Some("WARC/1.1"));
     assert!(src_record.record_id().is_some_and(|id| id.starts_with("<urn:")));
-    assert_eq!(src_record.record_type(), WarcRecordType::Unknown);
+    assert_eq!(src_record.record_type(), WarcRecordType::NoType);
     assert_eq!(src_record.content_length(), 0);
     assert!(src_record.headers().contains_key("WARC-Type"));
     assert!(src_record.headers().contains_key("WARC-Date"));
@@ -507,7 +506,7 @@ fn record_equality_requires_frozen_identical_contents() -> io::Result<()> {
 #[test]
 fn record_init_headers_http() -> io::Result<()> {
     let mut record = WarcRecord::new();
-    record.init_headers(Some(WarcRecordType::AnyType), Some(b"uuid:494749ad-b14a-4f22-b143-0bab4347884b"));
+    record.init_headers(WarcRecordType::AnyType, Some(b"uuid:494749ad-b14a-4f22-b143-0bab4347884b"));
     assert_eq!(record.record_type(), WarcRecordType::Unknown);
     assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:494749ad-b14a-4f22-b143-0bab4347884b>"));
     assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
@@ -530,7 +529,7 @@ fn record_init_headers_http() -> io::Result<()> {
 #[test]
 fn warc_record_debug_format() -> io::Result<()> {
     let mut non_http = WarcRecord::new();
-    non_http.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:debug-resource"));
+    non_http.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:debug-resource"));
     assert_eq!(non_http.content_length(), 0);
     assert_eq!(non_http.headers().get("Content-Length").as_deref(), Some("0"));
     non_http.set_bytes_payload(b"ABC".to_vec());
@@ -584,7 +583,7 @@ fn write_record() -> io::Result<()> {
     let payload = b"ABCDE".to_vec();
 
     let mut default_write = WarcRecord::new();
-    default_write.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:write-default"));
+    default_write.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:write-default"));
     assert_eq!(default_write.content_length(), 0);
     default_write.set_bytes_payload(payload.clone());
     assert_eq!(default_write.content_length(), payload.len() as u64);
@@ -604,7 +603,7 @@ fn write_record_with_block_size() -> io::Result<()> {
     let payload = b"ABCDE".to_vec();
 
     let mut chunked_write = WarcRecord::new();
-    chunked_write.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:write-chunked"));
+    chunked_write.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:write-chunked"));
     assert_eq!(chunked_write.content_length(), 0);
     chunked_write.set_bytes_payload(payload.clone());
     assert_eq!(chunked_write.content_length(), payload.len() as u64);
@@ -651,7 +650,7 @@ fn write_record_with_checksum() -> io::Result<()> {
 fn verify_record_digests() -> io::Result<()> {
     let payload = b"ABC".to_vec();
     let mut record = WarcRecord::new();
-    record.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-test"));
+    record.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:digest-test"));
     assert_eq!(record.content_length(), 0);
     record.set_bytes_payload(payload.clone());
     assert_eq!(record.content_length(), payload.len() as u64);
@@ -747,7 +746,7 @@ fn verify_record_digests() -> io::Result<()> {
     assert!(!http_with_digests.verify_block_digest(false).unwrap());
 
     let mut writable = WarcRecord::new();
-    writable.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:write-test"));
+    writable.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:write-test"));
     assert_eq!(writable.content_length(), 0);
     writable.set_bytes_payload(payload.clone());
     assert_eq!(writable.content_length(), payload.len() as u64);
@@ -772,7 +771,7 @@ fn verify_record_digests() -> io::Result<()> {
 fn verify_record_digest_error_kinds() -> io::Result<()> {
     let payload = b"ABC".to_vec();
     let mut record = WarcRecord::new();
-    record.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-errors"));
+    record.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:digest-errors"));
     assert_eq!(record.content_length(), 0);
     record.set_bytes_payload(payload.clone());
     assert_eq!(record.content_length(), payload.len() as u64);
@@ -792,7 +791,7 @@ fn verify_record_digest_error_kinds() -> io::Result<()> {
     assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
 
     let mut stream_error_record = WarcRecord::new();
-    stream_error_record.init_headers(Some(WarcRecordType::Resource), Some(b"urn:uuid:digest-stream-error"));
+    stream_error_record.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:digest-stream-error"));
     stream_error_record.headers_mut().set("WARC-Block-Digest", "sha1:AAAA");
     assert!(matches!(stream_error_record.verify_block_digest(false), Err(DigestError::StreamError(_))));
 
