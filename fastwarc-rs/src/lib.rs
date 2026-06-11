@@ -52,7 +52,7 @@
 //! for record in ArchiveIterator::new(in_file) {
 //!     match record {
 //!         Ok(r) => println!("Record ID: {}", r.borrow().record_id().expect("No record ID")),
-//!         Err(e) => println!("Error: {}", e.to_string()),
+//!         Err(e) => println!("Error: {}", e),
 //!     }
 //! }
 //! ```
@@ -363,6 +363,153 @@
 //! If you do not need to preserve the stream contents, you can set `consume = true`. This will avoid the allocation of
 //! a payload buffer and fully consume the rest of the record instead. However, that also means that the payload is
 //! lost after verifying the digests.
+//!
+//!
+//! # Writing WARC Files
+//!
+//! FastWARC supports creating new WARC records from scratch or from existing byte buffers. The created records can then
+//! be written out using any [`std::io::Write`] writer. For writing compressed WARCs, you should use the writers
+//! provided in [`stream_io`].
+//!
+//! ## Create and Serialise Records
+//! Here's how you can create a new record and populate it with headers and a payload:
+//!
+//! ```
+//! use fastwarc::warc::record::{WarcRecord, WarcRecordType};
+//! use std::fs::File;
+//!
+//! let mut record = WarcRecord::new();
+//!
+//! // Initialize mandatory headers.
+//! record.init_headers(WarcRecordType::Response, Some(b"record-uuid"));
+//!
+//! // Alternative: initialize mandatory headers with an auto-generated random ID.
+//! record.init_headers(WarcRecordType::Response, None);
+//!
+//! // Set the target ID header.
+//! record.headers_mut().append_bytes(b"WARC-Target-URI", b"https://example.com/index.html");
+//!
+//! // Set the payload bytes (automatically adjusts the Content-Length header).
+//! let payload = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+//!               <!DOCTYPE html><html><body>Hello, world!</body></html>";
+//! record.set_bytes_payload(payload.to_vec());
+//!
+//! // Mark the record as an HTTP record by setting the correct Content-Type.
+//! record.set_is_http(true);
+//!
+//! // Write out the record.
+//! let mut out_file = File::create("out.warc").expect("Error creating output file");
+//! record.write(&mut out_file).expect("Write error");
+//! ```
+//!
+//! Output file:
+//!
+//! ```warc
+//! WARC/1.1
+//! WARC-Type: response
+//! WARC-Date: 2026-06-11T11:07:04.191283Z
+//! WARC-Record-ID: <urn:uuid:94719fe2-63ee-4060-b322-fc4ddbdc0834>
+//! Content-Length: 98
+//! WARC-Target-URI: https://example.com/index.html
+//! Content-Type: application/http; msgtype=response
+//!
+//! HTTP/1.1 200 OK
+//! Content-Type: text/html
+//!
+//! <!DOCTYPE html><html><body>Hello, world!</body></html>
+//!
+//!
+//! ```
+//!
+//! Instead of constructing the record manually, you can also parse an existing byte string:
+//!
+//! ```no_run
+//! # use fastwarc::warc::record::WarcRecord;
+//! # let in_buf = Vec::new();
+//! let mut record = match WarcRecord::from_bytes(in_buf.clone()) {
+//!     Ok(r) => r,
+//!     Err(e) => panic!("Error reading record: {}", e),
+//! };
+//!
+//! // Write out the record.
+//! let mut out_buf = Vec::with_capacity(record.content_length() as usize);
+//! record.write(&mut out_buf).expect("Write error");
+//!
+//! // Unless the record has been mutated, the output is guaranteed to be byte-identical.
+//! assert_eq!(in_buf, out_buf);
+//! ```
+//!
+//! ## Write Compressed WARCs
+//! Compressed WARC files consist of a series frames (or members in Gzip lingo) that can individually be decompressed,
+//! one per record. To correctly write such a WARC file, use the compressing writers from FastWARC's [`stream_io`] module.
+//!
+//! ```no_run
+//! use fastwarc::stream_io::gzip::GzipWriter;
+//! use fastwarc::stream_io::traits::WarcWrite;
+//! use fastwarc::warc::record::{WarcRecord, WarcRecordType};
+//! use std::fs::File;
+//!
+//! // Create a request record.
+//! let mut request = WarcRecord::new();
+//! request.init_headers(WarcRecordType::Request, None);
+//! request.set_bytes_payload(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n".to_vec());
+//! request.set_is_http(true);
+//!
+//! // Create a response record.
+//! let mut response = WarcRecord::new();
+//! response.init_headers(WarcRecordType::Response, None);
+//! response.set_bytes_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+//!                           <!DOCTYPE html><html><body>Hello, world!</body></html>".to_vec());
+//! response.set_is_http(true);
+//!
+//! if let Err(e) = || -> std::io::Result<()> {
+//!     // Create output file.
+//!     let mut gzip_writer = GzipWriter::new(File::create("out.warc.gz")?);
+//!
+//!     // Write records and end each compression member with finish().
+//!     request.write(&mut gzip_writer)?;
+//!     gzip_writer.finish()?;
+//!     response.write(&mut gzip_writer)?;
+//!     gzip_writer.finish()?;
+//!
+//!     Ok(())
+//! }() { eprintln!("Write error: {}", e); }
+//! ```
+//!
+//! ## Write Custom Zstandard Dictionaries
+//! Zstandard-compressed WARCs support custom compression dictionaries to achieve better compression ratios. The
+//! dictionary is stored in a special dictionary frame before the first record in the output file. Such a dictionary
+//! can, e.g., be trained on the first few records of a WARC file. FastWARC supports reading and writing WARCs
+//! with custom dictionaries. If FastWARC encounters a dictionary frame at the start of a Zstandard WARC, it will
+//! automatically use it to decompress the remainder of the stream.
+//!
+//! Here's how you can create a `.warc.zst` file with a dictionary frame in it:
+//!
+//! ```no_run
+//! use fastwarc::stream_io::zstd::{train_dictionary_from_samples, ZstdWriter};
+//! use fastwarc::stream_io::traits::WarcWrite;
+//! use fastwarc::warc::record::WarcRecord;
+//! use std::fs::File;
+//!
+//! // let record_bytes = vec![b"WARC/1.1\r\n...", ...];
+//! # let record_bytes = vec![b"..."];
+//!
+//! const MAX_DICT_SIZE: usize = 128 << 10;     // 128 KiB
+//! if let Err(e) = || -> std::io::Result<()> {
+//!     // Train dict on the first few records (I/O error if size is too small).
+//!     let dict = train_dictionary_from_samples(&record_bytes[..10], MAX_DICT_SIZE)?;
+//!
+//!     // Write a Zstandard WARC with a dictionary frame.
+//!     let mut zstd_writer = ZstdWriter::with_dictionary(
+//!         File::create("out.warc.zst")?, dict, None);
+//!     for b in record_bytes {
+//!         let mut r = WarcRecord::from_bytes(b.to_vec())?;
+//!         r.write(&mut zstd_writer)?;
+//!         zstd_writer.finish()?;
+//!     }
+//!     Ok(())
+//! }() { eprintln!("Write error: {}", e); }
+//! ```
 //!
 //!
 //! # ClueWeb Notes

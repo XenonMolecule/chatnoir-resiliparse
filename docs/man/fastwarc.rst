@@ -35,26 +35,26 @@ To build FastWARC from the `source repository <https://github.com/chatnoir-eu/ch
 
 .. code:: bash
 
-  # Install Rust toolchain (if not already installed)
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   # Install Rust toolchain (if not already installed)
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 Afterwards, follow these steps to build FastWARC from the GitHub repository:
 
 .. code:: bash
 
-  # Clone repository
-  git clone https://github.com/chatnoir-eu/chatnoir-resiliparse.git
-  cd chatnoir-resiliparse
+   # Clone repository
+   git clone https://github.com/chatnoir-eu/chatnoir-resiliparse.git
+   cd chatnoir-resiliparse
 
-  # Create a fresh venv first (recommended)
-  python3 -m venv venv && source venv/bin/activate
+   # Create a fresh venv first (recommended)
+   python3 -m venv venv && source venv/bin/activate
 
-  # Option 1: Build and install in editable mode (best for development)
-  python3 -m pip install -e ./fastwarc-py
+   # Option 1: Build and install in editable mode (best for development)
+   python3 -m pip install -e ./fastwarc-py
 
-  # Option 2: Build and install wheels in separate steps (best for redistribution)
-  python3 -m pip wheel -w build ./fastwarc-py
-  ls ./build/*.whl | xargs python3 -m pip install
+   # Option 2: Build and install wheels in separate steps (best for redistribution)
+   python3 -m pip wheel -w build ./fastwarc-py
+   ls ./build/*.whl | xargs python3 -m pip install
 
 Iterating WARC Files
 --------------------
@@ -68,31 +68,31 @@ The central class for stream-processing WARC files is :class:`.ArchiveIterator`:
 
 .. code-block:: python
 
-  from fastwarc import ArchiveIterator
+   from fastwarc import ArchiveIterator
 
-  # Explicit file-like object
-  with open('warcfile.warc.gz', 'rb') as f:
-      for record in ArchiveIterator(f):
-          print(record.record_id)
+   # Explicit file-like object
+   with open('warcfile.warc.gz', 'rb') as f:
+       for record in ArchiveIterator(f):
+           print(record.record_id)
 
-  # File path (more efficient for local files)
-  for record in ArchiveIterator('warcfile.warc.gz'):
-      print(record.record_id)
+   # File path (more efficient for local files)
+   for record in ArchiveIterator('warcfile.warc.gz'):
+       print(record.record_id)
 
 This will iterate over all records in the file and print out their IDs. You can pass any file-like Python object or a file path as a string to :class:`.ArchiveIterator`. The stream or file can be either uncompressed or a Gzip-, Zstd-, or LZ4-compressed WARC. FastWARC will try to auto-detect the stream format (unless you pass ``stream_detect=False``). But if you already know the compression algorithm beforehand, you can optimize the process a little by explicitly passing a :class:`.GzipReader`, :class:`.ZstdReader`, or :class:`.LZ4Reader` object instead:
 
 .. code-block:: python
 
-  from fastwarc.stream_io import *
+   from fastwarc.stream_io import *
 
-  # Gzip:
-  stream = GzipReader('warcfile.warc.gz')
+   # Gzip:
+   stream = GzipReader('warcfile.warc.gz')
 
-  # Zstandard:
-  stream = ZstdReader('warcfile.warc.zst')
+   # Zstandard:
+   stream = ZstdReader('warcfile.warc.zst')
 
-  # LZ4:
-  stream = LZ4Reader('warcfile.warc.lz4')
+   # LZ4:
+   stream = LZ4Reader('warcfile.warc.lz4')
 
 Instead of a filename, you can also use any kind of file-like object:
 
@@ -104,28 +104,28 @@ If `fsspec <https://filesystem-spec.readthedocs.io/>`__ is installed (which is a
 
 .. code-block:: python
 
-  from fastwarc.warc import ArchiveIterator
+   from fastwarc.warc import ArchiveIterator
 
-  # Read remote S3 object (with optional credentials)
-  creds = {'key': '...',
-           'secret': '...',
-           'endpoint_url': '...'}
-  for record in ArchiveIterator('s3://mybucket/warcfile.warc.gz', fsspec_args=creds):
-      print(record.record_id)
+   # Read remote S3 object (with optional credentials)
+   creds = {'key': '...',
+            'secret': '...',
+            'endpoint_url': '...'}
+   for record in ArchiveIterator('s3://mybucket/warcfile.warc.gz', fsspec_args=creds):
+       print(record.record_id)
 
-  # Or without stream auto-detection:
-  for record in ArchiveIterator(GzipReader('s3://mybucket/warcfile.warc.gz', fsspec_args=creds)):
-      print(record.record_id)
+   # Or without stream auto-detection:
+   for record in ArchiveIterator(GzipReader('s3://mybucket/warcfile.warc.gz', fsspec_args=creds)):
+       print(record.record_id)
 
 Create your own :class:`fsspec.core.OpenFile` object if you need more control:
 
 .. code-block:: python
 
-  from fsspec import open as fsspec_open
+   from fsspec import open as fsspec_open
 
-  with fsspec_open('s3://mybucket/warcfile.warc.gz', 'rb', **creds) as f:
-      for record in ArchiveIterator(f):
-          print(record.record_id)
+   with fsspec_open('s3://mybucket/warcfile.warc.gz', 'rb', **creds) as f:
+       for record in ArchiveIterator(f):
+           print(record.record_id)
 
 
 Filtering Records
@@ -138,10 +138,10 @@ If you want only records of a certain type, you can skip all other records effic
 
 .. code-block:: python
 
-  from fastwarc import ArchiveIterator, WarcRecordType
+   from fastwarc import ArchiveIterator, WarcRecordType
 
-  for record in ArchiveIterator(stream, record_types=WarcRecordType.request | WarcRecordType.response):
-      pass
+   for record in ArchiveIterator(stream, record_types=WarcRecordType.request | WarcRecordType.response):
+       pass
 
 This will skip all records with a ``WARC-Type`` other than ``request`` or ``response``.
 
@@ -151,15 +151,15 @@ You can automatically skip any records whose ``Content-Length`` exceeds or is lo
 
 .. code-block:: python
 
-  from fastwarc import ArchiveIterator
+   from fastwarc import ArchiveIterator
 
-  # Skip all records that are larger than 500 KiB
-  for record in ArchiveIterator(stream, max_content_length=512 << 10):
-      pass
+   # Skip all records that are larger than 500 KiB
+   for record in ArchiveIterator(stream, max_content_length=512 << 10):
+       pass
 
-  # Skip all records that are smaller than 128 bytes
-  for record in ArchiveIterator(stream, min_content_length=128):
-      pass
+   # Skip all records that are smaller than 128 bytes
+   for record in ArchiveIterator(stream, min_content_length=128):
+       pass
 
 
 Function Filters
@@ -170,18 +170,18 @@ FastWARC comes with a handful of existing filters that you can use:
 
 .. code-block:: python
 
-  from fastwarc.warc import *
+   from fastwarc.warc import *
 
-  # Skip any non-HTTP records
-  for record in ArchiveIterator(stream, func_filter=is_http):
-      pass
+   # Skip any non-HTTP records
+   for record in ArchiveIterator(stream, func_filter=is_http):
+       pass
 
-  # Skip records without a block digest (without verifying it)
-  for record in ArchiveIterator(stream, func_filter=has_block_digest):
-      pass
+   # Skip records without a block digest (without verifying it)
+   for record in ArchiveIterator(stream, func_filter=has_block_digest):
+       pass
 
-  # Skip records that are not WARC/1.1
-  for record in ArchiveIterator(stream, func_filter=is_warc_11):
+   # Skip records that are not WARC/1.1
+   for record in ArchiveIterator(stream, func_filter=is_warc_11):
       pass
 
 Other Function Filters
@@ -201,10 +201,10 @@ Besides these, you can pass any Python callable that accepts a :class:`.WarcReco
 
 .. code-block:: python
 
-  # Skip records which haven't been identified as HTML pages
-  for record in ArchiveIterator(stream,
-        func_filter=lambda r: r.headers.get('WARC-Identified-Payload-Type') == 'text/html'):
-      pass
+   # Skip records which haven't been identified as HTML pages
+   for record in ArchiveIterator(stream,
+         func_filter=lambda r: r.headers.get('WARC-Identified-Payload-Type') == 'text/html'):
+       pass
 
 Pure Python functions are less efficient than FastWARC's provided function filters, so try to keep them minimal.
 
@@ -214,8 +214,8 @@ You can skip all records with an invalid ``WARC-Block-Digest`` or ``WARC-Payload
 
 .. code-block:: python
 
-  for record in ArchiveIterator(stream, verify_digests=True):
-      pass
+   for record in ArchiveIterator(stream, verify_digests=True):
+       pass
 
 .. warning::
 
@@ -227,10 +227,10 @@ Multiple filters can be combined with a custom function or lambda:
 
 .. code-block:: python
 
-  # Skip records without any sort of digest header
-  for record in ArchiveIterator(stream,
-        func_filter=lambda r: has_block_digest(r) and has_payload_digest(r)):
-      pass
+   # Skip records without any sort of digest header
+   for record in ArchiveIterator(stream,
+         func_filter=lambda r: has_block_digest(r) and has_payload_digest(r)):
+       pass
 
 
 Record Properties
@@ -239,30 +239,30 @@ The :class:`.ArchiveIterator` returns objects of type :class:`.WarcRecord`, whic
 
 .. code-block:: python
 
-  for record in ArchiveIterator(stream):
-      record.headers              # Dict-like object containing the WARC headers
-      record.record_id            # Shorthand for record.headers['WARC-Record-ID']
-      record.record_type          # Shorthand for record.headers['WARC-Type']
-      record.record_date          # Parsed record.headers['WARC-Date']
-      record.content_length       # Effective record payload length
-      record.stream_pos           # Record start offset in the (uncompressed) stream
-      record.is_http              # Boolean indicating whether record is an HTTP record
-      record.is_http_parsed       # Boolean indicating whether the record has been parsed as HTTP
-      record.http_headers         # Dict-like object containing the parsed HTTP headers
-      record.http_content_type    # Plain HTTP Content-Type without charset
-      record.http_charset         # HTTP charset from the Content-Type header (if any)
-      record.http_date            # Parsed HTTP Date header
-      record.http_last_modified   # Parsed HTTP Last-Modified header
-      record.reader               # A WarcRecordPayloadReader for the record content
+   for record in ArchiveIterator(stream):
+       record.headers              # Dict-like object containing the WARC headers
+       record.record_id            # Shorthand for record.headers['WARC-Record-ID']
+       record.record_type          # Shorthand for record.headers['WARC-Type']
+       record.record_date          # Parsed record.headers['WARC-Date']
+       record.content_length       # Effective record payload length
+       record.stream_pos           # Record start offset in the (uncompressed) stream
+       record.is_http              # Boolean indicating whether record is an HTTP record
+       record.is_http_parsed       # Boolean indicating whether the record has been parsed as HTTP
+       record.http_headers         # Dict-like object containing the parsed HTTP headers
+       record.http_content_type    # Plain HTTP Content-Type without charset
+       record.http_charset         # HTTP charset from the Content-Type header (if any)
+       record.http_date            # Parsed HTTP Date header
+       record.http_last_modified   # Parsed HTTP Last-Modified header
+       record.reader               # A WarcRecordPayloadReader for the record content
 
-      # Read up to 1024 bytes from the record stream
-      body = record.reader.read(1024)
+       # Read up to 1024 bytes from the record stream
+       body = record.reader.read(1024)
 
-      # Read the remaining record bytes
-      body += record.reader.read()
+       # Read the remaining record bytes
+       body += record.reader.read()
 
-      # Or: consume rest of stream without allocating a buffer for it (i.e., skip over)
-      record.reader.consume()
+       # Or: consume rest of stream without allocating a buffer for it (i.e., skip over)
+       record.reader.consume()
 
 HTTP request and response records are parsed automatically for convenience. If not needed (or wanted), you can disable this behaviour by passing ``parse_http=False`` to the :class:`.ArchiveIterator` constructor to avoid unnecessary processing. :attr:`record.reader <.WarcRecord.reader>` will then start at the beginning of the HTTP header block instead of the HTTP body. You can parse HTTP headers later on a per-record basis by calling :meth:`record.parse_http() <.WarcRecord.parse_http>` as long as the :class:`.WarcRecordPayloadReader` hasn't been consumed at that point.
 
@@ -283,22 +283,145 @@ If a record has digest headers, you can verify the consistency of the record con
 
 .. code-block:: python
 
-  for record in ArchiveIterator(stream, parse_http=False):
-      if 'WARC-Block-Digest' in record.headers:
-          print('Block digest OK:', record.verify_block_digest(consume=False))
+   for record in ArchiveIterator(stream, parse_http=False):
+       if 'WARC-Block-Digest' in record.headers:
+           print('Block digest OK:', record.verify_block_digest(consume=False))
 
-      if 'WARC-Payload-Digest' in record.headers:
-          # It's safe to call this even if the record has no HTTP payload
-          record.parse_http()
-          print('Payload digest OK:', record.verify_payload_digest(consume=False))
+       if 'WARC-Payload-Digest' in record.headers:
+           # It's safe to call this even if the record has no HTTP payload
+           record.parse_http()
+           print('Payload digest OK:', record.verify_payload_digest(consume=False))
 
-Note that :meth:`~.WarcRecord.verify_block_digest` and :meth:`~.WarcRecord.verify_payload_digest` will simply return ``False`` and not throw an error if the headers do not exist, so check that first. Keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic HTTP parsing has to be turned off for this to work.
+Note that :meth:`~.WarcRecord.verify_block_digest` and :meth:`~.WarcRecord.verify_payload_digest` will simply return ``False`` and not raise an error if the headers do not exist, so check that first. Keep in mind that the block verification will fail if the reader has been (partially) consumed, so automatic HTTP parsing has to be turned off for this to work.
 
 .. warning::
 
   Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its contents for further processing if ``consume=False`` (that's why verifying the HTTP payload digest after verifying the block digest worked in the first place). If your records are very large, you need to ensure that they fit into memory entirely (e.g. by checking :attr:`record.content_length <.WarcRecord.content_length>`).
 
 If you do not need to preserve the stream contents, you can set ``consume=True``. This will avoid the creation of a stream copy altogether and fully consume the rest of the record instead. However, that also means that the payload is lost after verifying the digests.
+
+
+.. _fastwarc-writing-warcs:
+
+Writing WARC Files
+------------------
+
+FastWARC supports creating new WARC records from scratch or from existing byte buffers. The created records can then be written out using any file-like writer object. For writing compressed WARCs, you should use the writers provided in :mod:`.stream_io`.
+
+Create and Serialise Records
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Here's how you can create a new record and populate it with headers and a payload:
+
+.. code:: python
+
+   from fastwarc import WarcRecord, WarcRecordType
+
+   record = WarcRecord()
+
+   # Initialize mandatory headers.
+   record.init_headers(WarcRecordType.response, b'record-uuid')
+
+   # Alternative: initialize mandatory headers with an auto-generated random ID.
+   record.init_headers(WarcRecordType.response, None)
+
+   # Set the target ID header.
+   record.headers.append_bytes(b'WARC-Target-URI', b'https://example.com/index.html')
+
+   # Set the payload bytes (automatically adjusts the Content-Length header).
+   payload = (b'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' +
+              b'<!DOCTYPE html><html><body>Hello, world!</body></html>')
+   record.set_bytes_payload(payload)
+
+   # Mark the record as an HTTP record by setting the correct Content-Type.
+   record.is_http = True
+
+   # Write out the record.
+   with open('out.warc', 'wb') as out_file:
+       record.write(out_file)
+
+Output file:
+
+.. code::
+
+   WARC/1.1
+   WARC-Type: response
+   WARC-Date: 2026-06-11T11:07:04.191283Z
+   WARC-Record-ID: <urn:uuid:94719fe2-63ee-4060-b322-fc4ddbdc0834>
+   Content-Length: 98
+   WARC-Target-URI: http://example.com/index.html
+   Content-Type: application/http; msgtype=response
+
+   HTTP/1.1 200 OK
+   Content-Type: text/html
+
+   <!DOCTYPE html><html><body>Hello, world!</body></html>
+
+Instead of constructing the record manually, you can also parse an existing byte string:
+
+.. code:: python
+
+   record = WarcRecord.from_bytes(in_buf)
+
+   # Write out the record.
+   import io
+   out_buf = io.BytesIO()
+   record.write(out_buf)
+
+   # Unless the record has been mutated, the output is guaranteed to be byte-identical.
+   assert in_buf == out_buf.getvalue()
+
+Write Compressed WARCs
+^^^^^^^^^^^^^^^^^^^^^^
+Compressed WARC files consist of a series frames (or members in Gzip lingo) that can individually be decompressed, one per record. To correctly write such a WARC file, use the compressing writers from FastWARC's :mod:`stream_io` module.
+
+.. code:: python
+
+   from fastwarc import WarcRecord, WarcRecordType
+   from fastwarc.stream_io import GzipWriter
+
+   # Create a request record.
+   request = WarcRecord()
+   request.init_headers(WarcRecordType.request, None);
+   request.set_bytes_payload(b'GET / HTTP/1.1\r\nHost: example.com\r\n\r\n')
+   request.is_http = True
+
+   # Create a response record.
+   response = WarcRecord()
+   response.init_headers(WarcRecordType.response, None);
+   response.set_bytes_payload(b'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' +
+                              b'<!DOCTYPE html><html><body>Hello, world!</body></html>')
+   response.is_http = True
+
+   # Create output file, write records, and end each compression member with finish().
+   with GzipWriter('out.warc.gz') as gzip_writer:
+       request.write(gzip_writer)
+       gzip_writer.finish()
+       response.write(gzip_writer)
+       gzip_writer.finish()
+
+Write Custom Zstandard Dictionaries
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Zstandard-compressed WARCs support custom compression dictionaries to achieve better compression ratios. The dictionary is stored in a special dictionary frame before the first record in the output file. Such a dictionary can, e.g., be trained on the first few records of a WARC file. FastWARC supports reading and writing WARCs with custom dictionaries. If FastWARC encounters a dictionary frame at the start of a Zstandard WARC, it will automatically use it to decompress the remainder of the stream.
+
+Here's how you can create a ``.warc.zst`` file with a dictionary frame in it:
+
+.. code:: python
+
+   from fastwarc import WarcRecord
+   from fastwarc.stream_io import ZstdWriter, zstd_train_dictionary_from_samples
+
+   # record_bytes = [b'WARC/1.1\r\n...', ...];
+
+   # Train dict on the first few records (raises OSError if size is too small).
+   MAX_DICT_SIZE = 128 << 10  # 128 KiB
+   zstd_dict = zstd_train_dictionary_from_samples(record_bytes[:10], MAX_DICT_SIZE)
+
+   # Write a Zstandard WARC with a dictionary frame.
+   with ZstdWriter('out.warc.zst', dictionary=zstd_dict) as zstd_writer:
+       for b in record_bytes:
+           r = WarcRecord.from_bytes(b)
+           r.write(zstd_writer)
+           zstd_writer.finish()
 
 
 .. _fastwarc-clueweb:
@@ -333,24 +456,24 @@ The following times were benchmarked on a 2020 M1 MacBook Pro:
 
 .. code-block::
 
-  # Uncompressed WARC:
-  FastWARC: 1.9s, 59283 records/s, 2748.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
-  WARCIO: 5.0s, 22642 records/s, 1049.8 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   # Uncompressed WARC:
+   FastWARC: 1.9s, 59283 records/s, 2748.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   WARCIO: 5.0s, 22642 records/s, 1049.8 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-  # Gzip WARC:
-  FastWARC: 6.5s, 17600 records/s, 816.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
-  WARCIO: 9.8s, 11706 records/s, 542.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   # Gzip WARC:
+   FastWARC: 6.5s, 17600 records/s, 816.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   WARCIO: 9.8s, 11706 records/s, 542.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
 The following times were benchmarked on a Threadripper 2920X 12-Core CPU with a Samsung 980PRO NVMe SSD (cold read without page cache):
 
 .. code-block::
 
-  # Uncompressed WARC:
-  FastWARC: 3.5s, 32395 records/s, 1502.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
-  WARCIO: 15.7s, 7294 records/s, 338.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   # Uncompressed WARC:
+   FastWARC: 3.5s, 32395 records/s, 1502.0 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   WARCIO: 15.7s, 7294 records/s, 338.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
-  # Gzip WARC:
-  FastWARC: 6.9s, 16470 records/s, 763.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
-  WARCIO: 25.9s, 4419 records/s, 204.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   # Gzip WARC:
+   FastWARC: 6.9s, 16470 records/s, 763.7 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
+   WARCIO: 25.9s, 4419 records/s, 204.9 MiB/s, 47.5 KiB/rec (114274 total, 5298.4 MiB)
 
 For more detailed information and benchmarking results, checkout the `benchmarks folder <https://github.com/chatnoir-eu/chatnoir-resiliparse/tree/develop/benchmarks/warc>`__ in the GitHub repository.
