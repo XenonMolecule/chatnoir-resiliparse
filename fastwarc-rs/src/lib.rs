@@ -450,7 +450,6 @@
 //! use fastwarc::stream_io::gzip::GzipWriter;
 //! use fastwarc::stream_io::traits::WarcWrite;
 //! use fastwarc::warc::record::{WarcRecord, WarcRecordType};
-//! use std::fs::File;
 //!
 //! // Create a request record.
 //! let mut request = WarcRecord::new();
@@ -467,7 +466,7 @@
 //!
 //! if let Err(e) = || -> std::io::Result<()> {
 //!     // Create output file.
-//!     let mut gzip_writer = GzipWriter::new(File::create("out.warc.gz")?);
+//!     let mut gzip_writer = GzipWriter::from_path("out.warc.gz")?;
 //!
 //!     // Write records and end each compression member with finish().
 //!     request.write(&mut gzip_writer)?;
@@ -503,8 +502,8 @@
 //!     let dict = train_dictionary_from_samples(&record_bytes[..10], MAX_DICT_SIZE)?;
 //!
 //!     // Write a Zstandard WARC with a dictionary frame.
-//!     let mut zstd_writer = ZstdWriter::with_dictionary(
-//!         File::create("out.warc.zst")?, dict, None);
+//!     let out_file = File::create("out.warc.zst")?;
+//!     let mut zstd_writer = ZstdWriter::with_dictionary(out_file, dict, None);
 //!     for b in record_bytes {
 //!         let mut r = WarcRecord::from_bytes(b.to_vec())?;
 //!         r.write(&mut zstd_writer)?;
