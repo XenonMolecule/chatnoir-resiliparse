@@ -18,7 +18,7 @@ use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use memchr::{memchr, memmem};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::{fmt, io};
 
@@ -185,7 +185,7 @@ fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
 /// WARC headers should be created with [`HeaderEncoding::Unicode`].
 /// HTTP headers should use [`HeaderEncoding::Latin1`]. However, in either case,
 /// you should still avoid non-ASCII characters).
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct HeaderMap {
     pub(super) encoding: HeaderEncoding,
     pub(super) dirty: bool,
@@ -837,6 +837,24 @@ impl Display for HeaderMap {
             HeaderEncoding::Latin1 => Cow::Owned(WINDOWS_1252.decode(&buf, DecoderTrap::Ignore).unwrap_or_default()),
         };
         write!(f, "{}", headers_str)
+    }
+}
+
+impl Debug for HeaderMap {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HeaderMap")
+            .field("encoding", &self.encoding)
+            .field("dirty", &self.dirty)
+            .field(
+                "status_line",
+                &self
+                    .status_line
+                    .as_ref()
+                    .map(|s| String::from_utf8_lossy(s.as_slice(&self.raw_header_block)).to_string()),
+            )
+            .field("raw_header_block", &String::from_utf8_lossy(&self.raw_header_block))
+            .field("headers", &self.headers)
+            .finish()
     }
 }
 
