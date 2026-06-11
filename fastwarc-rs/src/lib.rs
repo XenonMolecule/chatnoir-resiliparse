@@ -439,6 +439,9 @@
 //! assert_eq!(in_buf, out_buf);
 //! ```
 //!
+//! You can also use [`WarcRecord::write_with_checksum()`](warc::record::WarcRecord::write_with_checksum) to automatically
+//! calculate and write SHA-1 checksums of the record contents and HTTP payload (if available).
+//!
 //! ## Write Compressed WARCs
 //! Compressed WARC files consist of a series frames (or members in Gzip lingo) that can individually be decompressed,
 //! one per record. To correctly write such a WARC file, use the compressing writers from FastWARC's [`stream_io`] module.

@@ -370,6 +370,8 @@ Instead of constructing the record manually, you can also parse an existing byte
    # Unless the record has been mutated, the output is guaranteed to be byte-identical.
    assert in_buf == out_buf.getvalue()
 
+You can also use :meth:`.WarcRecord.write` with `checksum_data=True` to automatically calculate and write SHA-1 checksums of the record contents and HTTP payload (if available).
+
 Write Compressed WARCs
 ^^^^^^^^^^^^^^^^^^^^^^
 Compressed WARC files consist of a series frames (or members in Gzip lingo) that can individually be decompressed, one per record. To correctly write such a WARC file, use the compressing writers from FastWARC's :mod:`stream_io` module.
