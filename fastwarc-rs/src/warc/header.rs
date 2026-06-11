@@ -158,7 +158,7 @@ impl CowHeaderTuple {
 
 /// Internal helper for trimming slice offsets to exclude leading and trailing white space.
 #[inline]
-fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
+pub(super) fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
     let start = value.len() - value.trim_ascii_start().len();
     let end = value.trim_ascii_end().len();
     (start, end)
@@ -188,6 +188,7 @@ fn _sanitize_header_value(value: &[u8], is_key: bool) -> Vec<u8> {
 #[derive(Default, Debug, Clone)]
 pub struct HeaderMap {
     pub(super) encoding: HeaderEncoding,
+    pub(super) dirty: bool,
     pub(super) raw_header_block: Vec<u8>,
     pub(super) status_line: Option<CowHeaderValue>,
     pub(super) headers: Vec<CowHeaderTuple>,
@@ -202,6 +203,7 @@ impl HeaderMap {
     pub fn new(encoding: HeaderEncoding) -> Self {
         HeaderMap {
             encoding,
+            dirty: false,
             raw_header_block: Vec::new(),
             status_line: None,
             headers: Vec::new(),
@@ -329,14 +331,27 @@ impl HeaderMap {
         max_header_len: usize,
         quirks_mode: bool,
     ) -> Result<usize, io::Error> {
-        self.clear();
+        // Internal state: The raw header block has already been seeded externally
+        // by the WARC record parser with the WARC/* status line.
+        let preserve_prefix = !has_status_line
+            && self.status_line.is_some()
+            && self.headers.is_empty()
+            && !self.raw_header_block.is_empty();
+        if !preserve_prefix {
+            self.clear();
+        }
+        self.dirty = false;
         self.raw_header_block
             .reserve(768usize.saturating_sub(self.raw_header_block.capacity()));
         self.headers.reserve(16);
 
         let mut bytes_consumed = 0usize;
         let mut expect_status_line = has_status_line;
-        let mut line_start = 0usize;
+        let mut line_start = if preserve_prefix {
+            self.raw_header_block.len()
+        } else {
+            0usize
+        };
         let crlf_finder = memmem::Finder::new("\r\n");
 
         loop {
@@ -391,6 +406,7 @@ impl HeaderMap {
                 bytes_consumed += eol + sep_len;
 
                 let line = &self.raw_header_block[line_start..];
+                // EOH.
                 if line.len() == sep_len || (quirks_mode && line.trim_ascii_end().is_empty()) {
                     reader.consume(consumed);
                     return Ok(bytes_consumed);
@@ -434,6 +450,7 @@ impl HeaderMap {
         let status_line = status_line.as_ref();
         let mut status_line_sanitized = Vec::with_capacity(status_line.len());
         status_line_sanitized.extend(_sanitize_header_value(status_line, true));
+        self.dirty = true;
         self.status_line = Some(CowHeaderValue::Owned(status_line_sanitized));
     }
 
@@ -600,6 +617,7 @@ impl HeaderMap {
         let value = value.as_ref();
         let mut key_lower = Vec::with_capacity(key.len());
         key_lower.extend(_sanitize_header_value(&key.to_ascii_lowercase(), true));
+        self.dirty = true;
 
         let mut found = false;
         self.headers.retain_mut(|h| {
@@ -650,6 +668,7 @@ impl HeaderMap {
     pub fn append_bytes(&mut self, key: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
         let key = key.as_ref();
         let value = value.as_ref();
+        self.dirty = true;
         self.headers
             .push(CowHeaderTuple::Owned(_sanitize_header_value(key, true), _sanitize_header_value(value, false)));
     }
@@ -657,6 +676,7 @@ impl HeaderMap {
     /// Internal function for appending a header without sanitization
     /// (assumes data is already sanitized). Still trims leading and trailing white space.
     pub(super) fn append_bytes_no_sanitize(&mut self, key: &[u8], value: &[u8]) {
+        self.dirty = true;
         self.headers
             .push(CowHeaderTuple::Owned(key.trim_ascii().to_vec(), value.trim_ascii().to_vec()));
     }
@@ -672,8 +692,12 @@ impl HeaderMap {
         let key = key.as_ref();
         let key = _sanitize_header_value(key, true);
         let raw_header_block = self.raw_header_block.as_slice();
+        let old_len = self.headers.len();
         self.headers
             .retain(|h| !h.key(raw_header_block).eq_ignore_ascii_case(key.as_slice()));
+        if self.headers.len() != old_len {
+            self.dirty = true;
+        }
     }
 
     /// Iterator of keys and values.
@@ -746,6 +770,7 @@ impl HeaderMap {
 
     /// Clear all headers and the status line.
     pub fn clear(&mut self) {
+        self.dirty = false;
         self.raw_header_block.clear();
         self.headers.clear();
         self.status_line = None;
@@ -753,6 +778,12 @@ impl HeaderMap {
 
     /// Write the header block onto a stream.
     pub fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<usize> {
+        // If not marked dirty, write out raw byte buffer.
+        if !self.dirty && !self.raw_header_block.is_empty() {
+            writer.write_all(&self.raw_header_block)?;
+            return Ok(self.raw_header_block.len());
+        }
+
         let mut bytes_written = 0usize;
         if let Some(s) = &self.status_line
             && !s.as_slice(&self.raw_header_block).is_empty()

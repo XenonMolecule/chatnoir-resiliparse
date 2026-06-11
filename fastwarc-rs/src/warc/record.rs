@@ -15,7 +15,7 @@
 use crate::stream_io::bufread::{LimitedBufReader, RawReaderAdapter};
 use crate::stream_io::traits::{IntoWarcReader, WarcRead};
 use crate::stream_io::{brotli, chunked, gzip, zstd};
-use crate::warc::header::{CowHeaderValue, HeaderEncoding, HeaderMap};
+use crate::warc::header::{_trim_ascii_offsets, CowHeaderValue, HeaderEncoding, HeaderMap};
 use digest::{Digest, DynDigest};
 use sha2::digest;
 use std::borrow::Cow;
@@ -697,7 +697,6 @@ impl WarcRecord {
     ) -> Result<usize, io::Error> {
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
         let mut bytes_read = 0usize;
-        let status_line;
         let mut line = Vec::with_capacity(32);
 
         loop {
@@ -724,7 +723,11 @@ impl WarcRecord {
                 // ClueWeb09/12 legacy
                 || (trimmed.starts_with(b"WARC/0.") && trimmed.len() <= 9)
             {
-                status_line = Some(CowHeaderValue::Owned(trimmed.to_owned()));
+                // Pre-seed WARC header map
+                let offsets = _trim_ascii_offsets(&line);
+                self.headers.clear();
+                self.headers.raw_header_block.extend_from_slice(&line);
+                self.headers.status_line = Some(CowHeaderValue::Offsets(offsets));
                 // If supported, use the (potentially more accurate) member start position
                 // instead of the starting inner stream position.
                 if let Some(p) = reader.frame_start_position()?
@@ -743,7 +746,6 @@ impl WarcRecord {
         bytes_read += self
             .headers
             .parse_with_opts(reader, false, max_header_len, quirks_mode)?;
-        self.headers.status_line = status_line;
 
         let mut parse_count = 0;
         for (k, v) in self.headers.items_bytes() {
@@ -1217,8 +1219,11 @@ impl WarcRecord {
         let reader = get_reader_mut!(self).ok_or_else(|| io::Error::other("No reader set"))?;
 
         // Ensure Content-Length is correct
-        self.headers
-            .set_bytes(b"Content-Length", block_content_length.to_string().as_bytes());
+        let block_content_length = block_content_length.to_string();
+        if self.headers.get_bytes(b"Content-Length").as_deref() != Some(block_content_length.as_bytes()) {
+            self.headers
+                .set_bytes(b"Content-Length", block_content_length.as_bytes());
+        }
 
         // Write WARC headers
         bytes_written += self.headers.write(writer)?;

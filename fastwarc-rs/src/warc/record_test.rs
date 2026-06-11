@@ -647,6 +647,61 @@ fn write_record_with_checksum() -> io::Result<()> {
 }
 
 #[test]
+fn serialize_preserves_byte_identical_headers_until_mutated() -> io::Result<()> {
+    let http_data = "HTTP/1.1 200 OK\r\n\
+        X-Bar: abc\r\n\
+        \x20def\r\n\
+        Content-Length: 3000\r\n\r\n";
+    let record_data = format!(
+        "WARC/1.1\r\n\
+        WARC-Type: resource\r\n\
+        WARC-Record-ID: <urn:uuid:continuation>\r\n\
+        Content-Type: application/http; msgtype=response\r\n\
+        X-Foo: one\r\n\
+        \x20two\r\n\
+        Content-Length: {}\r\n\
+        \r\n\
+        {}\
+        \r\n\r\n",
+        http_data.len(),
+        http_data
+    );
+    let record_bytes = record_data.as_bytes();
+
+    let mut record = WarcRecord::from_bytes(record_bytes.to_vec())?;
+    assert_eq!(record.headers().get("X-Foo").as_deref(), Some("one two"));
+
+    // Parsing HTTP does not mutate headers.
+    record.parse_http()?;
+    assert_eq!(record.http_headers.as_ref().unwrap().get_bytes("X-Bar").as_deref(), Some(b"abc def".as_slice()));
+
+    // Record is preserved byte-identical, including continuation lines.
+    let mut serialized = Vec::new();
+    let bytes_written = record.write(&mut serialized)?;
+    assert_eq!(bytes_written, serialized.len());
+    assert_eq!(String::from_utf8_lossy(&serialized), String::from_utf8_lossy(&record_bytes));
+
+    // Mutating a header marks it as dirty and serialisation is no longer guaranteed to be byte-identical.
+    record.headers_mut().set("X-Bar", "baz");
+
+    let mut mutated_serialized = Vec::new();
+    let bytes_written = record.write(&mut mutated_serialized)?;
+    assert_eq!(bytes_written, mutated_serialized.len());
+    assert_ne!(mutated_serialized, record_bytes);
+
+    // Continuation lines have been combined.
+    let mutated_text = String::from_utf8_lossy(&mutated_serialized);
+    assert!(mutated_text.contains("X-Foo: one two\r\n"));
+    assert!(!mutated_text.contains("X-Foo: one\r\n two\r\n"));
+
+    // HTTP header map was not mutated, so it remains identical.
+    assert!(!mutated_text.contains("X-Bar: abc def\r\n"));
+    assert!(mutated_text.contains("X-Bar: abc\r\n def\r\n"));
+
+    Ok(())
+}
+
+#[test]
 fn verify_record_digests() -> io::Result<()> {
     let payload = b"ABC".to_vec();
     let mut record = WarcRecord::new();

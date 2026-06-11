@@ -304,6 +304,44 @@ fn parse_headers_with_lf_line_endings_in_quirks_mode() -> io::Result<()> {
 }
 
 #[test]
+fn write_preserves_non_standard_or_broken_headers_if_not_modified() -> io::Result<()> {
+    // Non-standard line endings, continuations, broken Unicode header, no value
+    let http_headers = b"HTTP/1.1 200 OK\n\
+        Content-Length: 123\n\
+        X-Foo: test\n\
+        X-Cont: abc\n\
+        \x20def\n\
+        X-Broken-\xFD-Unicode: test\xFE\n\
+        No-Key\n\
+        \n";
+
+    let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
+    let mut reader = io::Cursor::new(http_headers);
+    let bytes_read = headers.parse_with_opts(&mut reader, true, 8192, true)?;
+
+    assert_eq!(bytes_read, http_headers.len());
+    assert_eq!(headers.get_bytes(b"X-Foo").as_deref(), Some(b"test".as_slice()));
+
+    // Continuations are sanitised here, but writing the header out should preserve them.
+    assert_eq!(headers.get_bytes(b"X-Cont").as_deref(), Some(b"abc def".as_slice()));
+
+    // Broken Unicode is preserved
+    assert_eq!(headers.get_bytes(b"X-Broken-\xFD-Unicode").as_deref(), Some(b"test\xFE".as_slice()));
+
+    // Header without key missing from map.
+    assert!(!headers.contains_key_bytes(b"No-Key"));
+
+    // Header map was not mutated, output should be byte-identical.
+    let mut serialized = Vec::new();
+    let bytes_written = headers.write(&mut serialized)?;
+
+    assert_eq!(bytes_written, http_headers.len());
+    assert_eq!(serialized, http_headers);
+
+    Ok(())
+}
+
+#[test]
 fn new_empty_header_encoding() -> io::Result<()> {
     let mut headers_unicode = HeaderMap::new(HeaderEncoding::Unicode);
     let mut headers_latin1 = HeaderMap::new(HeaderEncoding::Latin1);
