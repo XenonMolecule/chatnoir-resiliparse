@@ -16,7 +16,6 @@ import os
 import platform
 from pathlib import Path
 from shutil import copytree
-from subprocess import check_call
 import sys
 
 from Cython.Build import cythonize
@@ -107,12 +106,6 @@ class resiliparse_sdist(sdist):
         super().make_release_tree(base_dir, files)
         base_dir = Path(base_dir)
 
-        # Copy Resiliparse header files
-        copytree(ROOT_DIR.parent / 'resiliparse-py' / 'resiliparse_inc',
-                 base_dir / 'resiliparse_inc')
-        copytree(ROOT_DIR.parent / 'resiliparse-py' / 'resiliparse_common',
-                 base_dir / 'resiliparse_common')
-
         # Patch Cargo.toml
         pkg_name = base_dir.name.split('-', 1)[0]
         self.inline_workspace_dependencies(ROOT_DIR.parent / 'Cargo.toml', base_dir / pkg_name / 'Cargo.toml')
@@ -140,7 +133,6 @@ class resiliparse_sdist(sdist):
         crate['workspace'] = {}
 
         crate_manifest.write_text(tomli_w.dumps(crate))
-        check_call(['cargo', 'generate-lockfile'], cwd=crate_manifest.parent)
 
 
 def get_cython_args():
@@ -170,6 +162,13 @@ def get_ext_modules():
 
 
 def main():
+    # Copy Resiliparse headers
+    if ROOT_DIR.parent.joinpath('resiliparse-py', 'resiliparse_inc').is_dir():
+        copytree(ROOT_DIR.parent / 'resiliparse-py' / 'resiliparse_inc',
+                 ROOT_DIR / 'resiliparse_inc', dirs_exist_ok=True)
+        copytree(ROOT_DIR.parent / 'resiliparse-py' / 'resiliparse_common',
+                 ROOT_DIR / 'resiliparse_common', dirs_exist_ok=True)
+
     setup(
         ext_modules=get_ext_modules(),
         rust_extensions=[
