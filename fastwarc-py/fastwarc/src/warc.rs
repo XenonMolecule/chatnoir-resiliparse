@@ -18,7 +18,7 @@ use crate::stream_io::{
 use fastwarc::stream_io::bufread::{LimitedBufReader, TrackingBufReader};
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
 use fastwarc::warc::header::{HeaderEncoding, HeaderMap, WarcHeader};
-use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, filter};
+use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, ArchiveIteratorTrait, filter};
 use fastwarc::warc::record::{AutoDecode, WarcRecord, WarcRecordType};
 use fastwarc::warc::record::{DigestError::StreamError, SharedWarcRecord};
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};
@@ -1350,10 +1350,7 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc", unsendable)]
 pub struct ArchiveIteratorPy {
-    inner: ArchiveIteratorThreadSafe,
-    record_types: u16,
-    min_content_length: Option<u64>,
-    max_content_length: Option<u64>,
+    inner: Box<dyn ArchiveIteratorTrait<Arc<Mutex<WarcRecord>>>>,
     func_filter: Option<Py<PyAny>>,
     inplace: bool,
     current_record: Option<Py<WarcRecordPy>>,
@@ -1445,47 +1442,31 @@ impl ArchiveIteratorPy {
             .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?)
             .with_inplace(inplace);
 
-        // TODO: Move common methods to trait and define filters here.
-        // let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
-        // let max_filter = filter::has_content_length_lte(max_content_length.unwrap_or(u64::MAX));
-        // let type_filter = filter::has_record_type(record_types);
-        // let filter = |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r);
-        // let iterator = iterator.with_filter(filter);
+        let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
+        let max_filter = filter::has_content_length_lte(max_content_length.unwrap_or(u64::MAX));
+        let type_filter = filter::has_record_type(record_types);
+        let filter = move |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r);
 
         Ok(Self {
-            inner: iterator,
-            record_types,
-            min_content_length,
-            max_content_length,
+            inner: Box::new(iterator.with_filter(filter)),
             func_filter,
             inplace,
             current_record: None,
         })
     }
 
+    /// Return :class:`WarcRecord` iterator.
     pub fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
     /// Return the next :class:`WarcRecord` from the stream.
-    ///
     pub fn __next__<'py>(&mut self, py: Python<'py>) -> PyResult<Option<Py<WarcRecordPy>>> {
         loop {
             let Some(next) = self.inner.next() else {
                 return Ok(None);
             };
             let record = next?;
-            let record_ref = record.lock().unwrap();
-
-            // TODO: Move this out of here once we have a common archive iterator trait
-            let content_length = record_ref.content_length();
-            if !record_ref.record_type().matches_bitmask(self.record_types)
-                || self.min_content_length.is_some_and(|min| content_length < min)
-                || self.max_content_length.is_some_and(|max| content_length > max)
-            {
-                continue;
-            }
-            drop(record_ref);
 
             let record_obj = if self.inplace {
                 if let Some(record_obj) = &self.current_record {

@@ -26,8 +26,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// Common trait for different types of archive iterators.
-pub trait ArchiveIteratorTrait: Iterator<Item = Result<WarcRecord, io::Error>> {}
-impl<I: Iterator<Item = Result<WarcRecord, io::Error>>> ArchiveIteratorTrait for I {}
+pub trait ArchiveIteratorTrait<S>: Iterator<Item = io::Result<S>> {}
 
 /// Convenience wrapper for iterating [`WarcRecord`] instances from a stream.
 ///
@@ -316,6 +315,8 @@ where
     }
 }
 
+impl<S> ArchiveIteratorTrait<S> for ArchiveIteratorImpl<S> where S: SharedWarcRecord {}
+
 impl<S> Iterator for ArchiveIteratorImpl<S>
 where
     S: SharedWarcRecord,
@@ -394,6 +395,13 @@ pub type FilteredArchiveIterator<F> = FilteredArchiveIteratorImpl<Rc<RefCell<War
 ///
 /// This is a thread-safe variant of [`FilteredArchiveIterator`].
 pub type FilteredArchiveIteratorThreadSafe<F> = FilteredArchiveIteratorImpl<Arc<Mutex<WarcRecord>>, F>;
+
+impl<S, F> ArchiveIteratorTrait<S> for FilteredArchiveIteratorImpl<S, F>
+where
+    S: SharedWarcRecord,
+    F: Fn(&mut WarcRecord) -> bool,
+{
+}
 
 impl<S, F> Iterator for FilteredArchiveIteratorImpl<S, F>
 where
