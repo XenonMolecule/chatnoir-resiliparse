@@ -1,5 +1,10 @@
 [build-system]
-requires = ["setuptools>=77.0", "setuptools-rust>=1.10", "Cython>=0.29.33"]
+requires = [
+    "setuptools>=77.0",
+    "setuptools-rust>=1.10",
+    "Cython>=0.29.33",
+    "tomli>=2.0.0; python_version < '3.11'",
+    "tomli-w>=1.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
