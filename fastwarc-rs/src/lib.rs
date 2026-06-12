@@ -381,7 +381,7 @@
 //! let mut record = WarcRecord::new();
 //!
 //! // Initialize mandatory headers.
-//! record.init_headers(WarcRecordType::Response, Some(b"record-uuid"));
+//! record.init_headers(WarcRecordType::Response, Some(b"uuid:record-uuid"));
 //!
 //! // Alternative: initialize mandatory headers with an auto-generated random ID.
 //! record.init_headers(WarcRecordType::Response, None);

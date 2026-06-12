@@ -319,7 +319,7 @@ Here's how you can create a new record and populate it with headers and a payloa
    record = WarcRecord()
 
    # Initialize mandatory headers.
-   record.init_headers(WarcRecordType.response, b'record-uuid')
+   record.init_headers(WarcRecordType.response, b'uuid:record-uuid')
 
    # Alternative: initialize mandatory headers with an auto-generated random ID.
    record.init_headers(WarcRecordType.response, None)
