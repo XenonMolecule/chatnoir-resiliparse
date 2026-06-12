@@ -10,7 +10,7 @@ WARC
 
 .. automodule:: fastwarc.warc
    :members:
-   :exclude-members: WarcRecordType
+   :exclude-members: WarcRecordType, WarcHeader
    :special-members: __iter__, __next__
    :show-inheritance:
 
@@ -19,9 +19,6 @@ WARC
       :undoc-members:
       :exclude-members: unknown, any_type, no_type
       :member-order: bysource
-
-      Enum indicating a WARC record's type as given by its ``WARC-Type`` header.
-      Multiple types can be combined with boolean operators for filtering records.
 
       .. autoattribute:: unknown
 
@@ -34,6 +31,11 @@ WARC
       .. autoattribute:: no_type
 
          Special type: no record type (filter only)
+
+   .. autoclass:: WarcHeader
+      :members:
+      :undoc-members:
+      :member-order: bysource
 
 
 .. _fastwarc-stream-io-api:

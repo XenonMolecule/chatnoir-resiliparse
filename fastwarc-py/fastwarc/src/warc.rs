@@ -17,7 +17,7 @@ use crate::stream_io::{
 };
 use fastwarc::stream_io::bufread::{LimitedBufReader, TrackingBufReader};
 use fastwarc::stream_io::traits::{IntoWarcReader, WarcRead};
-use fastwarc::warc::header::{HeaderEncoding, HeaderMap};
+use fastwarc::warc::header::{HeaderEncoding, HeaderMap, WarcHeader};
 use fastwarc::warc::iter::{ArchiveIteratorOptions, ArchiveIteratorThreadSafe, filter};
 use fastwarc::warc::record::{AutoDecode, WarcRecord, WarcRecordType};
 use fastwarc::warc::record::{DigestError::StreamError, SharedWarcRecord};
@@ -36,10 +36,10 @@ use time::{Date, Month, OffsetDateTime, Time, UtcOffset};
 // WarcRecordType
 // ===========================================================
 
-/// WARC record type enum.
+/// Enum indicating a WARC record's type as given by its :class:`WARC-Type` header.
 ///
-/// The enum values can be used directly or combined into a bitmask for
-/// :class:`ArchiveIterator` filtering.
+/// Multiple types can be combined with boolean operators for filtering records in
+/// :class:`ArchiveIterator`.
 #[allow(non_camel_case_types)]
 #[pyclass(name = "WarcRecordType", module = "fastwarc.warc", eq, eq_int, from_py_object)]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
@@ -134,6 +134,109 @@ impl WarcRecordTypePy {
 
     pub fn __repr__(&self) -> &'static str {
         WarcRecordType::from(*self).as_str()
+    }
+}
+
+// ===========================================================
+// WarcHeader
+// ===========================================================
+
+/// Pre-defined set of standard WARC 1.1 headers.
+/// This enum can be used in place of ``bytes`` or ``str`` values in  :class:`HeaderMap` methods.
+#[allow(non_camel_case_types)]
+#[pyclass(name = "WarcHeader", module = "fastwarc.warc", eq, from_py_object)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum WarcHeaderPy {
+    // TODO: Replace with py_native_enum when https://github.com/PyO3/pyo3/pull/6020 is merged.
+    WARC_TYPE,
+    WARC_RECORD_ID,
+    WARC_DATE,
+    CONTENT_LENGTH,
+    CONTENT_TYPE,
+    WARC_CONCURRENT_TO,
+    WARC_BLOCK_DIGEST,
+    WARC_PAYLOAD_DIGEST,
+    WARC_IP_ADDRESS,
+    WARC_REFERS_TO,
+    WARC_REFERS_TO_TARGET_URI,
+    WARC_REFERS_TO_DATE,
+    WARC_TARGET_URI,
+    WARC_TRUNCATED,
+    WARC_WARCINFO_ID,
+    WARC_FILENAME,
+    WARC_PROFILE,
+    WARC_IDENTIFIED_PAYLOAD_TYPE,
+    WARC_SEGMENT_ORIGIN_ID,
+    WARC_SEGMENT_NUMBER,
+    WARC_SEGMENT_TOTAL_LENGTH,
+}
+
+impl From<WarcHeaderPy> for WarcHeader {
+    fn from(value: WarcHeaderPy) -> Self {
+        match value {
+            WarcHeaderPy::WARC_TYPE => WarcHeader::WarcType,
+            WarcHeaderPy::WARC_RECORD_ID => WarcHeader::WarcRecordId,
+            WarcHeaderPy::WARC_DATE => WarcHeader::WarcDate,
+            WarcHeaderPy::CONTENT_LENGTH => WarcHeader::ContentLength,
+            WarcHeaderPy::CONTENT_TYPE => WarcHeader::ContentType,
+            WarcHeaderPy::WARC_CONCURRENT_TO => WarcHeader::WarcConcurrentTo,
+            WarcHeaderPy::WARC_BLOCK_DIGEST => WarcHeader::WarcBlockDigest,
+            WarcHeaderPy::WARC_PAYLOAD_DIGEST => WarcHeader::WarcPayloadDigest,
+            WarcHeaderPy::WARC_IP_ADDRESS => WarcHeader::WarcIpAddress,
+            WarcHeaderPy::WARC_REFERS_TO => WarcHeader::WarcRefersTo,
+            WarcHeaderPy::WARC_REFERS_TO_TARGET_URI => WarcHeader::WarcRefersToTargetUri,
+            WarcHeaderPy::WARC_REFERS_TO_DATE => WarcHeader::WarcRefersToDate,
+            WarcHeaderPy::WARC_TARGET_URI => WarcHeader::WarcTargetUri,
+            WarcHeaderPy::WARC_TRUNCATED => WarcHeader::WarcTruncated,
+            WarcHeaderPy::WARC_WARCINFO_ID => WarcHeader::WarcWarcinfoId,
+            WarcHeaderPy::WARC_FILENAME => WarcHeader::WarcFilename,
+            WarcHeaderPy::WARC_PROFILE => WarcHeader::WarcProfile,
+            WarcHeaderPy::WARC_IDENTIFIED_PAYLOAD_TYPE => WarcHeader::WarcIdentifiedPayloadType,
+            WarcHeaderPy::WARC_SEGMENT_ORIGIN_ID => WarcHeader::WarcSegmentOriginId,
+            WarcHeaderPy::WARC_SEGMENT_NUMBER => WarcHeader::WarcSegmentNumber,
+            WarcHeaderPy::WARC_SEGMENT_TOTAL_LENGTH => WarcHeader::WarcSegmentTotalLength,
+        }
+    }
+}
+
+#[pymethods]
+impl WarcHeaderPy {
+    pub fn __repr__(&self) -> String {
+        format!("WarcHeader.{self:?}")
+    }
+
+    pub fn __str__(&self) -> &'static str {
+        WarcHeader::from(*self).as_str()
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum HeaderKeyStrPy {
+    Header(WarcHeaderPy),
+    String(String),
+}
+
+impl HeaderKeyStrPy {
+    fn into_string(self) -> String {
+        match self {
+            HeaderKeyStrPy::Header(key) => WarcHeader::from(key).as_str().to_string(),
+            HeaderKeyStrPy::String(key) => key,
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum HeaderKeyBytesPy {
+    Header(WarcHeaderPy),
+    Bytes(Vec<u8>),
+}
+
+impl HeaderKeyBytesPy {
+    fn into_bytes(self) -> Vec<u8> {
+        match self {
+            HeaderKeyBytesPy::Header(key) => WarcHeader::from(key).as_str().as_bytes().to_vec(),
+            HeaderKeyBytesPy::Bytes(key) => key,
+        }
     }
 }
 
@@ -344,8 +447,9 @@ impl HeaderMapPy {
     ///
     /// :param key: header key
     /// :param value: header value
-    pub fn append(&mut self, key: &str, value: &str) {
-        self.with_headers_mut(|h| h.append(key, value));
+    pub fn append(&mut self, key: HeaderKeyStrPy, value: &str) {
+        let key = key.into_string();
+        self.with_headers_mut(|h| h.append(&key, value));
     }
 
     /// Headers as Python dict.
@@ -403,10 +507,11 @@ impl HeaderMapPy {
     pub fn get<'py>(
         &self,
         py: Python<'py>,
-        key: &str,
+        key: HeaderKeyStrPy,
         default: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        Ok(self.with_headers(|h| h.get(key).map(|s| s.into_owned())).map_or_else(
+        let key = key.into_string();
+        Ok(self.with_headers(|h| h.get(&key).map(|s| s.into_owned())).map_or_else(
             || default.unwrap_or_else(|| py.None().bind(py).clone()),
             |s| PyString::new(py, &s).into_any(),
         ))
@@ -415,9 +520,10 @@ impl HeaderMapPy {
     /// Get all occurrences of a header.
     ///
     /// :param key: header key
-    pub fn get_multiple<'py>(&self, py: Python<'py>, key: &str) -> PyResult<Bound<'py, PyTuple>> {
+    pub fn get_multiple<'py>(&self, py: Python<'py>, key: HeaderKeyStrPy) -> PyResult<Bound<'py, PyTuple>> {
+        let key = key.into_string();
         let values = self.with_headers(|h| {
-            h.get_multiple(key)
+            h.get_multiple(&key)
                 .into_iter()
                 .map(|s| s.into_owned())
                 .collect::<Vec<_>>()
@@ -430,17 +536,19 @@ impl HeaderMapPy {
     pub fn get_bytes<'py>(
         &self,
         py: Python<'py>,
-        key: &[u8],
+        key: HeaderKeyBytesPy,
         default: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let key = key.into_bytes();
         Ok(self
-            .with_headers(|h| h.get_bytes(key).map(|s| s.into_owned()))
+            .with_headers(|h| h.get_bytes(&key).map(|s| s.into_owned()))
             .map_or_else(|| default.unwrap_or_else(|| py.None().bind(py).clone()), |s| PyBytes::new(py, &s).into_any()))
     }
 
-    pub fn get_bytes_multiple<'py>(&self, py: Python<'py>, key: &[u8]) -> PyResult<Bound<'py, PyTuple>> {
+    pub fn get_bytes_multiple<'py>(&self, py: Python<'py>, key: HeaderKeyBytesPy) -> PyResult<Bound<'py, PyTuple>> {
+        let key = key.into_bytes();
         let values = self.with_headers(|h| {
-            h.get_bytes_multiple(key)
+            h.get_bytes_multiple(&key)
                 .into_iter()
                 .map(|s| s.into_owned())
                 .collect::<Vec<_>>()
@@ -449,39 +557,46 @@ impl HeaderMapPy {
         PyTuple::new(py, items)
     }
 
-    pub fn contains_key(&self, key: &str) -> bool {
-        self.with_headers(|h| h.contains_key(key))
+    pub fn contains_key(&self, key: HeaderKeyStrPy) -> bool {
+        let key = key.into_string();
+        self.with_headers(|h| h.contains_key(&key))
     }
 
-    pub fn contains_key_bytes(&self, key: &[u8]) -> bool {
-        self.with_headers(|h| h.contains_key_bytes(key))
+    pub fn contains_key_bytes(&self, key: HeaderKeyBytesPy) -> bool {
+        let key = key.into_bytes();
+        self.with_headers(|h| h.contains_key_bytes(&key))
     }
 
     /// Set a header value, overwriting any previous value for the same key.
     ///
     /// :param key: header key
     /// :param value: header value
-    pub fn set(&mut self, key: &str, value: &str) {
-        self.with_headers_mut(|h| h.set(key, value));
+    pub fn set(&mut self, key: HeaderKeyStrPy, value: &str) {
+        let key = key.into_string();
+        self.with_headers_mut(|h| h.set(&key, value));
     }
 
-    pub fn set_bytes(&mut self, key: &[u8], value: &[u8]) {
-        self.with_headers_mut(|h| h.set_bytes(key, value));
+    pub fn set_bytes(&mut self, key: HeaderKeyBytesPy, value: &[u8]) {
+        let key = key.into_bytes();
+        self.with_headers_mut(|h| h.set_bytes(&key, value));
     }
 
-    pub fn append_bytes(&mut self, key: &[u8], value: &[u8]) {
-        self.with_headers_mut(|h| h.append_bytes(key, value));
+    pub fn append_bytes(&mut self, key: HeaderKeyBytesPy, value: &[u8]) {
+        let key = key.into_bytes();
+        self.with_headers_mut(|h| h.append_bytes(&key, value));
     }
 
     /// Remove all headers matching ``key``.
     ///
     /// :param key: header key
-    pub fn remove(&mut self, key: &str) {
-        self.with_headers_mut(|h| h.remove(key));
+    pub fn remove(&mut self, key: HeaderKeyStrPy) {
+        let key = key.into_string();
+        self.with_headers_mut(|h| h.remove(&key));
     }
 
-    pub fn remove_bytes(&mut self, key: &[u8]) {
-        self.with_headers_mut(|h| h.remove_bytes(key));
+    pub fn remove_bytes(&mut self, key: HeaderKeyBytesPy) {
+        let key = key.into_bytes();
+        self.with_headers_mut(|h| h.remove_bytes(&key));
     }
 
     /// Item view of keys and values.
@@ -528,10 +643,11 @@ impl HeaderMapPy {
         PyTuple::new(py, values)
     }
 
-    pub fn __getitem__<'py>(&self, py: Python<'py>, item: &str) -> PyResult<Bound<'py, PyString>> {
-        self.with_headers(|h| h.get(item).map(|s| s.into_owned()))
+    pub fn __getitem__<'py>(&self, py: Python<'py>, item: HeaderKeyStrPy) -> PyResult<Bound<'py, PyString>> {
+        let item = item.into_string();
+        self.with_headers(|h| h.get(&item).map(|s| s.into_owned()))
             .map(|s| PyString::new(py, &s))
-            .ok_or_else(|| PyKeyError::new_err(item.to_string()))
+            .ok_or_else(|| PyKeyError::new_err(item))
     }
 
     pub fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
@@ -542,12 +658,14 @@ impl HeaderMapPy {
         self.with_headers(HeaderMap::len)
     }
 
-    pub fn __setitem__(&mut self, key: &str, value: &str) {
-        self.with_headers_mut(|h| h.set(key, value));
+    pub fn __setitem__(&mut self, key: HeaderKeyStrPy, value: &str) {
+        let key = key.into_string();
+        self.with_headers_mut(|h| h.set(&key, value));
     }
 
-    pub fn __contains__(&self, item: &str) -> bool {
-        self.with_headers(|h| h.contains_key(item))
+    pub fn __contains__(&self, item: HeaderKeyStrPy) -> bool {
+        let item = item.into_string();
+        self.with_headers(|h| h.contains_key(&item))
     }
 
     fn __eq__(&self, other: Bound<'_, PyAny>) -> bool {
@@ -771,7 +889,7 @@ impl WarcRecordPy {
 
     /// Record ID.
     ///
-    /// This is the same as ``headers['WARC-Record-ID']`` if present.
+    /// This is the same as ``headers[WarcHeader.WARC_RECORD_ID]`` if present.
     ///
     /// :type: str or None
     #[getter]

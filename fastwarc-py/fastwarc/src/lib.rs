@@ -40,9 +40,10 @@ pub mod _fastwarc {
         modules.set_item("fastwarc.warc", warc)?;
 
         // Top-level exports
-        m.add("ArchiveIterator", warc.getattr("ArchiveIterator")?)?;
-        m.add("WarcRecord", warc.getattr("WarcRecord")?)?;
         m.add("WarcRecordType", warc.getattr("WarcRecordType")?)?;
+        m.add("WarcHeader", warc.getattr("WarcHeader")?)?;
+        m.add("WarcRecord", warc.getattr("WarcRecord")?)?;
+        m.add("ArchiveIterator", warc.getattr("ArchiveIterator")?)?;
 
         m.add("GzipReader", stream_io.getattr("GzipReader")?)?;
         m.add("GzipWriter", stream_io.getattr("GzipWriter")?)?;
@@ -105,7 +106,9 @@ pub mod _warc {
     }
 
     #[pymodule_export]
-    pub use crate::warc::{ArchiveIteratorPy, HeaderMapPy, WarcRecordPayloadReaderPy, WarcRecordPy, WarcRecordTypePy};
+    pub use crate::warc::{
+        ArchiveIteratorPy, HeaderMapPy, WarcHeaderPy, WarcRecordPayloadReaderPy, WarcRecordPy, WarcRecordTypePy,
+    };
 
     #[pymodule_export]
     pub use crate::warc::{

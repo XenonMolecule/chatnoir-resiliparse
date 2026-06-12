@@ -15,7 +15,7 @@
 use crate::stream_io::bufread::{LimitedBufReader, RawReaderAdapter};
 use crate::stream_io::traits::{IntoWarcReader, WarcRead};
 use crate::stream_io::{brotli, chunked, gzip, zstd};
-use crate::warc::header::{_trim_ascii_offsets, CowHeaderValue, HeaderEncoding, HeaderMap};
+use crate::warc::header::{_trim_ascii_offsets, CowHeaderValue, HeaderEncoding, HeaderMap, WarcHeader};
 use digest::{Digest, DynDigest};
 use sha2::digest;
 use std::borrow::Cow;
@@ -578,7 +578,8 @@ impl WarcRecord {
     /// * `record_type` - Record type
     pub fn set_record_type(&mut self, record_type: WarcRecordType) {
         self.record_type = record_type;
-        self.headers.set_bytes(b"WARC-Type", record_type.as_str().as_bytes());
+        self.headers
+            .set_bytes(WarcHeader::WarcType, record_type.as_str().as_bytes());
     }
 
     /// "Freeze" a record by baking in the remaining payload stream contents.
@@ -749,13 +750,13 @@ impl WarcRecord {
 
         let mut parse_count = 0;
         for (k, v) in self.headers.items_bytes() {
-            if k.as_ref() == b"WARC-Type" {
+            if k.as_ref() == WarcHeader::WarcType.as_str().as_bytes() {
                 self.record_type = WarcRecordType::try_from(v.as_ref()).unwrap_or(WarcRecordType::Unknown);
                 parse_count += 1;
-            } else if k.as_ref() == b"Content-Type" {
+            } else if k.as_ref() == WarcHeader::ContentType.as_str().as_bytes() {
                 self.is_http = v.as_ref() == b"application/http" || v.starts_with(b"application/http;");
                 parse_count += 1;
-            } else if k.as_ref() == b"Content-Length" {
+            } else if k.as_ref() == WarcHeader::ContentLength.as_str().as_bytes() {
                 self.content_length = str::from_utf8(v.as_ref()).unwrap_or_default().parse().unwrap_or(0);
                 parse_count += 1;
             }
@@ -770,17 +771,17 @@ impl WarcRecord {
 
     /// WARC record ID.
     pub fn record_id(&self) -> Option<Cow<'_, str>> {
-        self.headers.get("WARC-Record-ID")
+        self.headers.get(WarcHeader::WarcRecordId)
     }
 
     /// Set WARC record ID.
     pub fn set_record_id(&mut self, record_id: impl AsRef<str>) {
-        self.headers.set("WARC-Record-ID", record_id)
+        self.headers.set(WarcHeader::WarcRecordId, record_id)
     }
 
     /// WARC record date.
     pub fn record_date(&self) -> Option<OffsetDateTime> {
-        if let Some(date) = self.headers.get("WARC-Date") {
+        if let Some(date) = self.headers.get(WarcHeader::WarcDate) {
             return OffsetDateTime::parse(&date, &Iso8601::DEFAULT).ok();
         }
         None
@@ -804,7 +805,7 @@ impl WarcRecord {
     /// Set WARC record date.
     pub fn set_record_date(&mut self, date: OffsetDateTime) {
         let formatted = self._clean_iso_datetime(date.format(&Iso8601::DEFAULT).unwrap());
-        self.headers.set_bytes(b"WARC-Date", formatted.as_bytes());
+        self.headers.set_bytes(WarcHeader::WarcDate, formatted.as_bytes());
     }
 
     /// WARC record headers.
@@ -832,7 +833,7 @@ impl WarcRecord {
                 WarcRecordType::Response => b"application/http; msgtype=response",
                 _ => b"application/http",
             };
-            self.headers.set_bytes(b"Content-Type", content_type);
+            self.headers.set_bytes(WarcHeader::ContentType, content_type);
         }
     }
 
@@ -858,7 +859,7 @@ impl WarcRecord {
         }
         self.http_headers
             .as_ref()?
-            .get("Content-Type")?
+            .get(WarcHeader::ContentType)?
             .split(";")
             .next()
             .map(|s| s.trim().to_string())
@@ -909,14 +910,15 @@ impl WarcRecord {
         self.headers.clear();
         self.headers.set_status_line_bytes(b"WARC/1.1");
         self.headers
-            .append_bytes_no_sanitize(b"WARC-Type", self.record_type.as_str().as_bytes());
+            .append_bytes_no_sanitize(WarcHeader::WarcType, self.record_type.as_str().as_bytes());
         let date = self._clean_iso_datetime(OffsetDateTime::now_utc().format(&Iso8601::DEFAULT).unwrap());
-        self.headers.append_bytes_no_sanitize(b"WARC-Date", date.as_bytes());
+        self.headers
+            .append_bytes_no_sanitize(WarcHeader::WarcDate, date.as_bytes());
 
         let record_id = format!("<urn:{}>", String::from_utf8_lossy(&urn));
         self.headers
-            .append_bytes_no_sanitize(b"WARC-Record-ID", record_id.as_bytes());
-        self.headers.append_bytes_no_sanitize(b"Content-Length", b"0");
+            .append_bytes_no_sanitize(WarcHeader::WarcRecordId, record_id.as_bytes());
+        self.headers.append_bytes_no_sanitize(WarcHeader::ContentLength, b"0");
     }
 
     /// Parse HTTP headers and advance content reader.
@@ -983,7 +985,10 @@ impl WarcRecord {
         let bytes_consumed = http_headers.parse_with_opts(reader, true, max_header_len, quirks_mode)?;
 
         // Parse charset if present
-        if let Some(content_type) = http_headers.get("Content-Type").map(|c| c.to_ascii_lowercase()) {
+        if let Some(content_type) = http_headers
+            .get(WarcHeader::ContentType)
+            .map(|c| c.to_ascii_lowercase())
+        {
             let charset_key = "charset=";
             if let Some(charset_pos) = content_type.find(charset_key) {
                 let charset_start = charset_pos + charset_key.len();
@@ -1209,10 +1214,11 @@ impl WarcRecord {
             if let Some(d) = payload_digest {
                 let payload_digest = format!("sha1:{}", BASE32.encode(&d.finalize()));
                 self.headers
-                    .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
+                    .set_bytes(WarcHeader::WarcPayloadDigest, payload_digest.as_bytes());
             }
             let block_digest = format!("sha1:{}", BASE32.encode(&block_digest.finalize()));
-            self.headers.set_bytes(b"WARC-Block-Digest", block_digest.as_bytes());
+            self.headers
+                .set_bytes(WarcHeader::WarcBlockDigest, block_digest.as_bytes());
             reader.rewind()?;
         }
 
@@ -1220,9 +1226,9 @@ impl WarcRecord {
 
         // Ensure Content-Length is correct
         let block_content_length = block_content_length.to_string();
-        if self.headers.get_bytes(b"Content-Length").as_deref() != Some(block_content_length.as_bytes()) {
+        if self.headers.get_bytes(WarcHeader::ContentLength).as_deref() != Some(block_content_length.as_bytes()) {
             self.headers
-                .set_bytes(b"Content-Length", block_content_length.as_bytes());
+                .set_bytes(WarcHeader::ContentLength, block_content_length.as_bytes());
         }
 
         // Write WARC headers
@@ -1266,8 +1272,8 @@ impl WarcRecord {
     pub fn verify_block_digest(&mut self, consume: bool) -> Result<bool, DigestError> {
         let digest = self
             .headers
-            .get("WARC-Block-Digest")
-            .ok_or_else(|| DigestError::Missing("WARC-Block-Digest".into()))?
+            .get(WarcHeader::WarcBlockDigest)
+            .ok_or_else(|| DigestError::Missing(WarcHeader::WarcBlockDigest.as_str().to_string()))?
             .to_string();
         self._verify_digest(&digest, consume)
     }
@@ -1289,8 +1295,8 @@ impl WarcRecord {
 
         let digest = self
             .headers
-            .get("WARC-Payload-Digest")
-            .ok_or_else(|| DigestError::Missing("WARC-Payload-Digest".into()))?
+            .get(WarcHeader::WarcPayloadDigest)
+            .ok_or_else(|| DigestError::Missing(WarcHeader::WarcPayloadDigest.as_str().to_string()))?
             .to_string();
         self._verify_digest(&digest, consume)
     }

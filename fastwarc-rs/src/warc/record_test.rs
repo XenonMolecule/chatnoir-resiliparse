@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::stream_io::bufread::LimitedBufReader;
-use crate::warc::header::{HeaderEncoding, HeaderMap};
+use crate::warc::header::{HeaderEncoding, HeaderMap, WarcHeader};
 use crate::warc::iter::ArchiveIterator;
 use crate::warc::mod_test::*;
 use data_encoding::{BASE32, HEXLOWER};
@@ -126,13 +126,13 @@ fn parse_warc_headers() -> io::Result<()> {
     assert_eq!(headers.status_line().as_deref(), Some("WARC/1.1"));
     assert_eq!(headers.status_line_bytes().as_deref(), Some(b"WARC/1.1".as_slice()));
     assert!(!record1.is_http());
-    assert_eq!(headers.get("WARC-Type").as_deref(), Some("request"));
-    assert_eq!(headers.get_bytes(b"WARC-Type").as_deref(), Some(b"request".as_slice()));
+    assert_eq!(headers.get(WarcHeader::WarcType).as_deref(), Some("request"));
+    assert_eq!(headers.get_bytes(WarcHeader::WarcType).as_deref(), Some(b"request".as_slice()));
     assert_eq!(record1.record_id().as_deref(), Some("<urn:uuid:record1>"));
-    assert_eq!(headers.get("WARC-Record-ID").as_deref(), Some("<urn:uuid:record1>"));
-    assert_eq!(headers.get_bytes(b"WARC-Record-ID").as_deref(), Some(b"<urn:uuid:record1>".as_slice()));
-    assert_eq!(headers.get("Content-Length").as_deref(), Some("3"));
-    assert_eq!(headers.get_bytes(b"Content-Length").as_deref(), Some(b"3".as_slice()));
+    assert_eq!(headers.get(WarcHeader::WarcRecordId).as_deref(), Some("<urn:uuid:record1>"));
+    assert_eq!(headers.get_bytes(WarcHeader::WarcRecordId).as_deref(), Some(b"<urn:uuid:record1>".as_slice()));
+    assert_eq!(headers.get(WarcHeader::ContentLength).as_deref(), Some("3"));
+    assert_eq!(headers.get_bytes(WarcHeader::ContentLength).as_deref(), Some(b"3".as_slice()));
 
     // Change headers
     let headers = record1.headers_mut();
@@ -183,7 +183,7 @@ fn parse_http_headers() -> io::Result<()> {
     assert_eq!(http_headers.status_line().as_deref(), Some("HTTP/1.1 200 OK"));
     assert_eq!(http_headers.status_code(), Some(200));
     assert_eq!(http_headers.reason_phrase().as_deref(), Some("OK"));
-    assert_eq!(http_headers.get("Content-Type").as_deref(), Some("text/plain; charset=utf-8"));
+    assert_eq!(http_headers.get(WarcHeader::ContentType).as_deref(), Some("text/plain; charset=utf-8"));
     assert_eq!(record.http_charset().as_deref(), Some("utf-8"));
     assert_eq!(record.http_content_type().as_deref(), Some("text/plain"));
 
@@ -287,8 +287,8 @@ fn record_http_parsing() -> io::Result<()> {
 
         let content_type = rec.http_content_type().unwrap();
         assert!(content_type.starts_with("text/"));
-        assert!(http_headers.contains_key("Content-Type"));
-        let content_type_header = http_headers.get("Content-Type").unwrap();
+        assert!(http_headers.contains_key(WarcHeader::ContentType));
+        let content_type_header = http_headers.get(WarcHeader::ContentType).unwrap();
         if let Some((_, charset)) = content_type_header.split_once("charset=") {
             assert_eq!(rec.http_charset().map(|c| c.into_owned()), Some(charset.trim().to_ascii_lowercase()));
         }
@@ -355,7 +355,7 @@ fn parse_warc_headers_quirks_and_payload_replacement() -> io::Result<()> {
     record.set_bytes_payload(b"XYZ".to_vec());
     assert!(record.is_frozen());
     assert_eq!(record.content_length(), 3);
-    assert_eq!(record.headers().get("Content-Length").as_deref(), Some("3"));
+    assert_eq!(record.headers().get(WarcHeader::ContentLength).as_deref(), Some("3"));
 
     let mut payload = Vec::new();
     record.reader_mut().unwrap().read_to_end(&mut payload)?;
@@ -386,27 +386,33 @@ Barbaz\n";
     assert!(src_record.record_id().is_some_and(|id| id.starts_with("<urn:")));
     assert_eq!(src_record.record_type(), WarcRecordType::NoType);
     assert_eq!(src_record.content_length(), 0);
-    assert!(src_record.headers().contains_key("WARC-Type"));
-    assert!(src_record.headers().contains_key("WARC-Date"));
-    assert!(src_record.headers().contains_key("WARC-Record-ID"));
-    assert_eq!(src_record.headers().get("WARC-Record-ID"), src_record.record_id());
-    assert_eq!(src_record.headers().get("Content-Length").as_deref(), Some("0"));
+    assert!(src_record.headers().contains_key(WarcHeader::WarcType));
+    assert!(src_record.headers().contains_key(WarcHeader::WarcDate));
+    assert!(src_record.headers().contains_key(WarcHeader::WarcRecordId));
+    assert_eq!(src_record.headers().get(WarcHeader::WarcRecordId), src_record.record_id());
+    assert_eq!(src_record.headers().get(WarcHeader::ContentLength).as_deref(), Some("0"));
     src_record.headers_mut().set("X-Multiline-Header", "Hello\r\nWorld");
     assert_eq!(src_record.headers().get("X-Multiline-Header").as_deref(), Some("Hello World"));
 
     src_record.set_bytes_payload(new_record_bytes_content.to_vec());
     let content_len = new_record_bytes_content.len().to_string();
     assert_eq!(src_record.content_length(), new_record_bytes_content.len() as u64);
-    assert_eq!(src_record.headers().get("Content-Length").as_deref(), Some(content_len.as_str()));
+    assert_eq!(src_record.headers().get(WarcHeader::ContentLength).as_deref(), Some(content_len.as_str()));
 
     src_record.set_is_http(true);
-    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http"));
+    assert_eq!(src_record.headers().get(WarcHeader::ContentType).as_deref(), Some("application/http"));
     src_record.set_record_type(WarcRecordType::Request);
     src_record.set_is_http(true);
-    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=request"));
+    assert_eq!(
+        src_record.headers().get(WarcHeader::ContentType).as_deref(),
+        Some("application/http; msgtype=request")
+    );
     src_record.set_record_type(WarcRecordType::Response);
     src_record.set_is_http(true);
-    assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=response"));
+    assert_eq!(
+        src_record.headers().get(WarcHeader::ContentType).as_deref(),
+        Some("application/http; msgtype=response")
+    );
 
     let payload_start = new_record_bytes_content
         .windows(4)
@@ -416,7 +422,7 @@ Barbaz\n";
     let payload_digest = format!("sha1:{}", BASE32.encode(&Sha1::digest(&new_record_bytes_content[payload_start..])));
     src_record
         .headers_mut()
-        .set_bytes(b"WARC-Payload-Digest", payload_digest.as_bytes());
+        .set_bytes(WarcHeader::WarcPayloadDigest, payload_digest.as_bytes());
 
     let mut stream = Vec::new();
     src_record.write_with_checksum(&mut stream)?;
@@ -427,7 +433,10 @@ Barbaz\n";
         let mut rec = rec.borrow_mut();
         assert_eq!(rec.headers().status_line(), src_record.headers().status_line());
         assert_eq!(rec.headers().get("X-Multiline-Header").as_deref(), Some("Hello World"));
-        assert_eq!(src_record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=response"));
+        assert_eq!(
+            src_record.headers().get(WarcHeader::ContentType).as_deref(),
+            Some("application/http; msgtype=response")
+        );
         assert_eq!(rec.headers(), src_record.headers());
         assert_eq!(rec.record_id(), src_record.record_id());
         assert_eq!(rec.record_type(), src_record.record_type());
@@ -511,7 +520,7 @@ fn record_init_headers_http() -> io::Result<()> {
     assert_eq!(record.record_id().as_deref(), Some("<urn:uuid:494749ad-b14a-4f22-b143-0bab4347884b>"));
     assert_eq!(record.headers().status_line().as_deref(), Some("WARC/1.1"));
     assert_eq!(record.content_length(), 0);
-    assert_eq!(record.headers().get("Content-Length").as_deref(), Some("0"));
+    assert_eq!(record.headers().get(WarcHeader::ContentLength).as_deref(), Some("0"));
 
     record.parse_http()?;
     assert!(!record.is_http_parsed());
@@ -519,7 +528,7 @@ fn record_init_headers_http() -> io::Result<()> {
     record.set_record_type(WarcRecordType::Request);
     record.set_is_http(true);
     assert!(record.is_http());
-    assert_eq!(record.headers().get("Content-Type").as_deref(), Some("application/http; msgtype=request"));
+    assert_eq!(record.headers().get(WarcHeader::ContentType).as_deref(), Some("application/http; msgtype=request"));
     assert_eq!(record.http_content_type(), None);
     assert_eq!(record.http_charset(), None);
 
@@ -531,10 +540,10 @@ fn warc_record_debug_format() -> io::Result<()> {
     let mut non_http = WarcRecord::new();
     non_http.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:debug-resource"));
     assert_eq!(non_http.content_length(), 0);
-    assert_eq!(non_http.headers().get("Content-Length").as_deref(), Some("0"));
+    assert_eq!(non_http.headers().get(WarcHeader::ContentLength).as_deref(), Some("0"));
     non_http.set_bytes_payload(b"ABC".to_vec());
     assert_eq!(non_http.content_length(), 3);
-    assert_eq!(non_http.headers().get("Content-Length").as_deref(), Some("3"));
+    assert_eq!(non_http.headers().get(WarcHeader::ContentLength).as_deref(), Some("3"));
 
     let non_http_debug = format!("{non_http:?}");
     assert!(non_http_debug.contains("WarcRecord"));
@@ -679,7 +688,7 @@ fn serialize_preserves_byte_identical_headers_until_mutated() -> io::Result<()> 
     let mut serialized = Vec::new();
     let bytes_written = record.write(&mut serialized)?;
     assert_eq!(bytes_written, serialized.len());
-    assert_eq!(String::from_utf8_lossy(&serialized), String::from_utf8_lossy(&record_bytes));
+    assert_eq!(String::from_utf8_lossy(&serialized), String::from_utf8_lossy(record_bytes));
 
     // Mutating a header marks it as dirty and serialisation is no longer guaranteed to be byte-identical.
     record.headers_mut().set("X-Bar", "baz");
@@ -711,7 +720,9 @@ fn verify_record_digests() -> io::Result<()> {
     assert_eq!(record.content_length(), payload.len() as u64);
 
     let digest = BASE32.encode(&Sha1::digest(&payload));
-    record.headers_mut().set("WARC-Block-Digest", format!("sha1:{digest}"));
+    record
+        .headers_mut()
+        .set(WarcHeader::WarcBlockDigest, format!("sha1:{digest}"));
 
     // `consume = false` should leave the frozen payload reader rewound for later use.
     assert!(record.verify_block_digest(false).unwrap());
@@ -720,51 +731,51 @@ fn verify_record_digests() -> io::Result<()> {
     let md5_digest = BASE32.encode(&Md5::digest(&payload));
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("md5:{md5_digest}"));
+        .set(WarcHeader::WarcBlockDigest, format!("md5:{md5_digest}"));
     assert!(record.verify_block_digest(false).unwrap());
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("md5:{}", BASE32.encode(b"xxxxxx")));
+        .set(WarcHeader::WarcBlockDigest, format!("md5:{}", BASE32.encode(b"xxxxxx")));
     assert!(!record.verify_block_digest(false).unwrap());
 
     let sha256_digest = BASE32.encode(&Sha256::digest(&payload));
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha256:{sha256_digest}"));
+        .set(WarcHeader::WarcBlockDigest, format!("sha256:{sha256_digest}"));
     assert!(record.verify_block_digest(false).unwrap());
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha256:{}", BASE32.encode(b"xxxxxx")));
+        .set(WarcHeader::WarcBlockDigest, format!("sha256:{}", BASE32.encode(b"xxxxxx")));
     assert!(!record.verify_block_digest(false).unwrap());
 
     let sha512_digest = BASE32.encode(&Sha512::digest(&payload));
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha512:{sha512_digest}"));
+        .set(WarcHeader::WarcBlockDigest, format!("sha512:{sha512_digest}"));
     assert!(record.verify_block_digest(false).unwrap());
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha512:{}", BASE32.encode(b"xxxxxx")));
+        .set(WarcHeader::WarcBlockDigest, format!("sha512:{}", BASE32.encode(b"xxxxxx")));
     assert!(!record.verify_block_digest(false).unwrap());
 
     let sha1_hex_digest = HEXLOWER.encode(&Sha1::digest(&payload));
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha1:{sha1_hex_digest}"));
+        .set(WarcHeader::WarcBlockDigest, format!("sha1:{sha1_hex_digest}"));
     assert!(record.verify_block_digest(false).unwrap());
     record
         .headers_mut()
-        .set("WARC-Block-Digest", format!("sha1:{}", "0".repeat(sha1_hex_digest.len())));
+        .set(WarcHeader::WarcBlockDigest, format!("sha1:{}", "0".repeat(sha1_hex_digest.len())));
     assert!(!record.verify_block_digest(false).unwrap());
 
     // Cover formatting failures.
-    record.headers_mut().remove("WARC-Block-Digest");
+    record.headers_mut().remove(WarcHeader::WarcBlockDigest);
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::Missing(_))));
-    record.headers_mut().set("WARC-Block-Digest", "sha999:AAAA");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "sha999:AAAA");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::Unsupported(_))));
-    record.headers_mut().set("WARC-Block-Digest", "bad-format");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "bad-format");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
-    record.headers_mut().set("WARC-Block-Digest", "sha1:_____");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "sha1:_____");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
     assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
 
@@ -831,23 +842,25 @@ fn verify_record_digest_error_kinds() -> io::Result<()> {
     record.set_bytes_payload(payload.clone());
     assert_eq!(record.content_length(), payload.len() as u64);
 
-    record.headers_mut().remove("WARC-Block-Digest");
+    record.headers_mut().remove(WarcHeader::WarcBlockDigest);
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::Missing(_))));
 
-    record.headers_mut().set("WARC-Block-Digest", "sha999:AAAA");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "sha999:AAAA");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::Unsupported(_))));
 
-    record.headers_mut().set("WARC-Block-Digest", "bad-format");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "bad-format");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
 
-    record.headers_mut().set("WARC-Block-Digest", "sha1:_____");
+    record.headers_mut().set(WarcHeader::WarcBlockDigest, "sha1:_____");
     assert!(matches!(record.verify_block_digest(false), Err(DigestError::FormatError(_))));
 
     assert!(matches!(record.verify_payload_digest(false), Err(DigestError::NoPayload(_))));
 
     let mut stream_error_record = WarcRecord::new();
     stream_error_record.init_headers(WarcRecordType::Resource, Some(b"urn:uuid:digest-stream-error"));
-    stream_error_record.headers_mut().set("WARC-Block-Digest", "sha1:AAAA");
+    stream_error_record
+        .headers_mut()
+        .set(WarcHeader::WarcBlockDigest, "sha1:AAAA");
     assert!(matches!(stream_error_record.verify_block_digest(false), Err(DigestError::StreamError(_))));
 
     Ok(())

@@ -50,25 +50,25 @@ fn new_empty_header_map() {
 #[test]
 fn set_get_remove_header() {
     let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
-    headers.set("Content-Type", "text/plain");
+    headers.set(WarcHeader::ContentType, "text/plain");
     assert_eq!(headers.encoding(), HeaderEncoding::Latin1);
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/plain"));
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/plain"));
     assert_eq!(headers.len(), 1);
 
     // Override existing
-    headers.set("Content-Type", "text/html");
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/html"));
+    headers.set(WarcHeader::ContentType, "text/html");
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/html"));
     assert_eq!(headers.len(), 1);
 
     // Add new
-    headers.set("Content-Length", "10");
-    assert_eq!(headers.get("Content-Length").as_deref(), Some("10"));
+    headers.set(WarcHeader::ContentLength, "10");
+    assert_eq!(headers.get(WarcHeader::ContentLength).as_deref(), Some("10"));
     assert_eq!(headers.len(), 2);
 
     // Set and get as bytes
-    headers.set_bytes(b"Content-Type", b"text/plain");
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/plain"));
-    assert_eq!(headers.get_bytes(b"Content-Type").as_deref(), Some(b"text/plain".as_slice()));
+    headers.set_bytes(WarcHeader::ContentType, b"text/plain");
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/plain"));
+    assert_eq!(headers.get_bytes(WarcHeader::ContentType).as_deref(), Some(b"text/plain".as_slice()));
     assert_eq!(headers.len(), 2);
 
     // Header does not exist
@@ -76,7 +76,7 @@ fn set_get_remove_header() {
 
     // Remove (case-insensitive)
     headers.remove("CONTENT-TYPE");
-    assert_eq!(headers.get("Content-Type"), None);
+    assert_eq!(headers.get(WarcHeader::ContentType), None);
     assert_eq!(headers.len(), 1);
 }
 
@@ -84,37 +84,40 @@ fn set_get_remove_header() {
 fn duplicate_header() {
     let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
     assert_eq!(headers.len(), 0);
-    assert_eq!(headers.get_multiple("Content-Type"), Vec::<&str>::new());
+    assert_eq!(headers.get_multiple(WarcHeader::ContentType), Vec::<&str>::new());
 
     // Set
-    headers.set("Content-Type", "text/plain");
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/plain"));
+    headers.set(WarcHeader::ContentType, "text/plain");
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/plain"));
     assert_eq!(headers.len(), 1);
-    assert_eq!(headers.get_multiple("Content-Type"), vec!["text/plain"]);
+    assert_eq!(headers.get_multiple(WarcHeader::ContentType), vec!["text/plain"]);
 
     // Set again
-    headers.set("Content-Type", "text/html");
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/html"));
+    headers.set(WarcHeader::ContentType, "text/html");
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/html"));
     assert_eq!(headers.len(), 1);
-    assert_eq!(headers.get_multiple("Content-Type"), vec!["text/html"]);
+    assert_eq!(headers.get_multiple(WarcHeader::ContentType), vec!["text/html"]);
 
     // Append duplicate
-    headers.append("Content-Type", "text/plain");
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/html"));
+    headers.append(WarcHeader::ContentType, "text/plain");
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/html"));
     assert_eq!(headers.len(), 2);
-    assert_eq!(headers.get_multiple("Content-Type"), vec!["text/html", "text/plain"]);
-    assert_eq!(headers.get_bytes_multiple(b"Content-Type"), vec![b"text/html".as_slice(), b"text/plain".as_slice()]);
+    assert_eq!(headers.get_multiple(WarcHeader::ContentType), vec!["text/html", "text/plain"]);
+    assert_eq!(
+        headers.get_bytes_multiple(WarcHeader::ContentType),
+        vec![b"text/html".as_slice(), b"text/plain".as_slice()]
+    );
 
     // Remove (case-insensitive)
     headers.remove("CONTENT-TYPE");
-    assert_eq!(headers.get("Content-Type"), None);
+    assert_eq!(headers.get(WarcHeader::ContentType), None);
     assert_eq!(headers.len(), 0);
 }
 
 #[test]
 fn header_case_insensitive_key() {
     let mut headers = HeaderMap::new(HeaderEncoding::Unicode);
-    headers.set("Content-Type", "text/html");
+    headers.set(WarcHeader::ContentType, "text/html");
     assert!(headers.keys().any(|k| k == "Content-Type"));
     assert_eq!(headers.get("CONTENT-TYPE").as_deref(), Some("text/html"));
     assert_eq!(headers.get("content-type").as_deref(), Some("text/html"));
@@ -126,7 +129,7 @@ fn header_case_insensitive_key() {
 
 #[test]
 fn header_case_insensitive_key_from_helpers() {
-    let borrowed_key = CaseInsensitiveKey::from("Content-Type");
+    let borrowed_key = CaseInsensitiveKey::from(WarcHeader::ContentType.as_str());
     let owned_key = CaseInsensitiveKey::from("content-type".to_string());
     let cow_key = CaseInsensitiveKey::from(Cow::Borrowed("CONTENT-TYPE"));
     assert_eq!(borrowed_key, "content-type");
@@ -136,7 +139,7 @@ fn header_case_insensitive_key_from_helpers() {
 
 #[test]
 fn header_case_insensitive_key_eq_and_deref() {
-    let borrowed_key = CaseInsensitiveKey::from("Content-Type");
+    let borrowed_key = CaseInsensitiveKey::from(WarcHeader::ContentType.as_str());
     let owned_key = CaseInsensitiveKey::from("content-type".to_string());
 
     assert_eq!(borrowed_key, owned_key);
@@ -146,14 +149,14 @@ fn header_case_insensitive_key_eq_and_deref() {
     assert_eq!("content-type", borrowed_key);
     assert_ne!(borrowed_key, "Accept");
 
-    assert_eq!(borrowed_key.as_ref(), "Content-Type");
+    assert_eq!(borrowed_key.as_ref(), WarcHeader::ContentType.as_str());
 }
 
 #[test]
 fn iterate_headers() {
     let tuples = [
-        ("Content-Type", "text/html"),
-        ("Content-Length", "1234"),
+        (WarcHeader::ContentType.as_str(), "text/html"),
+        (WarcHeader::ContentLength.as_str(), "1234"),
         ("Set-Cookie", "cookie1=value1"),
         ("Set-Cookie", "cookie2=value2"),
     ];
@@ -198,7 +201,7 @@ fn header_sanitization() {
     headers.set("Foo:bar", "bar:baz");
     headers.set("new\r\nline", "new\t\nline");
 
-    assert_eq!(headers.get("Content-Type").as_deref(), Some("text/html; charset=utf-8"));
+    assert_eq!(headers.get(WarcHeader::ContentType).as_deref(), Some("text/html; charset=utf-8"));
     assert_eq!(headers.get("Foobar").as_deref(), Some("bar:baz"));
     assert_eq!(headers.get("new line").as_deref(), Some("new\t line"));
 }

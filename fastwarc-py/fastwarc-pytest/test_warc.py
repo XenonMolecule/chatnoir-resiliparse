@@ -85,25 +85,67 @@ def test_warc_record_type_binary_operators():
 @pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("warcinfo", 2),
-        ("response", 4),
-        ("resource", 8),
-        ("request", 16),
-        ("metadata", 32),
-        ("revisit", 64),
-        ("conversion", 128),
-        ("continuation", 256),
-        ("unknown", 32768),
-        ("any_type", 65535),
-        ("no_type", 0),
+        ("WARC_TYPE", "WARC-Type"),
+        ("WARC_RECORD_ID", "WARC-Record-ID"),
+        ("WARC_DATE", "WARC-Date"),
+        ("CONTENT_LENGTH", "Content-Length"),
+        ("CONTENT_TYPE", "Content-Type"),
+        ("WARC_CONCURRENT_TO", "WARC-Concurrent-To"),
+        ("WARC_BLOCK_DIGEST", "WARC-Block-Digest"),
+        ("WARC_PAYLOAD_DIGEST", "WARC-Payload-Digest"),
+        ("WARC_IP_ADDRESS", "WARC-IP-Address"),
+        ("WARC_REFERS_TO", "WARC-Refers-To"),
+        ("WARC_REFERS_TO_TARGET_URI", "WARC-Refers-To-Target-URI"),
+        ("WARC_REFERS_TO_DATE", "WARC-Refers-To-Date"),
+        ("WARC_TARGET_URI", "WARC-Target-URI"),
+        ("WARC_TRUNCATED", "WARC-Truncated"),
+        ("WARC_WARCINFO_ID", "WARC-Warcinfo-ID"),
+        ("WARC_FILENAME", "WARC-Filename"),
+        ("WARC_PROFILE", "WARC-Profile"),
+        ("WARC_IDENTIFIED_PAYLOAD_TYPE", "WARC-Identified-Payload-Type"),
+        ("WARC_SEGMENT_ORIGIN_ID", "WARC-Segment-Origin-ID"),
+        ("WARC_SEGMENT_NUMBER", "WARC-Segment-Number"),
+        ("WARC_SEGMENT_TOTAL_LENGTH", "WARC-Segment-Total-Length"),
     ],
 )
-def test_warc_record_type_conversions(name: str, value: int):
-    record_type = getattr(WarcRecordType, name)
+def test_warc_header_conversions(name: str, value: str):
+    header = getattr(WarcHeader, name)
 
-    assert record_type == value
-    assert getattr(fastwarc.warc, name) == record_type
-    assert int(record_type) == value
+    assert getattr(fastwarc.warc, "WarcHeader") is WarcHeader
+    assert getattr(WarcHeader, name) == header
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("WARC_TYPE", "WARC-Type"),
+        ("WARC_RECORD_ID", "WARC-Record-ID"),
+        ("WARC_DATE", "WARC-Date"),
+        ("CONTENT_LENGTH", "Content-Length"),
+        ("CONTENT_TYPE", "Content-Type"),
+        ("WARC_CONCURRENT_TO", "WARC-Concurrent-To"),
+        ("WARC_BLOCK_DIGEST", "WARC-Block-Digest"),
+        ("WARC_PAYLOAD_DIGEST", "WARC-Payload-Digest"),
+        ("WARC_IP_ADDRESS", "WARC-IP-Address"),
+        ("WARC_REFERS_TO", "WARC-Refers-To"),
+        ("WARC_REFERS_TO_TARGET_URI", "WARC-Refers-To-Target-URI"),
+        ("WARC_REFERS_TO_DATE", "WARC-Refers-To-Date"),
+        ("WARC_TARGET_URI", "WARC-Target-URI"),
+        ("WARC_TRUNCATED", "WARC-Truncated"),
+        ("WARC_WARCINFO_ID", "WARC-Warcinfo-ID"),
+        ("WARC_FILENAME", "WARC-Filename"),
+        ("WARC_PROFILE", "WARC-Profile"),
+        ("WARC_IDENTIFIED_PAYLOAD_TYPE", "WARC-Identified-Payload-Type"),
+        ("WARC_SEGMENT_ORIGIN_ID", "WARC-Segment-Origin-ID"),
+        ("WARC_SEGMENT_NUMBER", "WARC-Segment-Number"),
+        ("WARC_SEGMENT_TOTAL_LENGTH", "WARC-Segment-Total-Length"),
+    ],
+)
+def test_warc_header_str_and_repr(name: str, value: str):
+    header = getattr(WarcHeader, name)
+
+    assert str(header) == value
+    assert repr(header) == f"WarcHeader.{name}"
 
 
 @pytest.mark.parametrize(
@@ -189,6 +231,18 @@ def test_header_map_binding_surface():
     assert len(headers) == 0
     assert headers.status_line is None
 
+    headers.set(WarcHeader.CONTENT_TYPE, "text/plain")
+    headers.set_bytes(WarcHeader.CONTENT_LENGTH, b"12")
+    assert headers.get(WarcHeader.CONTENT_TYPE) == "text/plain"
+    assert headers.get_bytes(WarcHeader.CONTENT_LENGTH) == b"12"
+    assert headers.contains_key(WarcHeader.CONTENT_TYPE)
+    assert headers.contains_key_bytes(WarcHeader.CONTENT_LENGTH)
+    headers[WarcHeader.WARC_RECORD_ID] = "<urn:uuid:test>"
+    assert headers[WarcHeader.WARC_RECORD_ID] == "<urn:uuid:test>"
+    headers.remove(WarcHeader.CONTENT_TYPE)
+    headers.remove_bytes(WarcHeader.CONTENT_LENGTH)
+    assert not headers.contains_key(WarcHeader.CONTENT_TYPE)
+
 
 def test_http_headers_absent_on_non_http_record():
     record = WarcRecord()
@@ -233,7 +287,7 @@ def test_header_write_parse_roundtrip():
 def test_warc_record_write():
     record = _make_http_record()
     record.record_date = dt.datetime(2025, 5, 1, 12, 30, tzinfo=dt.timezone(dt.timedelta(hours=2)))
-    record.headers["WARC-Concurrent-To"] = "<urn:uuid:other>"
+    record.headers[WarcHeader.WARC_CONCURRENT_TO] = "<urn:uuid:other>"
 
     payload_digest = hashlib.sha1(HTTP_BODY).digest()
     stream = io.BytesIO()
@@ -550,7 +604,7 @@ def test_archive_iterator_inplace():
             is_concurrent,
             False,
             16 * 2,
-            lambda rec: 'WARC-Concurrent-To' in rec.headers,
+            lambda rec: WarcHeader.WARC_CONCURRENT_TO in rec.headers,
             id="is-concurrent",
         ),
         pytest.param(

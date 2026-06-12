@@ -258,9 +258,9 @@
 //!     let body = record.with_mut(|r| -> io::Result<&[u8]> {
 //!         r.headers();            // Map-like object containing the WARC headers.
 //!         r.headers_mut();        // Mutable reference to the WARC headers.
-//!         r.record_id();          // Shorthand for record.headers().get("WARC-Record-ID").
-//!         r.record_type();        // Shorthand for record.headers().get("WARC-Type").
-//!         r.record_date();        // Parsed record.headers().get("WARC-Date").
+//!         r.record_id();          // Shorthand for record.headers().get(WarcHeader::WarcRecordId).
+//!         r.record_type();        // Shorthand for record.headers().get(WarcHeader::WarcType).
+//!         r.record_date();        // Parsed record.headers().get(WarcHeader::WarcDate).
 //!         r.content_length();     // Effective record payload length.
 //!         r.stream_pos();         // Record start offset in the (uncompressed) stream.
 //!         r.is_http();            // Boolean indicating whether record is an HTTP record.
@@ -326,17 +326,18 @@
 //! # use fastwarc::warc::record::WarcRecord;
 //! use fastwarc::warc::record::{SharedWarcRecord, DigestError};
 //! use std::io::{self, Read};
+//! use fastwarc::warc::header::WarcHeader;
 //!
 //! # let in_file = io::Cursor::new(Vec::new());
 //! for record in ArchiveIterator::new(in_file).with_parse_http(false) {
 //!     record.expect("Error reading record").with_mut(|r| -> Result<(), DigestError> {
 //!
-//!         if r.headers().contains_key("WARC-Block-Digest") {
+//!         if r.headers().contains_key(WarcHeader::WarcBlockDigest) {
 //!             // consume = false means do not consume record body (record will be frozen).
 //!             println!("Block digest OK: {}", r.verify_block_digest(false)?);
 //!         }
 //!
-//!         if r.headers().contains_key("WARC-Payload-Digest") {
+//!         if r.headers().contains_key(WarcHeader::WarcPayloadDigest) {
 //!             // It's safe to call this even if the record has no HTTP payload.
 //!             r.parse_http();
 //!             println!("Payload digest OK: {}", r.verify_payload_digest(false)?);
@@ -377,6 +378,7 @@
 //! ```
 //! use fastwarc::warc::record::{WarcRecord, WarcRecordType};
 //! use std::fs::File;
+//! use fastwarc::warc::header::WarcHeader;
 //!
 //! let mut record = WarcRecord::new();
 //!
@@ -387,7 +389,7 @@
 //! record.init_headers(WarcRecordType::Response, None);
 //!
 //! // Set the target ID header.
-//! record.headers_mut().append_bytes(b"WARC-Target-URI", b"https://example.com/index.html");
+//! record.headers_mut().append_bytes(WarcHeader::WarcRecordId, b"https://example.com/index.html");
 //!
 //! // Set the payload bytes (automatically adjusts the Content-Length header).
 //! let payload = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\

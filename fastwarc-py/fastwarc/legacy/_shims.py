@@ -14,9 +14,11 @@
 
 # Legacy shims for making the new Rust extension work with the old type names
 
-try:
+import sys
+
+if sys.version_info >= (3, 13):
     from warnings import deprecated
-except ImportError:
+else:
     from typing_extensions import deprecated
 
 __all__ = [

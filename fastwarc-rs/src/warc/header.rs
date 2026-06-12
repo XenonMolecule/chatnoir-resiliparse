@@ -194,6 +194,76 @@ pub struct HeaderMap {
     pub(super) headers: Vec<CowHeaderTuple>,
 }
 
+/// Pre-defined set of standard WARC 1.1 headers.
+/// This enum can be used in place of raw byte or Unicode strings for better type safety.
+pub enum WarcHeader {
+    WarcType,
+    WarcRecordId,
+    WarcDate,
+    ContentLength,
+    ContentType,
+    WarcConcurrentTo,
+    WarcBlockDigest,
+    WarcPayloadDigest,
+    WarcIpAddress,
+    WarcRefersTo,
+    WarcRefersToTargetUri,
+    WarcRefersToDate,
+    WarcTargetUri,
+    WarcTruncated,
+    WarcWarcinfoId,
+    WarcFilename,
+    WarcProfile,
+    WarcIdentifiedPayloadType,
+    WarcSegmentOriginId,
+    WarcSegmentNumber,
+    WarcSegmentTotalLength,
+}
+
+impl WarcHeader {
+    /// Return the string representation of the header.
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WarcHeader::WarcType => "WARC-Type",
+            WarcHeader::WarcRecordId => "WARC-Record-ID",
+            WarcHeader::WarcDate => "WARC-Date",
+            WarcHeader::ContentLength => "Content-Length",
+            WarcHeader::ContentType => "Content-Type",
+            WarcHeader::WarcConcurrentTo => "WARC-Concurrent-To",
+            WarcHeader::WarcBlockDigest => "WARC-Block-Digest",
+            WarcHeader::WarcPayloadDigest => "WARC-Payload-Digest",
+            WarcHeader::WarcIpAddress => "WARC-IP-Address",
+            WarcHeader::WarcRefersTo => "WARC-Refers-To",
+            WarcHeader::WarcRefersToTargetUri => "WARC-Refers-To-Target-URI",
+            WarcHeader::WarcRefersToDate => "WARC-Refers-To-Date",
+            WarcHeader::WarcTargetUri => "WARC-Target-URI",
+            WarcHeader::WarcTruncated => "WARC-Truncated",
+            WarcHeader::WarcWarcinfoId => "WARC-Warcinfo-ID",
+            WarcHeader::WarcFilename => "WARC-Filename",
+            WarcHeader::WarcProfile => "WARC-Profile",
+            WarcHeader::WarcIdentifiedPayloadType => "WARC-Identified-Payload-Type",
+            WarcHeader::WarcSegmentOriginId => "WARC-Segment-Origin-ID",
+            WarcHeader::WarcSegmentNumber => "WARC-Segment-Number",
+            WarcHeader::WarcSegmentTotalLength => "WARC-Segment-Total-Length",
+        }
+    }
+}
+
+impl AsRef<str> for WarcHeader {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<[u8]> for WarcHeader {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_str().as_bytes()
+    }
+}
+
 impl HeaderMap {
     /// Create a new header map with the specified encoding.
     ///
@@ -675,10 +745,10 @@ impl HeaderMap {
 
     /// Internal function for appending a header without sanitization
     /// (assumes data is already sanitized). Still trims leading and trailing white space.
-    pub(super) fn append_bytes_no_sanitize(&mut self, key: &[u8], value: &[u8]) {
+    pub(super) fn append_bytes_no_sanitize(&mut self, key: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
         self.dirty = true;
         self.headers
-            .push(CowHeaderTuple::Owned(key.trim_ascii().to_vec(), value.trim_ascii().to_vec()));
+            .push(CowHeaderTuple::Owned(key.as_ref().trim_ascii().to_vec(), value.as_ref().trim_ascii().to_vec()));
     }
 
     /// Remove a header if it exists.

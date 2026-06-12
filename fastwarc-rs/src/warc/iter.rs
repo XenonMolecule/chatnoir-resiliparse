@@ -442,6 +442,7 @@ where
 
 /// Filter predicates to be used with [`ArchiveIterator::with_filter()`].
 pub mod filter {
+    use crate::warc::header::WarcHeader;
     use crate::warc::record::WarcRecord;
     use std::fmt::Debug;
 
@@ -463,7 +464,7 @@ pub mod filter {
 
     /// Filter predicate for checking if a record has a block digest.
     pub fn has_block_digest(record: &mut WarcRecord) -> bool {
-        record.headers().contains_key_bytes(b"WARC-Block-Digest")
+        record.headers().contains_key_bytes(WarcHeader::WarcBlockDigest)
     }
 
     /// Filter predicate for checking if a record's WARC-Block-Digest is valid.
@@ -474,7 +475,7 @@ pub mod filter {
 
     /// Filter predicate for checking if a record has a payload digest.
     pub fn has_payload_digest(record: &mut WarcRecord) -> bool {
-        record.headers().contains_key_bytes(b"WARC-Payload-Digest")
+        record.headers().contains_key_bytes(WarcHeader::WarcPayloadDigest)
     }
 
     /// Filter predicate for checking if a record's WARC-Payload-Digest is valid.
@@ -490,7 +491,7 @@ pub mod filter {
 
     /// Filter predicate for checking if a record is concurrent to another record.
     pub fn is_concurrent(record: &mut WarcRecord) -> bool {
-        record.headers().contains_key_bytes(b"WARC-Concurrent-To")
+        record.headers().contains_key_bytes(WarcHeader::WarcConcurrentTo)
     }
 
     /// Parameterized filter predicate for checking if a record's record type matches the given bitmask

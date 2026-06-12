@@ -201,9 +201,11 @@ Besides these, you can pass any Python callable that accepts a :class:`.WarcReco
 
 .. code-block:: python
 
+   from fastwarc import WarcHeader
+
    # Skip records which haven't been identified as HTML pages
    for record in ArchiveIterator(stream,
-         func_filter=lambda r: r.headers.get('WARC-Identified-Payload-Type') == 'text/html'):
+         func_filter=lambda r: r.headers.get(WarcHeader.WARC_IDENTIFIED_PAYLOAD_TYPE) == 'text/html'):
        pass
 
 Pure Python functions are less efficient than FastWARC's provided function filters, so try to keep them minimal.
@@ -241,9 +243,9 @@ The :class:`.ArchiveIterator` returns objects of type :class:`.WarcRecord`, whic
 
    for record in ArchiveIterator(stream):
        record.headers              # Dict-like object containing the WARC headers
-       record.record_id            # Shorthand for record.headers['WARC-Record-ID']
-       record.record_type          # Shorthand for record.headers['WARC-Type']
-       record.record_date          # Parsed record.headers['WARC-Date']
+       record.record_id            # Shorthand for record.headers[WarcHeader.WARC_RECORD_ID]
+       record.record_type          # Shorthand for record.headers[WarcHeader.WARC_TYPE]
+       record.record_date          # Parsed record.headers[WarcHeader.WARC_DATE]
        record.content_length       # Effective record payload length
        record.stream_pos           # Record start offset in the (uncompressed) stream
        record.is_http              # Boolean indicating whether record is an HTTP record
@@ -283,11 +285,13 @@ If a record has digest headers, you can verify the consistency of the record con
 
 .. code-block:: python
 
+   from fastwarc import WarcHeader
+
    for record in ArchiveIterator(stream, parse_http=False):
-       if 'WARC-Block-Digest' in record.headers:
+       if WarcHeader.WARC_BLOCK_DIGEST in record.headers:
            print('Block digest OK:', record.verify_block_digest(consume=False))
 
-       if 'WARC-Payload-Digest' in record.headers:
+       if WarcHeader.WARC_PAYLOAD_DIGEST in record.headers:
            # It's safe to call this even if the record has no HTTP payload
            record.parse_http()
            print('Payload digest OK:', record.verify_payload_digest(consume=False))
@@ -325,7 +329,7 @@ Here's how you can create a new record and populate it with headers and a payloa
    record.init_headers(WarcRecordType.response, None)
 
    # Set the target ID header.
-   record.headers.append_bytes(b'WARC-Target-URI', b'https://example.com/index.html')
+   record.headers.append_bytes(WarcHeader.WARC_TARGET_URI, b'https://example.com/index.html')
 
    # Set the payload bytes (automatically adjusts the Content-Length header).
    payload = (b'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' +

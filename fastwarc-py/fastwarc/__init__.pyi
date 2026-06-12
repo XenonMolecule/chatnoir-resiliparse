@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .warc import ArchiveIterator, WarcRecord, WarcRecordType
+from .warc import ArchiveIterator, WarcHeader, WarcRecord, WarcRecordType
 from .stream_io import (
     GzipReader,
     GzipWriter,
@@ -31,6 +31,7 @@ from .stream_io import (
 
 __all__ = [
     'ArchiveIterator',
+    'WarcHeader',
     'WarcRecord',
     'WarcRecordType',
     'GzipReader',
