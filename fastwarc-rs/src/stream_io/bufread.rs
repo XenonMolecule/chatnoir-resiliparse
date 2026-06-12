@@ -228,7 +228,7 @@ impl<T: BufReadSeek> RawReaderAdapter<T> {
     }
 }
 
-impl<T> WarcRead for RawReaderAdapter<T>
+impl<T: Send> WarcRead for RawReaderAdapter<T>
 where
     T: BufReadSeek,
 {
@@ -286,7 +286,7 @@ impl<T: ReadSeek> IntoWarcReader for BufReader<T> {
     }
 }
 
-impl<T: AsRef<[u8]> + 'static> IntoWarcReader for io::Cursor<T> {
+impl<T: AsRef<[u8]> + Send + 'static> IntoWarcReader for io::Cursor<T> {
     #[inline]
     fn into_warc_reader(self) -> Box<dyn WarcRead> {
         Box::new(RawReaderAdapter::new(self))
@@ -397,7 +397,7 @@ impl<T: _Write> IntoWarcWriter for io::BufWriter<T> {
 
 impl<T> IntoWarcWriter for io::Cursor<T>
 where
-    T: AsMut<[u8]> + 'static,
+    T: AsMut<[u8]> + Send + 'static,
     io::Cursor<T>: Write,
 {
     #[inline]

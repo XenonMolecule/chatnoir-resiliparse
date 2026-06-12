@@ -30,7 +30,6 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 #[test]
 fn archive_iterator_option_setters() -> io::Result<()> {

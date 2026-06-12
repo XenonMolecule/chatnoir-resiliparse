@@ -248,7 +248,7 @@ impl HeaderKeyBytesPy {
 /// Dict-like type representing a WARC or HTTP header block.
 ///
 /// :param encoding: header source encoding
-#[pyclass(name = "HeaderMap", module = "fastwarc.warc", unsendable)]
+#[pyclass(name = "HeaderMap", module = "fastwarc.warc")]
 pub struct HeaderMapPy {
     inner: HeaderMapBacking,
 }
@@ -691,7 +691,7 @@ impl HeaderMapPy {
 /// This object is tied to the lifetime of its parent :class:`WarcRecord`. If the
 /// record belongs to an active :class:`ArchiveIterator`, the reader becomes stale
 /// once iteration advances unless the record has been frozen with :meth:`WarcRecord.freeze`.
-#[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy, unsendable)]
+#[pyclass(name = "WarcRecordPayloadReader", module = "fastwarc.warc", extends = WarcReaderPy)]
 pub struct WarcRecordPayloadReaderPy {
     record: Arc<Mutex<WarcRecord>>,
 }
@@ -779,7 +779,7 @@ impl WarcRecordPayloadReaderPy {
 ///
 /// WARC records are pickleable. Pickling preserves the current record state,
 /// including parsed HTTP headers if they have already been parsed.
-#[pyclass(name = "WarcRecord", subclass, module = "fastwarc.warc", unsendable)]
+#[pyclass(name = "WarcRecord", subclass, module = "fastwarc.warc")]
 pub struct WarcRecordPy {
     inner: Arc<Mutex<WarcRecord>>,
 }
@@ -1348,9 +1348,9 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 ///                 a new instance in each iteration.
 /// :param fsspec_args: arguments for :mod:`fsspec`, or ``False`` to disable it
 /// :param strict_mode: this argument is deprecated and ignored. Use ``quirks_mode`` instead.
-#[pyclass(name = "ArchiveIterator", module = "fastwarc.warc", unsendable)]
+#[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
 pub struct ArchiveIteratorPy {
-    inner: Box<dyn ArchiveIteratorTrait<Arc<Mutex<WarcRecord>>>>,
+    inner: Box<dyn ArchiveIteratorTrait<Arc<Mutex<WarcRecord>>> + Send + Sync>,
     func_filter: Option<Py<PyAny>>,
     inplace: bool,
     current_record: Option<Py<WarcRecordPy>>,

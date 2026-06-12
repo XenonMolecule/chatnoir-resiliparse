@@ -19,8 +19,8 @@ use std::io;
 // Global trait definitions
 // ===========================================================
 
-pub trait ReadSeek: io::Read + io::Seek + 'static {}
-impl<T: io::Read + io::Seek + ?Sized + 'static> ReadSeek for T {}
+pub trait ReadSeek: io::Read + io::Seek + Send + 'static {}
+impl<T: io::Read + io::Seek + Send + ?Sized + 'static> ReadSeek for T {}
 
 pub trait BufReadSeek: ReadSeek + io::BufRead {}
 impl<T: ReadSeek + io::BufRead> BufReadSeek for T {}
