@@ -461,7 +461,7 @@
 //! let mut response = WarcRecord::new();
 //! response.init_headers(WarcRecordType::Response, None);
 //! response.set_bytes_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
-//!                           <!DOCTYPE html><html><body>Hello, world!</body></html>".to_vec());
+//!                            <!DOCTYPE html><html><body>Hello, world!</body></html>".to_vec());
 //! response.set_is_http(true);
 //!
 //! if let Err(e) = || -> std::io::Result<()> {
