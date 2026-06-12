@@ -35,3 +35,5 @@ with open(base_path / 'resiliparse-py/pyproject.toml', 'w') as f:
     f.write(re.sub(r'"fastwarc==\d+\.\d+\.\d+"',
                    f'"fastwarc=={cargo_ver}"',
                    resiliparse_toml))
+
+run(['cargo', 'generate-lockfile'], cwd=base_path)
