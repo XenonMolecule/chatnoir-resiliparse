@@ -104,7 +104,7 @@ If `fsspec <https://filesystem-spec.readthedocs.io/>`__ is installed (which is a
 
 .. code-block:: python
 
-   from fastwarc.warc import ArchiveIterator
+   from fastwarc import ArchiveIterator
 
    # Read remote S3 object (with optional credentials)
    creds = {'key': '...',
@@ -370,7 +370,7 @@ Instead of constructing the record manually, you can also parse an existing byte
    # Unless the record has been mutated, the output is guaranteed to be byte-identical.
    assert in_buf == out_buf.getvalue()
 
-You can also use :meth:`.WarcRecord.write` with `checksum_data=True` to automatically calculate and write SHA-1 checksums of the record contents and HTTP payload (if available).
+You can also use :meth:`.WarcRecord.write` with ``checksum_data=True`` to automatically calculate and write SHA-1 checksums of the record contents and HTTP payload (if available).
 
 Write Compressed WARCs
 ^^^^^^^^^^^^^^^^^^^^^^
