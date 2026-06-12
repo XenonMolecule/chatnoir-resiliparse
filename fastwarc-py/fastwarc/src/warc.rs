@@ -142,7 +142,8 @@ impl WarcRecordTypePy {
 // ===========================================================
 
 /// Pre-defined set of standard WARC 1.1 headers.
-/// This enum can be used in place of ``bytes`` or ``str`` values in  :class:`HeaderMap` methods.
+/// This enum can be used in place of ``bytes`` or ``str`` values in  :class:`HeaderMap` methods
+/// to void misspellings.
 #[allow(non_camel_case_types)]
 #[pyclass(name = "WarcHeader", module = "fastwarc.warc", eq, from_py_object)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

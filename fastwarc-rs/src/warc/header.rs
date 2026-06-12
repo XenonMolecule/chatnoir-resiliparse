@@ -195,7 +195,7 @@ pub struct HeaderMap {
 }
 
 /// Pre-defined set of standard WARC 1.1 headers.
-/// This enum can be used in place of raw byte or Unicode strings for better type safety.
+/// This enum can be used in place of raw byte or Unicode strings to void misspellings.
 pub enum WarcHeader {
     WarcType,
     WarcRecordId,
