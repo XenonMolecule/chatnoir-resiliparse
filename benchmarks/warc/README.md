@@ -99,9 +99,10 @@ Summary: 0.8s, 137433 records/s, 6372.2 MiB/s, 47.5 KiB/rec (114274 total, 5298.
 
 Following is a summary of the benchmarking results as a table. More details can be found in the individual subfolders.
 
-The rows are sorted by best uncompressed throughput. Compressed times can vary greatly based on the compressor
-implementation used. FastWARC generally has the fastest (de-)compressors and is beaten only by `libarchive`'s LZ4
-implementation.
+The rows are sorted by best uncompressed throughput. The legacy Cython implementation of FastWARC is marked with
+*(legacy)*. Compressed times can vary greatly based on the compressor implementation used. FastWARC generally has the
+fastest (de-)compressors and is beaten only by `libarchive`'s LZ4 implementation. The LZ4 performance of the legacy
+Cython implementation is also slightly better, meaning that the LZ4 Rust library is not yet on par with liblz4 in C.
 
 FastWARC and `libarchive` both have the overall fastest parsers. FastWARC comes out on top when the WARC file is
 read from a cold disk instead of from the page cache (or directly from RAM) or when the WARC is compressed (which is
@@ -119,21 +120,22 @@ records also matters a lot.
 These results were measured on an AMD Ryzen Threadripper 2920X 12-Core CPU with a Samsung 980PRO NVMe SSD (single-core
 performance, read buffer size: 1 MiB).
 
-| Parser         | Time (Uncompressed) | Time (Gzip) | Time (Zstd) | Time (LZ4) | MiB/s (Uncompressed) | MiB/s (Gzip) | MiB/s (Zstd) | MiB/s (LZ4) |
-|----------------|--------------------:|------------:|------------:|-----------:|---------------------:|-------------:|-------------:|------------:|
-| `fastwarc`     |                3.4s |        6.6s |        5.1s |       3.3s |               1539.7 |        797.0 |       1030.0 |      1586.9 |
-| `fastwarc-py`  |                3.5s |        6.9s |        5.4s |       3.5s |               1502.0 |        763.7 |        980.5 |      1523.2 |
-| `rust_warc`    |                4.0s |       11.6s |           - |          - |               1320.2 |        457.4 |            - |           - |
-| `libarchive`   |                4.5s |       11.1s |       12.5s |       2.8s |               1174.5 |        478.2 |        423.9 |      1881.2 |
-| `slyrz_warc`   |                5.1s |       23.0s |           - |          - |               1031.1 |        230.7 |            - |           - |
-| `warcio.js`    |                5.6s |       43.8s |           - |          - |                952.0 |        119.8 |            - |           - |
-| `gowarc`       |                6.0s |       35.1s |        9.1s |          - |                876.2 |        150.8 |        584.9 |           - |
-| `warc-rs`      |                6.1s |       13.7s |           - |          - |                874.0 |        386.3 |            - |           - |
-| `jwarc`        |                7.8s |       14.0s |          -* |          - |                681.4 |        379.7 |           -* |           - |
-| `warcpp`       |                8.0s |           - |           - |          - |                652.5 |            - |            - |           - |
-| `node-warc`    |               13.4s |       33.9s |           - |          - |                396.3 |        156.3 |            - |           - |
-| `warcio`       |               15.7s |       25.9s |           - |          - |                338.2 |        204.9 |            - |           - |
-| `warcprotocol` |               20.6s |      137.5s |           - |          - |                257.8 |         38.5 |            - |           - |
+| Parser                   | Time (Uncompressed) | Time (Gzip) | Time (Zstd) | Time (LZ4) | MiB/s (Uncompressed) | MiB/s (Gzip) | MiB/s (Zstd) | MiB/s (LZ4) |
+|--------------------------|--------------------:|------------:|------------:|-----------:|---------------------:|-------------:|-------------:|------------:|
+| `fastwarc`               |                3.4s |        6.6s |        5.1s |       3.3s |               1539.7 |        797.0 |       1030.0 |      1586.9 |
+| `fastwarc-py`            |                3.6s |        6.8s |        5.4s |       3.5s |               1463.6 |        783.1 |        985.2 |      1517.8 |
+| `fastwarc-py` *(legacy)* |                4.0s |       12.9s |           - |       3.0s |               1323.8 |        411.5 |            - |      1760.5 |
+| `rust_warc`              |                4.0s |       11.6s |           - |          - |               1320.2 |        457.4 |            - |           - |
+| `libarchive`             |                4.5s |       11.1s |       12.5s |       2.8s |               1174.5 |        478.2 |        423.9 |      1881.2 |
+| `slyrz_warc`             |                5.1s |       23.0s |           - |          - |               1031.1 |        230.7 |            - |           - |
+| `warcio.js`              |                5.6s |       43.8s |           - |          - |                952.0 |        119.8 |            - |           - |
+| `gowarc`                 |                6.0s |       35.1s |        9.1s |          - |                876.2 |        150.8 |        584.9 |           - |
+| `warc-rs`                |                6.1s |       13.7s |           - |          - |                874.0 |        386.3 |            - |           - |
+| `jwarc`                  |                7.8s |       14.0s |          -* |          - |                681.4 |        379.7 |           -* |           - |
+| `warcpp`                 |                8.0s |           - |           - |          - |                652.5 |            - |            - |           - |
+| `node-warc`              |               13.4s |       33.9s |           - |          - |                396.3 |        156.3 |            - |           - |
+| `warcio`                 |               15.7s |       25.9s |           - |          - |                338.2 |        204.9 |            - |           - |
+| `warcprotocol`           |               20.6s |      137.5s |           - |          - |                257.8 |         38.5 |            - |           - |
 
 \* `jwarc` generally supports reading Zstd WARCs, but the iterator could not finish the test file.
 
@@ -143,20 +145,21 @@ These results were measured on an AMD Ryzen Threadripper 2920X 12-Core CPU with 
 (single-core performance, read buffer size: 1 MiB). This measures the raw parser speed, but is not a particularly
 realistic benchmark.
 
-| Parser         | Time (Uncompressed) | Time (Gzip) | Time (Zstd) | Time (LZ4) | MiB/s (Uncompressed) | MiB/s (Gzip) | MiB/s (Zstd) | MiB/s (LZ4) |
-|----------------|--------------------:|------------:|------------:|-----------:|---------------------:|-------------:|-------------:|------------:|
-| `fastwarc`     |                0.8s |        6.0s |        4.6s |       2.4s |               6372.2 |        879.6 |       1160.6 |      2184.6 |
-| `libarchive`   |                0.8s |       10.5s |       11.7s |       1.8s |               6237.3 |        504.9 |        454.5 |      2943.9 |
-| `fastwarc-py`  |                1.0s |        6.1s |        4.7s |       2.6s |               5256.8 |        870.6 |       1128.1 |      2072.1 |
-| `rust_warc`    |                1.4s |       10.8s |           - |          - |               3843.3 |        489.5 |            - |           - |
-| `slyrz_warc`   |                1.9s |       22.5s |           - |          - |               2860.6 |        235.6 |            - |           - |
-| `gowarc`       |                2.0s |       34.3s |        8.2s |          - |               2659.3 |        154.3 |        644.1 |           - |
-| `warcio.js`    |                2.1s |       43.8s |           - |          - |               2466.1 |        120.0 |            - |           - |
-| `jwarc`        |                2.7s |       13.5s |          -* |          - |               1927.1 |        393.3 |           -* |           - |
-| `warc-rs`      |                3.6s |       13.4s |           - |          - |               1461.1 |        394.7 |            - |           - |
-| `warcpp`       |                4.6s |           - |           - |          - |               1139.3 |            - |            - |           - |
-| `node-warc`    |                9.7s |       34.4s |           - |          - |                546.5 |        154.0 |            - |           - |
-| `warcio`       |               12.8s |       24.9s |           - |          - |                414.3 |        212.4 |            - |           - |
-| `warcprotocol` |               18.2s |      141.2s |           - |          - |                291.6 |         37.5 |            - |           - |
+| Parser                   | Time (Uncompressed) | Time (Gzip) | Time (Zstd) | Time (LZ4) | MiB/s (Uncompressed) | MiB/s (Gzip) | MiB/s (Zstd) | MiB/s (LZ4) |
+|--------------------------|--------------------:|------------:|------------:|-----------:|---------------------:|-------------:|-------------:|------------:|
+| `fastwarc`               |                0.8s |        6.0s |        4.6s |       2.4s |               6372.2 |        879.6 |       1160.6 |      2184.6 |
+| `libarchive`             |                0.8s |       10.5s |       11.7s |       1.8s |               6237.3 |        504.9 |        454.5 |      2943.9 |
+| `fastwarc-py`            |                0.9s |        6.0s |        4.6s |       2.6s |               5666.2 |        890.3 |       1142.4 |      2045.1 |
+| `rust_warc`              |                1.4s |       10.8s |           - |          - |               3843.3 |        489.5 |            - |           - |
+| `fastwarc-py` *(legacy)* |                1.5s |       12.3s |           - |       2.3s |               3513.4 |        431.8 |            - |      2344.3 |
+| `slyrz_warc`             |                1.9s |       22.5s |           - |          - |               2860.6 |        235.6 |            - |           - |
+| `gowarc`                 |                2.0s |       34.3s |        8.2s |          - |               2659.3 |        154.3 |        644.1 |           - |
+| `warcio.js`              |                2.1s |       43.8s |           - |          - |               2466.1 |        120.0 |            - |           - |
+| `jwarc`                  |                2.7s |       13.5s |          -* |          - |               1927.1 |        393.3 |           -* |           - |
+| `warc-rs`                |                3.6s |       13.4s |           - |          - |               1461.1 |        394.7 |            - |           - |
+| `warcpp`                 |                4.6s |           - |           - |          - |               1139.3 |            - |            - |           - |
+| `node-warc`              |                9.7s |       34.4s |           - |          - |                546.5 |        154.0 |            - |           - |
+| `warcio`                 |               12.8s |       24.9s |           - |          - |                414.3 |        212.4 |            - |           - |
+| `warcprotocol`           |               18.2s |      141.2s |           - |          - |                291.6 |         37.5 |            - |           - |
 
 \* `jwarc` generally supports reading Zstd WARCs, but the iterator could not finish the test file. 
