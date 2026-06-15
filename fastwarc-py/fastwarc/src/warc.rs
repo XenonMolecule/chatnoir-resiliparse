@@ -459,15 +459,11 @@ impl HeaderMapPy {
     ///
     pub fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        let items = self.with_headers(|h| {
+        self.with_headers(|h| {
             h.to_map()
                 .into_iter()
-                .map(|(k, v)| (k.as_ref().to_string(), v))
-                .collect::<Vec<_>>()
-        });
-        for (key, value) in items {
-            dict.set_item(key.as_str(), value.as_str())?;
-        }
+                .try_for_each(|(key, value)| dict.set_item(key.as_ref(), value.as_str()))
+        })?;
         Ok(dict)
     }
 
@@ -523,14 +519,10 @@ impl HeaderMapPy {
     /// :param key: header key
     pub fn get_multiple<'py>(&self, py: Python<'py>, key: HeaderKeyStrPy) -> PyResult<Bound<'py, PyTuple>> {
         let key = key.into_string();
-        let values = self.with_headers(|h| {
-            h.get_multiple(&key)
-                .into_iter()
-                .map(|s| s.into_owned())
-                .collect::<Vec<_>>()
-        });
-        let items = values.into_iter().map(|s| PyString::new(py, &s));
-        PyTuple::new(py, items)
+        self.with_headers(|h| {
+            let items = h.get_multiple(&key).into_iter().map(|s| PyString::new(py, &s));
+            PyTuple::new(py, items)
+        })
     }
 
     #[pyo3(signature = (key, default=None))]
@@ -548,14 +540,13 @@ impl HeaderMapPy {
 
     pub fn get_bytes_multiple<'py>(&self, py: Python<'py>, key: HeaderKeyBytesPy) -> PyResult<Bound<'py, PyTuple>> {
         let key = key.into_bytes();
-        let values = self.with_headers(|h| {
-            h.get_bytes_multiple(&key)
+        self.with_headers(|h| {
+            let items = h
+                .get_bytes_multiple(&key)
                 .into_iter()
-                .map(|s| s.into_owned())
-                .collect::<Vec<_>>()
-        });
-        let items = values.into_iter().map(|s| PyBytes::new(py, &s));
-        PyTuple::new(py, items)
+                .map(|s| PyBytes::new(py, s.as_ref()));
+            PyTuple::new(py, items)
+        })
     }
 
     pub fn contains_key(&self, key: HeaderKeyStrPy) -> bool {
