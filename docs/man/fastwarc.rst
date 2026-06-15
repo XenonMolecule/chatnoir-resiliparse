@@ -192,17 +192,17 @@ Other Function Filters
 ^^^^^^^^^^^^^^^^^^^^^^
 The full list of pre-defined function filters is:
 
-- :func:`.is_warc_10`
-- :func:`.is_warc_11`
-- :func:`.has_block_digest`
-- :func:`.has_valid_block_digest`
-- :func:`.has_payload_digest`
-- :func:`.has_valid_payload_digest`
-- :func:`.is_http`
-- :func:`.is_concurrent`
-- :func:`.has_record_type`
-- :func:`.has_content_length_lte`
-- :func:`.has_content_length_gte`
+- :func:`is_warc_10 <.is_warc_10>`
+- :func:`is_warc_11 <.is_warc_11>`
+- :func:`has_block_digest <.has_block_digest>`
+- :func:`has_valid_block_digest <.has_valid_block_digest>`
+- :func:`has_payload_digest <.has_payload_digest>`
+- :func:`has_valid_payload_digest <.has_valid_payload_digest>`
+- :func:`is_http <.is_http>`
+- :func:`is_concurrent <.is_concurrent>`
+- :func:`has_record_type(...) <.has_record_type>`
+- :func:`has_content_length_lte(...) <.has_content_length_lte>`
+- :func:`has_content_length_gte(...) <.has_content_length_gte>`
 
 :func:`.has_record_type`, :func:`.has_content_length_lte`, and :func:`.has_content_length_gte` are parameterised predicates. They are equivalent to using ``record_types``, ``min_content_length``, and ``max_content_length`` in the :class:`.ArchiveIterator` constructor.
 
