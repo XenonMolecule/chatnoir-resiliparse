@@ -27,13 +27,12 @@ pub mod _fastwarc {
         let py = m.py();
 
         // Load submodules.
+        // Don't add with add_submodule(), otherwise they end up in __all__.
         let stream_io = pyo3::wrap_pymodule!(_stream_io)(py);
         let stream_io = stream_io.bind(py);
-        m.add_submodule(stream_io)?;
 
         let warc = pyo3::wrap_pymodule!(_warc)(py);
         let warc = warc.bind(py);
-        m.add_submodule(warc)?;
 
         // Register submodules to make them importable.
         let sys = PyModule::import(py, "sys")?;
