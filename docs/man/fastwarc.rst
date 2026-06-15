@@ -172,17 +172,21 @@ FastWARC comes with a handful of existing filters that you can use:
 
    from fastwarc.warc import *
 
-   # Skip any non-HTTP records
+   # Skip any non-HTTP records.
    for record in ArchiveIterator(stream, func_filter=is_http):
        pass
 
-   # Skip records without a block digest (without verifying it)
+   # Skip records without a block digest (without verifying it).
    for record in ArchiveIterator(stream, func_filter=has_block_digest):
        pass
 
-   # Skip records that are not WARC/1.1
+   # Skip records that are not WARC/1.1.
    for record in ArchiveIterator(stream, func_filter=is_warc_11):
       pass
+
+   # Skip records that are neither requests nor responses, same as record_types=(request | response).
+   for record in ArchiveIterator(stream, func_filter=has_record_type(request | response)):
+       pass
 
 Other Function Filters
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -196,6 +200,11 @@ The full list of pre-defined function filters is:
 - :func:`.has_valid_payload_digest`
 - :func:`.is_http`
 - :func:`.is_concurrent`
+- :func:`.has_record_type`
+- :func:`.has_content_length_lte`
+- :func:`.has_content_length_gte`
+
+:func:`.has_record_type`, :func:`.has_content_length_lte`, and :func:`.has_content_length_gte` are parameterised predicates. They are equivalent to using ``record_types``, ``min_content_length``, and ``min_content_length`` in the :class:`ArchiveIterator` constructor.
 
 Besides these, you can pass any Python callable that accepts a :class:`.WarcRecord` and returns a ``bool``:
 

@@ -108,11 +108,8 @@ pub mod _warc {
     #[pymodule_export]
     pub use crate::warc::{
         ArchiveIteratorPy, HeaderMapPy, WarcHeaderPy, WarcRecordPayloadReaderPy, WarcRecordPy, WarcRecordTypePy,
-    };
-
-    #[pymodule_export]
-    pub use crate::warc::{
-        has_block_digest_py, has_payload_digest_py, has_valid_block_digest_py, has_valid_payload_digest_py,
-        is_concurrent_py, is_http_py, is_warc_10_py, is_warc_11_py,
+        has_block_digest_py, has_content_length_gte_py, has_content_length_lte_py, has_payload_digest_py,
+        has_record_type_py, has_valid_block_digest_py, has_valid_payload_digest_py, is_concurrent_py, is_http_py,
+        is_warc_10_py, is_warc_11_py,
     };
 }

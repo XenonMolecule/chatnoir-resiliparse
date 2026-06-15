@@ -49,6 +49,9 @@ __all__ = [
     'has_valid_payload_digest',
     'is_http',
     'is_concurrent',
+    'has_content_length_gte',
+    'has_content_length_lte',
+    'has_record_type'
 ]
 
 
@@ -408,3 +411,12 @@ def is_http(record: WarcRecord) -> bool: ...
 
 
 def is_concurrent(record: WarcRecord) -> bool: ...
+
+
+def has_record_type(record_type_bitmask: WarcRecordType | int) -> Callable[[WarcRecord], bool]: ...
+
+
+def has_content_length_lte(max: int) -> Callable[[WarcRecord], bool]: ...
+
+
+def has_content_length_gte(min: int) -> Callable[[WarcRecord], bool]: ...

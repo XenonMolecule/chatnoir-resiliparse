@@ -1351,7 +1351,7 @@ fn http_datetime_to_py<'py>(py: Python<'py>, value: Option<&str>) -> PyResult<Op
 #[pyclass(name = "ArchiveIterator", module = "fastwarc.warc")]
 pub struct ArchiveIteratorPy {
     inner: Box<dyn ArchiveIteratorTrait<Arc<Mutex<WarcRecord>>> + Send + Sync>,
-    func_filter: Option<Py<PyAny>>,
+    py_func_filter: Option<Py<PyAny>>,
     inplace: bool,
     current_record: Option<Py<WarcRecordPy>>,
 }
@@ -1363,6 +1363,33 @@ fn auto_decode_str_to_enum(value: &str) -> PyResult<AutoDecode> {
         "content" => AutoDecode::ContentEncoding,
         "all" => AutoDecode::All,
         _ => return Err(PyValueError::new_err(format!("Invalid value for auto_decode: '{}'", value))),
+    })
+}
+
+/// Distinguish between native and non-native func_filters for more efficient dispatch.
+/// Returns a tuple of options with (native kind, py object), of which one is always `None`.
+fn extract_func_filter(
+    py: Python<'_>,
+    func_filter: Option<Py<PyAny>>,
+) -> PyResult<(Option<NativeFilterKind>, Option<Py<PyAny>>)> {
+    Ok(match func_filter {
+        Some(f) => match f.cast_bound::<NativeFilterPy>(py) {
+            Ok(b) => (Some(b.get().kind), None),
+            Err(_) => {
+                let bound = f.bind(py);
+                let native = if bound.getattr(intern!(py, "__module__"))?.eq("fastwarc.warc")? {
+                    NativeFilterKind::from_name(&bound.getattr(intern!(py, "__name__"))?.extract::<String>()?)
+                } else {
+                    None
+                };
+                if native.is_some() {
+                    (native, None)
+                } else {
+                    (None, Some(f))
+                }
+            }
+        },
+        None => (None, None),
     })
 }
 
@@ -1441,15 +1468,24 @@ impl ArchiveIteratorPy {
             .with_verify_digests(verify_digests)
             .with_decode_http_payload(auto_decode_str_to_enum(auto_decode)?)
             .with_inplace(inplace);
+        let func_filter = extract_func_filter(py, func_filter)?;
+        let native_filter_kind = func_filter.0;
+        let apply_native_func_filter = move |r: &mut WarcRecord| -> bool {
+            match &native_filter_kind {
+                Some(native) => native.apply(r),
+                None => true,
+            }
+        };
 
         let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
         let max_filter = filter::has_content_length_lte(max_content_length.unwrap_or(u64::MAX));
         let type_filter = filter::has_record_type(record_types);
-        let filter = move |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r);
+        let filter =
+            move |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r) && apply_native_func_filter(r);
 
         Ok(Self {
             inner: Box::new(iterator.with_filter(filter)),
-            func_filter,
+            py_func_filter: func_filter.1,
             inplace,
             current_record: None,
         })
@@ -1479,13 +1515,14 @@ impl ArchiveIteratorPy {
             } else {
                 Py::new(py, WarcRecordPy { inner: record.clone() })?
             };
-            // TODO: Use native dispatch for pre-defined filters
-            if let Some(func_filter) = &self.func_filter {
-                let keep = func_filter.bind(py).call1((record_obj.bind(py),))?.is_truthy()?;
-                if !keep {
-                    continue;
-                }
+
+            // Evaluate non-native func_filter.
+            if let Some(func_filter) = &self.py_func_filter
+                && !func_filter.bind(py).call1((record_obj.bind(py),))?.is_truthy()?
+            {
+                continue;
             }
+
             return Ok(Some(record_obj));
         }
     }
@@ -1494,6 +1531,75 @@ impl ArchiveIteratorPy {
 // ===========================================================
 // ArchiveIterator filter predicates
 // ===========================================================
+
+/// Tag identifying pre-defined native filter predicates.
+///
+/// Used by [`ArchiveIteratorPy`] to bypass the Python dispatch when `func_filter`
+/// is one of the pre-defined native filters.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum NativeFilterKind {
+    IsWarc10,
+    IsWarc11,
+    HasBlockDigest,
+    HasValidBlockDigest,
+    HasPayloadDigest,
+    HasValidPayloadDigest,
+    IsHttp,
+    IsConcurrent,
+    HasRecordType(u16),
+    HasContentLengthLte(u64),
+    HasContentLengthGte(u64),
+}
+
+impl NativeFilterKind {
+    fn apply(&self, record: &mut WarcRecord) -> bool {
+        match self {
+            Self::IsWarc10 => filter::is_warc_10(record),
+            Self::IsWarc11 => filter::is_warc_11(record),
+            Self::HasBlockDigest => filter::has_block_digest(record),
+            Self::HasValidBlockDigest => filter::has_valid_block_digest(record),
+            Self::HasPayloadDigest => filter::has_payload_digest(record),
+            Self::HasValidPayloadDigest => filter::has_valid_payload_digest(record),
+            Self::IsHttp => filter::is_http(record),
+            Self::IsConcurrent => filter::is_concurrent(record),
+            Self::HasRecordType(mask) => filter::has_record_type(*mask)(record),
+            Self::HasContentLengthLte(max) => filter::has_content_length_lte(*max)(record),
+            Self::HasContentLengthGte(min) => filter::has_content_length_gte(*min)(record),
+        }
+    }
+
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "is_warc_10" => Some(Self::IsWarc10),
+            "is_warc_11" => Some(Self::IsWarc11),
+            "has_block_digest" => Some(Self::HasBlockDigest),
+            "has_valid_block_digest" => Some(Self::HasValidBlockDigest),
+            "has_payload_digest" => Some(Self::HasPayloadDigest),
+            "has_valid_payload_digest" => Some(Self::HasValidPayloadDigest),
+            "is_http" => Some(Self::IsHttp),
+            "is_concurrent" => Some(Self::IsConcurrent),
+            _ => None,
+        }
+    }
+}
+
+/// Callable wrapper around pre-defined native filter predicates.
+///
+/// Instances behave like regular Python callables (``filter(record)``), but
+/// :class:`ArchiveIterator` dispatches them more efficiently than actual
+/// Python functions.
+#[pyclass(name = "NativeFilter", module = "fastwarc.warc", frozen)]
+pub struct NativeFilterPy {
+    pub kind: NativeFilterKind,
+}
+
+#[pymethods]
+impl NativeFilterPy {
+    pub fn __call__(&self, record: &WarcRecordPy) -> bool {
+        let mut record = record.lock();
+        self.kind.apply(&mut record)
+    }
+}
 
 fn apply_filter(record: &WarcRecordPy, predicate: impl FnOnce(&mut WarcRecord) -> bool) -> bool {
     let mut record = record.lock();
@@ -1562,4 +1668,40 @@ pub fn is_http_py(record: &WarcRecordPy) -> bool {
 #[pyfunction(name = "is_concurrent")]
 pub fn is_concurrent_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_concurrent)
+}
+
+/// Parameterized filter predicate for checking if a record’s record type matches the given bitmask
+/// This predicate is equivalent to using ``record_types`` in :class:`ArchiveIterator`.
+///
+/// :param record_type_bitmask: :class:`WarcRecordType` or bitmask of types
+/// :returns: WARC record filter
+#[pyfunction(name = "has_record_type")]
+pub fn has_record_type_py(record_type_bitmask: u16) -> NativeFilterPy {
+    NativeFilterPy {
+        kind: NativeFilterKind::HasRecordType(record_type_bitmask),
+    }
+}
+
+/// Parameterized filter predicate for checking if a record’s ``Content-Length`` is less than or equal to ``max``.
+/// This predicate is equivalent to using ``max_content_length`` in :class:`ArchiveIterator`.
+///
+/// :param max: maximum ``Content-Length``
+/// :returns: WARC record filter
+#[pyfunction(name = "has_content_length_lte")]
+pub fn has_content_length_lte_py(max: u64) -> NativeFilterPy {
+    NativeFilterPy {
+        kind: NativeFilterKind::HasContentLengthLte(max),
+    }
+}
+
+/// Parameterized filter predicate for checking if a record’s Content-Length is greater than or equal to ``min``.
+/// This predicate is equivalent to using ``min_content_length`` in :class:`ArchiveIterator`.
+///
+/// :param min: minimum ``Content-Length``
+/// :returns: WARC record filter
+#[pyfunction(name = "has_content_length_gte")]
+pub fn has_content_length_gte_py(min: u64) -> NativeFilterPy {
+    NativeFilterPy {
+        kind: NativeFilterKind::HasContentLengthGte(min),
+    }
 }

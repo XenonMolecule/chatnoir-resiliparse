@@ -61,6 +61,14 @@ def _serialize_record(record: WarcRecord) -> bytes:
     return stream.getvalue()
 
 
+def _serialize_records(*records: WarcRecord) -> io.BytesIO:
+    stream = io.BytesIO()
+    for record in records:
+        record.write(stream)
+    stream.seek(0)
+    return stream
+
+
 def test_package_reexports_and_legacy_shims():
     assert WarcRecord is WarcRecord
     assert HeaderMap is HeaderMap
@@ -606,6 +614,27 @@ def test_archive_iterator_inplace():
             16 * 2,
             lambda rec: WarcHeader.WARC_CONCURRENT_TO in rec.headers,
             id="is-concurrent",
+        ),
+        pytest.param(
+            has_record_type(response | request),
+            False,
+            16 * 2 + 1,
+            lambda rec: rec.is_http and rec.record_type in [response, request],
+            id="has-record-type"
+        ),
+        pytest.param(
+            has_content_length_lte(400),
+            False,
+            33,
+            lambda rec: rec.content_length <= 400,
+            id="has-content-length-lte"
+        ),
+        pytest.param(
+            has_content_length_gte(600),
+            False,
+            16,
+            lambda rec: rec.content_length >= 600,
+            id="has-content-length-gte"
         ),
         pytest.param(
             lambda rec: rec.record_type in [request, response],

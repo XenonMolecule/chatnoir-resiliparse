@@ -455,6 +455,7 @@ pub mod filter {
     use std::fmt::Debug;
 
     /// Filter predicate for checking if a record is a WARC/1.0 record.
+    #[inline]
     pub fn is_warc_10(record: &mut WarcRecord) -> bool {
         record
             .headers()
@@ -463,6 +464,7 @@ pub mod filter {
     }
 
     /// Filter predicate for checking if a record is a WARC/1.1 record.
+    #[inline]
     pub fn is_warc_11(record: &mut WarcRecord) -> bool {
         record
             .headers()
@@ -471,38 +473,45 @@ pub mod filter {
     }
 
     /// Filter predicate for checking if a record has a block digest.
+    #[inline]
     pub fn has_block_digest(record: &mut WarcRecord) -> bool {
         record.headers().contains_key_bytes(WarcHeader::WarcBlockDigest)
     }
 
     /// Filter predicate for checking if a record's WARC-Block-Digest is valid.
     /// This is a mutating filter that freezes the record!
+    #[inline]
     pub fn has_valid_block_digest(record: &mut WarcRecord) -> bool {
         record.verify_block_digest(false).unwrap_or(false)
     }
 
     /// Filter predicate for checking if a record has a payload digest.
+    #[inline]
     pub fn has_payload_digest(record: &mut WarcRecord) -> bool {
         record.headers().contains_key_bytes(WarcHeader::WarcPayloadDigest)
     }
 
     /// Filter predicate for checking if a record's WARC-Payload-Digest is valid.
     /// This is a mutating filter that freezes the record!
+    #[inline]
     pub fn has_valid_payload_digest(record: &mut WarcRecord) -> bool {
         record.verify_payload_digest(false).unwrap_or(false)
     }
 
     /// Filter predicate for checking if a record is an HTTP record.
+    #[inline]
     pub fn is_http(record: &mut WarcRecord) -> bool {
         record.is_http()
     }
 
     /// Filter predicate for checking if a record is concurrent to another record.
+    #[inline]
     pub fn is_concurrent(record: &mut WarcRecord) -> bool {
         record.headers().contains_key_bytes(WarcHeader::WarcConcurrentTo)
     }
 
-    /// Parameterized filter predicate for checking if a record's record type matches the given bitmask
+    /// Parameterised filter predicate for checking if a record's record type matches the given bitmask.
+    #[inline]
     pub fn has_record_type<T: TryInto<u16>>(record_type_bitmask: T) -> impl Fn(&mut WarcRecord) -> bool
     where
         <T as TryInto<u16>>::Error: Debug,
@@ -511,12 +520,14 @@ pub mod filter {
         move |r: &mut WarcRecord| r.record_type() as u16 & mask != 0
     }
 
-    /// Parameterized filter predicate for checking if a record's Content-Length is less than or equal to `max`.
+    /// Parameterised filter predicate for checking if a record's `Content-Length` is less than or equal to `max`.
+    #[inline]
     pub fn has_content_length_lte(max: u64) -> impl Fn(&mut WarcRecord) -> bool {
         move |r: &mut WarcRecord| r.content_length() <= max
     }
 
-    /// Parameterized filter predicate for checking if a record's Content-Length is greater than or equal to `min`.
+    /// Parameterised filter predicate for checking if a record's `Content-Length` is greater than or equal to `min`.
+    #[inline]
     pub fn has_content_length_gte(min: u64) -> impl Fn(&mut WarcRecord) -> bool {
         move |r: &mut WarcRecord| r.content_length() >= min
     }
