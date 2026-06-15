@@ -204,7 +204,7 @@ The full list of pre-defined function filters is:
 - :func:`.has_content_length_lte`
 - :func:`.has_content_length_gte`
 
-:func:`.has_record_type`, :func:`.has_content_length_lte`, and :func:`.has_content_length_gte` are parameterised predicates. They are equivalent to using ``record_types``, ``min_content_length``, and ``min_content_length`` in the :class:`ArchiveIterator` constructor.
+:func:`.has_record_type`, :func:`.has_content_length_lte`, and :func:`.has_content_length_gte` are parameterised predicates. They are equivalent to using ``record_types``, ``min_content_length``, and ``max_content_length`` in the :class:`.ArchiveIterator` constructor.
 
 Besides these, you can pass any Python callable that accepts a :class:`.WarcRecord` and returns a ``bool``:
 
