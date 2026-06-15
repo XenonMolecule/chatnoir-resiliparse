@@ -1470,18 +1470,29 @@ impl ArchiveIteratorPy {
             .with_inplace(inplace);
         let func_filter = extract_func_filter(py, func_filter)?;
         let native_filter_kind = func_filter.0;
-        let apply_native_func_filter = move |r: &mut WarcRecord| -> bool {
+        let native_func_filter = move |r: &mut WarcRecord| -> bool {
             match &native_filter_kind {
                 Some(native) => native.apply(r),
                 None => true,
             }
         };
 
-        let min_filter = filter::has_content_length_gte(min_content_length.unwrap_or(u64::MIN));
-        let max_filter = filter::has_content_length_lte(max_content_length.unwrap_or(u64::MAX));
-        let type_filter = filter::has_record_type(record_types);
-        let filter =
-            move |r: &mut WarcRecord| min_filter(r) && max_filter(r) && type_filter(r) && apply_native_func_filter(r);
+        let filter = move |r: &mut WarcRecord| {
+            if let Some(min) = min_content_length
+                && !filter::has_content_length_gte(min)(r)
+            {
+                return false;
+            }
+            if let Some(min) = max_content_length
+                && !filter::has_content_length_lte(min)(r)
+            {
+                return false;
+            }
+            if record_types != WarcRecordTypePy::any_type as u16 && !filter::has_record_type(record_types)(r) {
+                return false;
+            }
+            native_func_filter(r)
+        };
 
         Ok(Self {
             inner: Box::new(iterator.with_filter(filter)),
