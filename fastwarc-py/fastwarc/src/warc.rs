@@ -1670,7 +1670,8 @@ pub fn is_concurrent_py(record: &WarcRecordPy) -> bool {
     apply_filter(record, filter::is_concurrent)
 }
 
-/// Parameterized filter predicate for checking if a record’s record type matches the given bitmask
+/// Parameterized filter predicate for checking if a record’s record type matches the given bitmask.
+///
 /// This predicate is equivalent to using ``record_types`` in :class:`ArchiveIterator`.
 ///
 /// :param record_type_bitmask: :class:`WarcRecordType` or bitmask of types
@@ -1683,6 +1684,7 @@ pub fn has_record_type_py(record_type_bitmask: u16) -> NativeFilterPy {
 }
 
 /// Parameterized filter predicate for checking if a record’s ``Content-Length`` is less than or equal to ``max``.
+///
 /// This predicate is equivalent to using ``max_content_length`` in :class:`ArchiveIterator`.
 ///
 /// :param max: maximum ``Content-Length``
@@ -1695,6 +1697,7 @@ pub fn has_content_length_lte_py(max: u64) -> NativeFilterPy {
 }
 
 /// Parameterized filter predicate for checking if a record’s Content-Length is greater than or equal to ``min``.
+///
 /// This predicate is equivalent to using ``min_content_length`` in :class:`ArchiveIterator`.
 ///
 /// :param min: minimum ``Content-Length``
