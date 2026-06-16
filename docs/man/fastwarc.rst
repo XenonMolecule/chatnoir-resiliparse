@@ -309,7 +309,7 @@ Note that :meth:`~.WarcRecord.verify_block_digest` and :meth:`~.WarcRecord.verif
 
 .. warning::
 
-  Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its contents for further processing if ``consume=False`` (that's why verifying the HTTP payload digest after verifying the block digest worked in the first place). If your records are very large, you need to ensure that they fit into memory entirely (e.g. by checking :attr:`record.content_length <.WarcRecord.content_length>`).
+  Calling either of these two methods will create an in-memory copy of the remaining record stream to preserve its contents for further processing (if ``consume=False``). That's why verifying the HTTP payload digest after verifying the block digest worked in the first place. If your records are very large, you need to ensure that they fit into memory entirely (e.g. by checking :attr:`record.content_length <.WarcRecord.content_length>`).
 
 If you do not need to preserve the stream contents, you can set ``consume=True``. This will avoid the creation of a stream copy altogether and fully consume the rest of the record instead. However, that also means that the payload is lost after verifying the digests.
 

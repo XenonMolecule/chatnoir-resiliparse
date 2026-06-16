@@ -356,8 +356,8 @@
 //! HTTP parsing has to be turned off for this to work.
 //!
 //! > **Warning:** Calling either of these two methods will create an in-memory copy of the remaining record stream to
-//! > preserve its contents for further processing if the `consume` parameter is set to `false` (that's why verifying the
-//! > HTTP payload digest after verifying the block digest worked in the first place). If your records are very large, you
+//! > preserve its contents for further processing (if `consume` is set to `false`). That's why verifying the HTTP
+//! > payload digest after verifying the block digest worked in the first place. If your records are very large, you
 //! > need to ensure that they fit into memory entirely (e.g., by checking
 //! > [`WarcRecord::content_length()`](warc::record::WarcRecord::content_length) first.
 //!
