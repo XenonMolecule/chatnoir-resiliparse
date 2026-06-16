@@ -104,7 +104,8 @@
 //!
 //! # let in_file = std::io::Cursor::new(Vec::new());
 //! for record in ArchiveIterator::new(in_file) {
-//!     record.unwrap().with_mut(|r| println!("Record ID: {}", r.record_id().unwrap()));
+//!     let r = record.expect("Error reading record");
+//!     r.with_mut(|r| println!("Record ID: {}", r.record_id().unwrap()));
 //! }
 //! ```
 //!
