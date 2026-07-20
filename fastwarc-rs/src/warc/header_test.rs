@@ -207,6 +207,24 @@ fn header_sanitization() {
 }
 
 #[test]
+fn parse_headers_with_empty_values() -> io::Result<()> {
+    let header_data = b"HTTP/1.1 200\r\n\
+                                  alt-svc: h3=\":443\"; ma=86400\r\n\
+                                  cache-control: max-age=0, private, must-revalidate\r\n\
+                                  cf-cache-status: DYNAMIC\r\n\
+                                  cf-ray: a09215a55df4ec03-IAD\r\n\
+                                  content-security-policy: \r\n\
+                                  \r\n";
+
+    let mut headers = HeaderMap::new(HeaderEncoding::Latin1);
+    let mut reader = io::Cursor::new(header_data);
+    headers.parse(&mut reader, true)?;
+    // No slicing errors etc.
+    assert_eq!(headers.get("content-security-policy").as_deref(), Some(""));
+    Ok(())
+}
+
+#[test]
 fn parse_headers_with_continuation_lines() -> io::Result<()> {
     let http_data = b"HTTP/1.1 200 OK\r\n\
                               Content-Length: 123\r\n\

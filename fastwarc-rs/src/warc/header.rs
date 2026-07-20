@@ -159,8 +159,8 @@ impl CowHeaderTuple {
 /// Internal helper for trimming slice offsets to exclude leading and trailing white space.
 #[inline]
 pub(super) fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
-    let start = value.len() - value.trim_ascii_start().len();
     let end = value.trim_ascii_end().len();
+    let start = end.min(value.len() - value.trim_ascii_start().len());
     (start, end)
 }
 
