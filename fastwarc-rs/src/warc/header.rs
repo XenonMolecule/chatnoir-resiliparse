@@ -160,7 +160,7 @@ impl CowHeaderTuple {
 #[inline]
 pub(super) fn _trim_ascii_offsets(value: &[u8]) -> HeaderOffset {
     let end = value.trim_ascii_end().len();
-    let start = end.min(value.len() - value.trim_ascii_start().len());
+    let start = value[..end].len() - value[..end].trim_ascii_start().len();
     (start, end)
 }
 
