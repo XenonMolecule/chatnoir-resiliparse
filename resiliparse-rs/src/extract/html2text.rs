@@ -822,6 +822,54 @@ unsafe fn is_unprintable_pua(node: *mut lxb_dom_node_t) -> bool {
     }
 }
 
+/// Cycle 0005: `<ul>` exemption thresholds (sweep-tuned on lpv11 dev under the
+/// zero-regression constraint).
+const UL_EXEMPT_MIN_TEXT: usize = 1000;
+const UL_EXEMPT_MAX_LINK_RATIO: f64 = 0.5;
+
+/// Minimum average non-link text per list item: separates lists whose items
+/// read like paragraphs (obituaries, docs, news briefs) from link directories
+/// and FAQ indexes whose items are a link plus a few keywords.
+const UL_EXEMPT_MIN_TEXT_PER_ITEM: usize = 150;
+
+/// Whether a list element carries substantial, mostly-non-link text.
+unsafe fn is_text_heavy_list(node: *mut lxb_dom_node_t) -> bool {
+    unsafe {
+        let element_text = get_collapsed_string(&get_node_text(node));
+        if element_text.len() < UL_EXEMPT_MIN_TEXT {
+            return false;
+        }
+        if is_link_cluster(node, UL_EXEMPT_MAX_LINK_RATIO, 0) {
+            return false;
+        }
+
+        // Per-item density: aggregate link text and count links / list items.
+        let mut link_len = 0usize;
+        let dom_coll = lxb_dom_collection_make_noi((*node).owner_document, 20);
+        lxb_dom_elements_by_tag_name(node.cast(), dom_coll, b"a".as_ptr(), 1);
+        let n_links = lxb_dom_collection_length_noi(dom_coll);
+        for i in 0..n_links {
+            link_len += get_collapsed_string(&get_node_text(lxb_dom_collection_node_noi(dom_coll, i))).len();
+        }
+        lxb_dom_collection_destroy(dom_coll, true);
+        let mut n_li = 0usize;
+        let mut child = (*node).first_child;
+        while !child.is_null() {
+            if (*child).local_name == LXB_TAG_LI {
+                n_li += 1;
+            }
+            child = (*child).next;
+        }
+        // A link directory / blogroll / index has multiple links per item
+        // (title + inline links); genuine list-structured prose has at most
+        // about one.
+        if n_links > n_li.max(1) {
+            return false;
+        }
+        element_text.len().saturating_sub(link_len) / n_li.max(1) >= UL_EXEMPT_MIN_TEXT_PER_ITEM
+    }
+}
+
 /// Check if element contains an excessive number of links compared to the whole content length.
 unsafe fn is_link_cluster(node: *mut lxb_dom_node_t, max_link_ratio: f64, max_length: usize) -> bool {
     unsafe {
@@ -920,6 +968,7 @@ unsafe fn is_main_content_node(
     keep_comments: bool,
     keep_post_meta: bool,
     keep_hidden: bool,
+    ul_exemption: bool,
 ) -> bool {
     unsafe {
         if (*node).type_ == LXB_DOM_NODE_TYPE_TEXT {
@@ -959,7 +1008,12 @@ unsafe fn is_main_content_node(
             }
             return false;
         } else if local_name == LXB_TAG_UL {
-            if body_depth < 4 || is_link_cluster(node, 0.2, 0) {
+            // Text-mass exemption (cycle 0005, active only in the tier-2
+            // rescue retry): a list carrying substantial, mostly-non-link
+            // text is main content (obituaries, docs pages, news briefs), no
+            // matter how shallow. Nav menus are short and link-dense, so they
+            // can't qualify.
+            if !(ul_exemption && is_text_heavy_list(node)) && (body_depth < 4 || is_link_cluster(node, 0.2, 0)) {
                 return false;
             }
         }
@@ -1212,29 +1266,66 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             lxb_html_document_destroy(doc);
             return String::new();
         }
-        let mut result = extract_plain_text_from_doc(doc, opts);
+        let (mut result, dropped_uls) = extract_plain_text_from_doc_impl(doc, opts, false);
 
-        // Near-empty rescue (cycle 0004): main-content extraction that comes
-        // back near-empty while the page clearly has text is a classifier
-        // false negative (0003: 98/110 catastrophic docs). Fall back to
-        // unfiltered extraction, keep it only if it yields much more content.
-        // The gate never fires on normally-extracting pages, so it cannot
-        // regress them; the double-extraction cost is only paid on gate hits.
-        if opts.main_content && result.len() < RESCUE_NEAR_EMPTY_ABS {
-            let body: *mut lxb_dom_node_t = (*doc).body.cast();
-            let body_text_len = if body.is_null() {
-                0
-            } else {
-                get_collapsed_string(&get_node_text(body)).len()
+        // Self-correcting rescues (cycles 0004/0005). Gated on the extraction
+        // having lost most of the page's text, so they cannot fire on (and
+        // therefore cannot regress) normally-extracting pages; the extra
+        // extraction cost is only paid on gate hits.
+        if opts.main_content {
+            // Full-page text materialization is the expensive part of the
+            // gates — compute it lazily, only once a cheaper precondition
+            // has already fired.
+            let mut body_text_len_cache: Option<usize> = None;
+            let mut body_text_len = |doc: *mut lxb_html_document_t| -> usize {
+                *body_text_len_cache.get_or_insert_with(|| {
+                    let body: *mut lxb_dom_node_t = (*doc).body.cast();
+                    if body.is_null() {
+                        0
+                    } else {
+                        get_collapsed_string(&get_node_text(body)).len()
+                    }
+                })
             };
-            if body_text_len > RESCUE_BODY_FACTOR * result.len().max(1) {
+
+            // Tier 1 (0004): near-empty output → unfiltered fallback, kept
+            // only if it yields much more content (classifier false negative
+            // wiped the whole page).
+            let mut rescued = false;
+            if result.len() < RESCUE_NEAR_EMPTY_ABS
+                && body_text_len(doc) > RESCUE_BODY_FACTOR * result.len().max(1)
+            {
                 let fallback_opts = ExtractOpts {
                     main_content: false,
                     ..opts.clone()
                 };
-                let fallback = extract_plain_text_from_doc(doc, &fallback_opts);
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, false);
                 if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
                     result = fallback;
+                    rescued = true;
+                }
+            }
+
+            // Tier 2 (0005): a rescue-eligible dropped list + output that is a
+            // small fraction of the page text → retry with the
+            // text-heavy-list exemption (the <ul> blacklist rule dropping
+            // list-structured main content), kept only if it recovers
+            // substantially more. Eligibility runs before the body-text
+            // materialization: dropped ULs are usually a handful of small nav
+            // lists, so testing them is much cheaper than a full-page
+            // text_content.
+            if !rescued
+                && !dropped_uls.is_empty()
+                && dropped_uls.iter().any(|&(n, d)| {
+                    is_main_content_node(n, d, opts.comments, opts.post_meta, opts.hidden_elements, true)
+                })
+                && (result.len() as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
+            {
+                let retry = extract_plain_text_from_doc(doc, opts, true);
+                if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
+                    && !duplicates_existing_content(&result, &retry)
+                {
+                    result = retry;
                 }
             }
         }
@@ -1242,6 +1333,40 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         lxb_html_document_destroy(doc);
         result
     }
+}
+
+/// Tier-2 gate (cycle 0005): fire when output is below this fraction of the
+/// collapsed body text; keep the retry only if it is this many times larger.
+/// Sweep-tuned on lpv11 dev under the zero-regression constraint.
+const UL_RESCUE_MAX_OUTPUT_RATIO: f64 = 0.3;
+const UL_RESCUE_KEEP_FACTOR: f64 = 2.0;
+
+/// Whether `retry` repeats content already present once in `base` (template
+/// widgets — e.g. Blogspot — can render the same post inside a list, so the
+/// list exemption would emit it twice). Detects a mid-`base` probe appearing
+/// more than once in `retry`.
+fn duplicates_existing_content(base: &str, retry: &str) -> bool {
+    const PROBE_LEN: usize = 80;
+    if base.len() < 2 * PROBE_LEN {
+        return false;
+    }
+    let mid = base.len() / 2;
+    // Find a char-boundary-aligned probe window around the middle.
+    let start = (mid - PROBE_LEN / 2..mid).rev().find(|&i| base.is_char_boundary(i));
+    let Some(start) = start else { return false };
+    let end = (start + PROBE_LEN..base.len()).find(|&i| base.is_char_boundary(i));
+    let Some(end) = end else { return false };
+    let probe = &base[start..end];
+    let mut count = 0;
+    let mut hay = retry;
+    while let Some(pos) = hay.find(probe) {
+        count += 1;
+        if count >= 2 {
+            return true;
+        }
+        hay = &hay[pos + 1..];
+    }
+    false
 }
 
 /// Rescue gate: main-content output below this many bytes counts as near-empty.
@@ -1255,11 +1380,27 @@ const RESCUE_BODY_FACTOR: usize = 30;
 /// main-content output.
 const RESCUE_KEEP_FACTOR: usize = 20;
 
-unsafe fn extract_plain_text_from_doc(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> String {
+unsafe fn extract_plain_text_from_doc(
+    doc: *mut lxb_html_document_t,
+    opts: &ExtractOpts,
+    ul_exemption: bool,
+) -> String {
+    unsafe { extract_plain_text_from_doc_impl(doc, opts, ul_exemption).0 }
+}
+
+/// Returns the extracted text plus the `<ul>` nodes (with their body depth)
+/// dropped by the main-content blacklist — recorded so the tier-2 rescue can
+/// lazily test rescue eligibility only when its output-size gate fires.
+unsafe fn extract_plain_text_from_doc_impl(
+    doc: *mut lxb_html_document_t,
+    opts: &ExtractOpts,
+    ul_exemption: bool,
+) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
+    let mut dropped_uls: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
         if body.is_null() {
-            return String::new();
+            return (String::new(), dropped_uls);
         }
 
         // Build the skip selector (BTreeSet: Python uses a set; order does not
@@ -1312,7 +1453,7 @@ unsafe fn extract_plain_text_from_doc(doc: *mut lxb_html_document_t, opts: &Extr
             ctx.root_node = n;
             ctx.node = n;
             if n.is_null() {
-                return String::new();
+                return (String::new(), dropped_uls);
             }
         }
 
@@ -1360,8 +1501,18 @@ unsafe fn extract_plain_text_from_doc(doc: *mut lxb_html_document_t, opts: &Extr
                         opts.comments,
                         opts.post_meta,
                         opts.hidden_elements,
+                        ul_exemption,
                     ))
             {
+                if !ul_exemption
+                    && opts.main_content
+                    && dropped_uls.len() < 64
+                    && (*ctx.node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                    && (*ctx.node).local_name == LXB_TAG_UL
+                    && !blacklisted_nodes.contains(&ctx.node)
+                {
+                    dropped_uls.push((ctx.node, ctx.depth + base_depth));
+                }
                 is_end_tag = true;
                 ctx.node = next_node(ctx.root_node, ctx.node, &mut ctx.depth, &mut is_end_tag);
                 continue;
@@ -1384,6 +1535,6 @@ unsafe fn extract_plain_text_from_doc(doc: *mut lxb_html_document_t, opts: &Extr
             (chars_extracted as f64 * 1.2) as usize,
         );
         rstrip_in_place(&mut output);
-        decode_utf8_ignore(output)
+        (decode_utf8_ignore(output), dropped_uls)
     }
 }
