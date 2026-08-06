@@ -7,15 +7,18 @@ HTML→text extraction, replicating the loop that took the jusText fork
 cycle; it encodes both the mechanics (harness, datasets, commit conventions) and
 the hard-won methodology (what worked, what repeatedly failed).
 
-**The subject under improvement** is a **Rust extractor in `resiliparse-rs`** —
-which does not exist yet. Today the only extraction implementation is the Cython
-one, `resiliparse.extract.html2text.extract_plain_text(html, main_content=True)`
-(`resiliparse-py/resiliparse/extract/html2text.pyx`); `resiliparse-rs` currently
-contains only the parse layer (lexbor bindings, DOM, CSS, serialize). The first
-milestone is therefore a Rust port of `html2text` on top of the Rust DOM
-(`resiliparse-rs/src/parse/html/`), gated on output parity with the Cython
-version; all quality iteration happens in Rust from then on. The Cython module
-stays frozen as the reference/baseline.
+**The subject under improvement** is resiliparse's extraction,
+`extract_plain_text(html, main_content=True)`. Today the only implementation is
+Cython (`resiliparse-py/resiliparse/extract/html2text.pyx`); `resiliparse-rs`
+contains only the parse layer (lexbor bindings, DOM, CSS, serialize) — upstream
+is actively rewriting the toolkit in Rust but hasn't reached the extract module
+yet. The plan is a **timeboxed spike** (see §8): try to port `html2text` to
+Rust on top of the Rust DOM (`resiliparse-rs/src/parse/html/`), gated on output
+parity with the Cython version. **If parity lands, all iteration happens in
+Rust and the Cython module freezes as the reference. If the spike fails the
+timebox, fall back to iterating on the Cython implementation** — the whole
+harness, cycle process, and speed policy below apply identically either way
+(the `--impl` flag makes the extractor a swappable detail).
 
 Two objectives, both first-class:
 
@@ -59,8 +62,9 @@ never to upstream.
 
 ### 2.2 Build from source
 
-Two builds are needed: the Rust workspace (the thing being iterated) and the
-Cython package (the frozen reference baseline).
+Two builds are needed: the Rust workspace (the port target for the §8 spike)
+and the Cython package (the reference baseline — and the iteration target if
+the spike falls back).
 
 ```bash
 # Rust workspace (resiliparse-rs is a default member; lexbor via bindgen/vcpkg)
@@ -250,17 +254,21 @@ everything together).
   in the per-cycle results table and in `viz.py compare` (a per-doc runtime
   join catches "one pathological doc got 100× slower" the same way it catches
   quality regressions).
-- **Measurement discipline:** `--release` builds only; single-worker
-  (`--workers 1`) for official timing so pool scheduling doesn't pollute
-  per-doc numbers; same machine across compared tags (note the machine in the
-  log entry the first time and on any change). Per-doc timing through the PyO3
-  binding includes binding overhead — that's fine as the standard number
-  (production also pays it), but for micro-optimizing hot paths add
-  **criterion benches in `resiliparse-rs`** (`cargo bench`) on a fixed set of
-  ~20 representative dev pages checked into the bench fixtures.
-- **The speed baseline is the Cython implementation** on the same docs, same
-  machine, via the same harness (`--impl cython`). Track the Rust/Cython ratio;
-  the Rust port should start at parity or faster and widen from there.
+- **Measurement discipline:** release/optimized builds only (`cargo build
+  --release` on the Rust path; on the Cython path never measure a stale
+  extension — rebuild after every `.pyx` edit); single-worker (`--workers 1`)
+  for official timing so pool scheduling doesn't pollute per-doc numbers; same
+  machine across compared tags (note the machine in the log entry the first
+  time and on any change). Per-doc timing through the Python binding includes
+  binding overhead — that's fine as the standard number (production also pays
+  it). For micro-optimizing hot paths on the Rust path, add **criterion
+  benches in `resiliparse-rs`** (`cargo bench`) on a fixed set of ~20
+  representative dev pages checked into the bench fixtures.
+- **The speed baseline is the stock Cython implementation** on the same docs,
+  same machine, via the same harness (`--impl cython`, tag 0001). If the Rust
+  spike (§8) wins, track the Rust/Cython ratio — the port should start at
+  parity or faster and widen from there. If iterating on Cython, tag 0001 is
+  still the ms/doc reference every cycle compares against.
 
 ## 5. The iteration cycle (per-cycle checklist)
 
@@ -396,19 +404,35 @@ Suggested first cycles (revise after the baseline):
    (`preserve_formatting`, `list_bullets`, `alt_texts`, `links`) — the best
    stock config is the real baseline. This tag is the reference every later
    Rust cycle compares against; the Cython module is frozen after this.
-2. **0002-000N — Rust port of `html2text` (the first milestone).** Port the
-   extraction walk (`_extract_plain_text_impl` + the `ExtractOpts`/
+2. **0002 — Rust port spike (TIMEBOXED: ~4 hours of focused work).** Attempt to
+   port the extraction walk (`_extract_plain_text_impl` + the `ExtractOpts`/
    `FormattingOpts` machinery, main-content scoring, list/table handling) onto
    the Rust DOM in `resiliparse-rs`, exposed to Python via the workspace's PyO3
-   pattern. Gate on **parity**: golden tests asserting byte-identical (or
-   documented-diff) output vs. the Cython reference over a fixed doc set, plus
-   lpv11 dev F1/Lev within noise of tag 0001 — and at-or-better ms/doc. This is
-   allowed to take several cycles; log each. Do not start quality iteration
-   until parity lands: otherwise you can't tell a port bug from a quality
-   change.
+   pattern (like `parse/_html_rs`). Since we're building on upstream's active
+   Rust rewrite, plan to merge `upstream/develop` periodically if this path wins.
+
+   **Parity bar:** golden tests asserting byte-identical (or documented-diff)
+   output vs. the Cython reference over a fixed doc set, lpv11 dev F1/Lev
+   within noise of tag 0001, and at-or-better ms/doc.
+
+   **Go/no-go at the timebox:** the spike *continues* past the timebox only if
+   the port runs end-to-end on lpv11 dev (no crashes, `--release`) and is
+   within ~0.02 F1 of the Cython baseline with the remaining diffs enumerable —
+   i.e., parity is clearly a matter of finishing, not of fighting the DOM API
+   or the build. Otherwise **stop, log the spike honestly as its own entry**
+   (what blocked it: missing DOM affordances, build friction, logic too
+   entangled), park "Rust port" in `QUEUE.md`, and **fall back to iterating on
+   the Cython `html2text.pyx`** — editable install, remember Cython needs a
+   rebuild before every measurement. Every later section of this playbook
+   applies unchanged on the fallback path; Cython is already fast, and the
+   speed gate (§6) still holds.
+
+   Either way: no quality iteration during the spike — a port bug must never be
+   confusable with a quality change.
 3. **Failure taxonomy.** Port `viz.py tags`; read the worst 20 docs. In jusText
    this immediately reoriented the roadmap (cycle 0006).
-4. **Markdown output mode (in Rust).** The single biggest quality gap: the gold
+4. **Markdown output mode** (in whichever implementation won the spike). The
+   single biggest quality gap: the gold
    has headings/bold/lists/tables/fences; `extract_plain_text` emits plain
    text. Extend the ported `FormattingOpts` (`FORMAT_OFF / FORMAT_BASIC /
    FORMAT_MINIMAL_HTML`) with a markdown flavor: `h1..h6 → #…######`,
