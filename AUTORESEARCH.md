@@ -414,18 +414,31 @@ Suggested first cycles (revise after the baseline):
    The spike has **two gates in sequence** — feasibility at the timebox, then a
    measured speed verdict — and iterating on Rust requires passing both.
 
+   **Parity is measured against the Cython outputs, not the gold.** The cached
+   predictions from tag 0001
+   (`benchmark/runs/<0001-tag>/lpv11/dev.predictions.jsonl`) are the oracle:
+   diff the Rust output doc-by-doc against the Cython output on the same docs.
+   The harness gives this for free — score the Rust predictions with the
+   *Cython predictions* in the gold slot, and mean Levenshtein similarity is
+   the parity meter (1.0 = byte-identical port). No gold, no judgment calls
+   about "within noise" — two implementations of the same algorithm should
+   agree exactly.
+
    **Gate 1 — feasibility (at the ~4h timebox):** the spike *continues* past
    the timebox only if the port runs end-to-end on lpv11 dev (no crashes,
-   `--release`) and is within ~0.02 F1 of the Cython baseline with the
-   remaining diffs enumerable — i.e., parity is clearly a matter of finishing,
-   not of fighting the DOM API or the build. Otherwise **stop, log the spike
-   honestly as its own entry** (what blocked it: missing DOM affordances,
-   build friction, logic too entangled), park "Rust port" in `QUEUE.md`, and
-   fall back to Cython.
+   `--release`) and matches the Cython output byte-for-byte on the large
+   majority of docs (roughly ≥90%) with the remaining diffs enumerable and
+   understood — i.e., parity is clearly a matter of finishing, not of fighting
+   the DOM API or the build. Otherwise **stop, log the spike honestly as its
+   own entry** (what blocked it: missing DOM affordances, build friction,
+   logic too entangled), park "Rust port" in `QUEUE.md`, and fall back to
+   Cython.
 
-   **Parity bar (finish this before gate 2):** golden tests asserting
-   byte-identical (or documented-diff) output vs. the Cython reference over a
-   fixed doc set, and lpv11 dev F1/Lev within noise of tag 0001.
+   **Parity bar (finish this before gate 2):** byte-identical output vs. the
+   Cython reference across lpv11 dev (parity similarity ≈ 1.0), with any
+   residual diffs individually documented and defensible (e.g. a Cython bug
+   the port deliberately doesn't reproduce). Freeze a handful of these docs as
+   golden tests in the Rust crate so future refactors can't silently drift.
 
    **Gate 2 — speed verdict (the point of the port):** with parity landed, run
    a head-to-head on lpv11 dev — same harness, same docs, same machine,
