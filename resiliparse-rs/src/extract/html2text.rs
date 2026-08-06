@@ -1212,11 +1212,48 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             lxb_html_document_destroy(doc);
             return String::new();
         }
-        let result = extract_plain_text_from_doc(doc, opts);
+        let mut result = extract_plain_text_from_doc(doc, opts);
+
+        // Near-empty rescue (cycle 0004): main-content extraction that comes
+        // back near-empty while the page clearly has text is a classifier
+        // false negative (0003: 98/110 catastrophic docs). Fall back to
+        // unfiltered extraction, keep it only if it yields much more content.
+        // The gate never fires on normally-extracting pages, so it cannot
+        // regress them; the double-extraction cost is only paid on gate hits.
+        if opts.main_content && result.len() < RESCUE_NEAR_EMPTY_ABS {
+            let body: *mut lxb_dom_node_t = (*doc).body.cast();
+            let body_text_len = if body.is_null() {
+                0
+            } else {
+                get_collapsed_string(&get_node_text(body)).len()
+            };
+            if body_text_len > RESCUE_BODY_FACTOR * result.len().max(1) {
+                let fallback_opts = ExtractOpts {
+                    main_content: false,
+                    ..opts.clone()
+                };
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts);
+                if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
+                    result = fallback;
+                }
+            }
+        }
+
         lxb_html_document_destroy(doc);
         result
     }
 }
+
+/// Rescue gate: main-content output below this many bytes counts as near-empty.
+/// Thresholds selected by exhaustive sweep on lpv11 dev (cycle 0004): this
+/// combination recovers 29 catastrophic docs with zero per-doc regressions;
+/// looser gates gain aggregate F1 but break the zero-regression rule.
+const RESCUE_NEAR_EMPTY_ABS: usize = 200;
+/// ... and the collapsed body text must be at least this many times larger.
+const RESCUE_BODY_FACTOR: usize = 30;
+/// Keep the fallback only if it is at least this many times larger than the
+/// main-content output.
+const RESCUE_KEEP_FACTOR: usize = 20;
 
 unsafe fn extract_plain_text_from_doc(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> String {
     unsafe {

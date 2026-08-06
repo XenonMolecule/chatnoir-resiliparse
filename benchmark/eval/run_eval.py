@@ -135,7 +135,13 @@ def cargo_build_release():
     start = perf_counter()
     env = dict(os.environ)
     env.setdefault("VCPKG_ROOT", os.path.expanduser("~/vcpkg"))
-    proc = subprocess.run(["cargo", "build", "--release", "-p", "resiliparse-extract-rs"],
+    cargo_bin = os.path.expanduser("~/.cargo/bin")
+    if os.path.isdir(cargo_bin) and cargo_bin not in env.get("PATH", ""):
+        env["PATH"] = cargo_bin + os.pathsep + env.get("PATH", "")
+    cargo = os.path.join(cargo_bin, "cargo")
+    if not os.path.exists(cargo):
+        cargo = "cargo"
+    proc = subprocess.run([cargo, "build", "--release", "-p", "resiliparse-extract-rs"],
                           cwd=REPO_DIR, env=env)
     if proc.returncode != 0:
         sys.exit("cargo build --release failed; refusing to run a stale binary")
