@@ -180,3 +180,7 @@ vcpkg_installed/
 
 # agents
 .codex
+
+# auto-research benchmark data (large, symlinked/untracked)
+benchmark/datasets*
+benchmark/runs/

@@ -1,0 +1,75 @@
+# Research log
+
+Chronological record of resiliparse extraction experiments on the lpv11 benchmark.
+One file per idea/cycle, newest insights captured while fresh. **Keep each entry
+under a 5-minute read.** Conventions replicate the jusText auto-research log
+(https://github.com/XenonMolecule/jusText, `research_log/`); the full playbook is
+`AUTORESEARCH.md` at the repo root.
+
+## Convention
+
+- Files: `NNNN-short-slug.md` (zero-padded, monotonically increasing).
+- Every entry names the **run tag** it was measured with (`vX.Y.Z-<sha>`), so
+  results trace back to cached runs under `benchmark/runs/<tag>/`.
+- Compare against the previous version with `viz.py compare <prevTag> <thisTag>`.
+- **Two first-class objectives:** quality (F1/Lev vs. the markdown-flavored lpv11
+  gold) *and* speed (ms/doc mean+p50/p95, docs/s — single worker, optimized
+  build, same machine). Every results table carries both.
+
+## Iteration cycle
+
+Each cycle is one pass of the loop below. A "cycle" maps to roughly one research
+log entry and one commit — though a single hypothesis may take several
+un-committed edits before it earns a commit.
+
+1. **Backfill** — add the git commit id to the *previous* entry (now that it exists).
+2. **Review** — skim prior entries + `QUEUE.md`; note anything that informs today.
+3. **Preregister** — write the hypothesis for this cycle *before* coding (a stub
+   entry with Hypothesis filled in).
+4. **Revert (rare)** — if a past change should be undone, revert it first.
+5. **Change** — make the code changes to test the hypothesis.
+6. **Measure** — `python benchmark/eval/run_eval.py --dataset lpv11 --split dev`
+   (auto-tags from git; `--tag` for dirty experiments). Never test mid-cycle.
+   Official timing runs: `--workers 1`, optimized build, rebuilt first.
+7. **Iterate** — refine and re-run freely.
+8. **Log** — once the result is clear (win, quality-neutral ship, or ruled out),
+   fill in Results (vs. prior tag via `viz.py compare`), Insights, Next.
+9. **Commit** — code + log entry together, message `NNNN: <short description>`.
+   Follow-ups: `NNNN fix:` / `NNNN polish:`. Queue-only commits: `Queue: <note>`.
+10. **Repeat.**
+
+Guardrails (see `AUTORESEARCH.md` §6): test split stays vaulted until declared
+milestones (`--allow-test`); zero per-doc regressions on guardrail sets; speed
+regressions >5% mean ms/doc (or new p95 blowups) block shipping like quality
+regressions; the gold is imperfect — never drop visibly-good content to chase
+the metric; verify markdown tables actually render.
+
+## Entry template
+
+```markdown
+# NNNN — <title>
+
+- **Date:** YYYY-MM-DD
+- **Tag:** vX.Y.Z-<sha>   (baseline compared against: <prevTag>)
+- **Status:** idea | in progress | landed | abandoned
+
+## Hypothesis
+One or two sentences: what we believe is wrong and what change should help.
+
+## What changed
+Bullet points of the actual code change.
+
+## Results
+Small table vs. the comparison tag (dev/train only; test only at milestones).
+Both F1/Lev and ms/doc. Net effect in one line.
+
+## Insights
+- What we learned (whether or not it worked). Failure modes confirmed/ruled out.
+
+## Next
+- Concrete follow-ups this surfaced.
+```
+
+## Index
+
+(one line per entry, updated every cycle)
