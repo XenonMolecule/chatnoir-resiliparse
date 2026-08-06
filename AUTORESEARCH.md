@@ -7,13 +7,25 @@ HTML→text extraction, replicating the loop that took the jusText fork
 cycle; it encodes both the mechanics (harness, datasets, commit conventions) and
 the hard-won methodology (what worked, what repeatedly failed).
 
-**The subject under improvement** is
-`resiliparse.extract.html2text.extract_plain_text(html, main_content=True, ...)`
-(`resiliparse-py/resiliparse/extract/html2text.pyx`, Cython/C++ on top of lexbor).
-The goal is main-content extraction whose output matches an LLM-distilled gold —
-and the gold is now **markdown-flavored** (headings, bold, lists, pipe tables,
-code fences), so "extraction quality" includes producing markdown structure, not
-just picking the right text.
+**The subject under improvement** is a **Rust extractor in `resiliparse-rs`** —
+which does not exist yet. Today the only extraction implementation is the Cython
+one, `resiliparse.extract.html2text.extract_plain_text(html, main_content=True)`
+(`resiliparse-py/resiliparse/extract/html2text.pyx`); `resiliparse-rs` currently
+contains only the parse layer (lexbor bindings, DOM, CSS, serialize). The first
+milestone is therefore a Rust port of `html2text` on top of the Rust DOM
+(`resiliparse-rs/src/parse/html/`), gated on output parity with the Cython
+version; all quality iteration happens in Rust from then on. The Cython module
+stays frozen as the reference/baseline.
+
+Two objectives, both first-class:
+
+1. **Quality** — output matching an LLM-distilled gold that is now
+   **markdown-flavored** (headings, bold, lists, pipe tables, code fences), so
+   "extraction quality" includes producing markdown structure, not just picking
+   the right text.
+2. **Speed** — resiliparse's reason to exist is throughput. Every cycle reports
+   ms/doc next to F1/Lev, and performance regressions block shipping the same
+   way quality regressions do (see §6).
 
 ---
 
@@ -45,22 +57,29 @@ Work on a long-lived branch of the fork (jusText used the fork's `main`;
 here branch `autoresearch` off `develop`). Push to the fork after each cycle —
 never to upstream.
 
-### 2.2 Build from source (editable)
+### 2.2 Build from source
 
-Code changes must be measurable immediately, so install from source:
+Two builds are needed: the Rust workspace (the thing being iterated) and the
+Cython package (the frozen reference baseline).
 
 ```bash
+# Rust workspace (resiliparse-rs is a default member; lexbor via bindgen/vcpkg)
+cargo build --release && cargo test
+
+# Cython reference (see docs/man/installation.rst for vcpkg prerequisites)
 python3 -m pip install -e ./resiliparse-py
 ```
 
-The extract module is Cython + vcpkg-managed C++ deps (lexbor, re2) and parts of
-`parse` are mid-port to Rust — see `docs/man/installation.rst` for the from-source
-prerequisites. **Note:** editing `html2text.pyx` requires re-running the build for
-the change to take effect (Cython, not pure Python). Bake a rebuild into the eval
-script or alias so you never measure a stale build. Sanity check:
+The Rust extractor should be reachable from the eval harness. Follow the
+workspace's existing PyO3 pattern (`resiliparse-py/resiliparse/parse/_html_rs`
+is a PyO3 crate in the same Cargo workspace): add an `extract` module/crate
+exposing the Rust `extract_plain_text` to Python. **Always benchmark and
+measure with `--release`** — debug-build timings are meaningless — and rebuild
+before every measurement so you never score a stale binary (bake
+`cargo build --release` into the eval invocation). Sanity check once bound:
 
 ```python
-from resiliparse.extract.html2text import extract_plain_text
+from resiliparse._extract_rs import extract_plain_text   # or wherever it's exposed
 extract_plain_text("<html><body><main><h1>t</h1><p>hi</p></main>", main_content=True)
 ```
 
@@ -94,8 +113,11 @@ Then adapt `run_eval.py`:
               "runtime_ms": (perf_counter() - start) * 1000.0, "error": error}
   ```
 
-- Drop the stoplist/`--model` machinery (jusText-specific); add flags for
-  extraction options you start experimenting with instead.
+- Drop the stoplist/`--model` machinery (jusText-specific). Add an
+  `--impl {rust,cython}` flag that selects which extractor the worker calls, so
+  the Cython reference and the Rust build score through the identical pipeline
+  (that's what makes parity and speedup claims trustworthy). Add flags for
+  extraction options as you start experimenting with them.
 - Keep everything else **exactly as is**: the run cache
   (`benchmark/runs/<tag>/<dataset>/<split>.{predictions,metrics}.jsonl` +
   `summary.json`), the auto-tag `v<version>-<gitsha>[-dirty]`, `--tag` for named
@@ -221,6 +243,25 @@ paragraphs, join with `"\n\n"` (the gold's paragraph separator — jusText cycle
 0102 exists because a downstream consumer joined with `"\n"` and mashed
 everything together).
 
+**Speed metrics** (first-class, reported every cycle alongside F1/Lev):
+
+- **ms/doc (mean + p50/p95) and docs/s** on lpv11 dev — the harness already
+  records `runtime_ms` per doc and aggregates it in `summary.json`; surface it
+  in the per-cycle results table and in `viz.py compare` (a per-doc runtime
+  join catches "one pathological doc got 100× slower" the same way it catches
+  quality regressions).
+- **Measurement discipline:** `--release` builds only; single-worker
+  (`--workers 1`) for official timing so pool scheduling doesn't pollute
+  per-doc numbers; same machine across compared tags (note the machine in the
+  log entry the first time and on any change). Per-doc timing through the PyO3
+  binding includes binding overhead — that's fine as the standard number
+  (production also pays it), but for micro-optimizing hot paths add
+  **criterion benches in `resiliparse-rs`** (`cargo bench`) on a fixed set of
+  ~20 representative dev pages checked into the bench fixtures.
+- **The speed baseline is the Cython implementation** on the same docs, same
+  machine, via the same harness (`--impl cython`). Track the Rust/Cython ratio;
+  the Rust port should start at parity or faster and widen from there.
+
 ## 5. The iteration cycle (per-cycle checklist)
 
 One cycle ≈ one hypothesis ≈ one research-log entry ≈ one commit. From
@@ -271,6 +312,14 @@ themselves every time an old dead end resurfaced looking shiny.
 - **Zero-regression rule.** A change ships only if `viz.py compare` shows no
   meaningful per-doc regressions on the guardrail sets. "Aggregate +0.001 but 39
   docs got worse" does not ship (jusText 0079). Per-doc comparison, not means.
+- **Speed is a shipping gate, not a footnote.** Every cycle's results table
+  includes ms/doc vs. the comparison tag. A quality win that costs meaningful
+  throughput (rule of thumb: >5% mean ms/doc, or any new per-doc pathological
+  blowup at p95+) doesn't ship as-is — either optimize it, gate it so the slow
+  path only runs where it can matter (the jusText "self-correcting rescue"
+  pattern is naturally cheap: it only fires on near-empty extractions), or log
+  the trade-off explicitly and get a deliberate decision. Pure speed wins at
+  quality Δ≈0 are shippable cycles in their own right.
 - **Ship quality wins at Δmetric ≈ 0.** If output is genuinely better (correct
   indentation, proper attribution, a table that renders) and nothing regresses,
   ship it even when the aggregate doesn't move. The metric is a proxy.
@@ -339,23 +388,38 @@ about jusText's classifier:
 
 Suggested first cycles (revise after the baseline):
 
-1. **0001 — Baseline.** `extract_plain_text(main_content=True)` on lpv11 dev,
+1. **0001 — Cython baseline (quality + speed reference).**
+   `extract_plain_text(main_content=True)` via `--impl cython` on lpv11 dev,
    raw-HTML and preprocessed variants; also the old general/math/code/science/
-   table devs for reference. Log F1/Lev, runtime/doc, failure-tag distribution.
-   Sweep the existing knobs (`preserve_formatting`, `list_bullets`, `alt_texts`,
-   `links`) — the best stock config is the real baseline.
-2. **0002 — Failure taxonomy.** Port `viz.py tags`; read the worst 20 docs. In
-   jusText this immediately reoriented the roadmap (cycle 0006).
-3. **Markdown output mode.** The single biggest structural gap: the gold has
-   headings/bold/lists/tables/fences; `extract_plain_text` emits plain text.
-   `html2text.pyx` already has a `FormattingOpts` enum (`FORMAT_OFF / FORMAT_BASIC /
-   FORMAT_MINIMAL_HTML`) — add a markdown flavor: `h1..h6 → #…######`,
-   `b/strong → **`, `i/em → *`, `li → -` / `1.`, uniform `<table>` → pipe tables,
-   `<pre>/<code>` → fenced blocks with indentation preserved. Verify renders (§6).
-   Expect most of the win on Levenshtein first.
-4. **Main-content selection gap-mining.** Then iterate §7-style: segmentation,
-   hygiene, engine handlers, rescues — in whatever order the failure taxonomy
-   says.
+   table devs for reference. Log F1/Lev, **ms/doc + docs/s**, failure-tag
+   distribution, and the machine specs. Sweep the existing knobs
+   (`preserve_formatting`, `list_bullets`, `alt_texts`, `links`) — the best
+   stock config is the real baseline. This tag is the reference every later
+   Rust cycle compares against; the Cython module is frozen after this.
+2. **0002-000N — Rust port of `html2text` (the first milestone).** Port the
+   extraction walk (`_extract_plain_text_impl` + the `ExtractOpts`/
+   `FormattingOpts` machinery, main-content scoring, list/table handling) onto
+   the Rust DOM in `resiliparse-rs`, exposed to Python via the workspace's PyO3
+   pattern. Gate on **parity**: golden tests asserting byte-identical (or
+   documented-diff) output vs. the Cython reference over a fixed doc set, plus
+   lpv11 dev F1/Lev within noise of tag 0001 — and at-or-better ms/doc. This is
+   allowed to take several cycles; log each. Do not start quality iteration
+   until parity lands: otherwise you can't tell a port bug from a quality
+   change.
+3. **Failure taxonomy.** Port `viz.py tags`; read the worst 20 docs. In jusText
+   this immediately reoriented the roadmap (cycle 0006).
+4. **Markdown output mode (in Rust).** The single biggest quality gap: the gold
+   has headings/bold/lists/tables/fences; `extract_plain_text` emits plain
+   text. Extend the ported `FormattingOpts` (`FORMAT_OFF / FORMAT_BASIC /
+   FORMAT_MINIMAL_HTML`) with a markdown flavor: `h1..h6 → #…######`,
+   `b/strong → **`, `i/em → *`, `li → -` / `1.`, uniform `<table>` → pipe
+   tables, `<pre>/<code>` → fenced blocks with indentation preserved. Verify
+   renders (§6). Expect most of the win on Levenshtein first.
+5. **Main-content selection gap-mining + speed cycles.** Then iterate §7-style:
+   segmentation, hygiene, engine handlers, rescues — in whatever order the
+   failure taxonomy says — interleaved with pure-performance cycles (criterion
+   profiles, allocation pressure, single-pass restructuring) once quality
+   plateaus between ideas.
 
 Also keep in mind: math content (LaTeX-as-image transcription, MediaWiki `class="tex"`
 images — jusText 0065/0098) and code formatting (line-numbered code tables → fenced
