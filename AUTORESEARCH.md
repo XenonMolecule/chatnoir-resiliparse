@@ -411,21 +411,42 @@ Suggested first cycles (revise after the baseline):
    pattern (like `parse/_html_rs`). Since we're building on upstream's active
    Rust rewrite, plan to merge `upstream/develop` periodically if this path wins.
 
-   **Parity bar:** golden tests asserting byte-identical (or documented-diff)
-   output vs. the Cython reference over a fixed doc set, lpv11 dev F1/Lev
-   within noise of tag 0001, and at-or-better ms/doc.
+   The spike has **two gates in sequence** — feasibility at the timebox, then a
+   measured speed verdict — and iterating on Rust requires passing both.
 
-   **Go/no-go at the timebox:** the spike *continues* past the timebox only if
-   the port runs end-to-end on lpv11 dev (no crashes, `--release`) and is
-   within ~0.02 F1 of the Cython baseline with the remaining diffs enumerable —
-   i.e., parity is clearly a matter of finishing, not of fighting the DOM API
-   or the build. Otherwise **stop, log the spike honestly as its own entry**
-   (what blocked it: missing DOM affordances, build friction, logic too
-   entangled), park "Rust port" in `QUEUE.md`, and **fall back to iterating on
-   the Cython `html2text.pyx`** — editable install, remember Cython needs a
-   rebuild before every measurement. Every later section of this playbook
-   applies unchanged on the fallback path; Cython is already fast, and the
-   speed gate (§6) still holds.
+   **Gate 1 — feasibility (at the ~4h timebox):** the spike *continues* past
+   the timebox only if the port runs end-to-end on lpv11 dev (no crashes,
+   `--release`) and is within ~0.02 F1 of the Cython baseline with the
+   remaining diffs enumerable — i.e., parity is clearly a matter of finishing,
+   not of fighting the DOM API or the build. Otherwise **stop, log the spike
+   honestly as its own entry** (what blocked it: missing DOM affordances,
+   build friction, logic too entangled), park "Rust port" in `QUEUE.md`, and
+   fall back to Cython.
+
+   **Parity bar (finish this before gate 2):** golden tests asserting
+   byte-identical (or documented-diff) output vs. the Cython reference over a
+   fixed doc set, and lpv11 dev F1/Lev within noise of tag 0001.
+
+   **Gate 2 — speed verdict (the point of the port):** with parity landed, run
+   a head-to-head on lpv11 dev — same harness, same docs, same machine,
+   `--workers 1`, `--impl rust` vs `--impl cython` — plus criterion benches on
+   the fixture pages. Do not assume Rust wins: the Cython implementation is
+   already mostly nogil C++ over the same lexbor parser, so a wash is a real
+   possibility. Rules of thumb for the verdict (log the numbers and the
+   decision either way):
+   - **≥ ~1.2× faster mean ms/doc (and no worse p95):** adopt Rust as the
+     iteration base.
+   - **~parity (0.9–1.2×):** speed alone doesn't decide it; adopting Rust is
+     then a strategic call (upstream is heading there; a clean port is
+     upstreamable) — surface the numbers to the user for the call rather than
+     deciding unilaterally.
+   - **Slower and not quickly fixable:** iterate on Cython; keep the port
+     parked with the measurements attached.
+
+   **Fallback path (either gate fails): iterate on the Cython
+   `html2text.pyx`** — editable install, remember Cython needs a rebuild
+   before every measurement. Every later section of this playbook applies
+   unchanged on the fallback path; the speed gate (§6) still holds.
 
    Either way: no quality iteration during the spike — a port bug must never be
    confusable with a quality change.
