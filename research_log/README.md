@@ -72,4 +72,6 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-(one line per entry, updated every cycle)
+lpv11/dev (raw HTML): F1 **0.7619** / Lev **0.6540** · 1.64 ms/doc (0001 baseline).
+
+- [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
