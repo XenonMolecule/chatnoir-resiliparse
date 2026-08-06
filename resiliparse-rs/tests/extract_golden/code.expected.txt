@@ -1,0 +1,364 @@
+#94715 Report by node docker-deb-debian_8_jessie_32bit covering 1973 tests from 54 modules resulted into 5 errors
+
+Report
+
+ObsPy Version
+1.1.0.post0+186.g718cc14c7e...
+Continuous Integration
+-
+GitHub Pull Request
+-
+Report File
+XML Document
+Total Runtime
+548.0 sec
+Report Date/Time
+2018-05-05 05:17:45
+
+System / Python
+
+Architecture
+32bit
+Machine
+x86_64
+Node
+docker-deb-debian_8_jessie_32bit
+Processor
+None
+Python Compiler
+GCC 4.9.1
+Python Implementation
+CPython
+Python Version
+3.4.2
+Release
+4.4.0-119-generic
+System
+Linux
+Version
+#143-Ubuntu SMP Mon Apr 2 16:08:24 UTC 2018
+
+Dependencies
+
+cartopy
+---
+decorator
+3.4.0
+flake8
+2.2.2
+future
+0.16.0
+geographiclib
+---
+lxml.etree
+3.4.0
+m2crypto
+---
+matplotlib
+1.4.2
+mock
+1.0.1
+mpl_toolkits.basemap
+---
+numpy
+1.8.2
+pep8-naming
+---
+pyflakes
+0.8.1
+pyimgur
+0.5.3
+pyproj
+1.8.9
+requests
+2.4.3
+scipy
+0.14.0
+setuptools
+5.5.1
+shapefile
+1.2.1
+sqlalchemy
+0.9.8
+
+Modules (54)
+
+Module Errors /
+Failures		 Tracebacks
+obspy.clients.arclink 1 1
+obspy.clients.earthworm - -
+obspy.clients.fdsn 1 2
+obspy.clients.filesystem - -
+obspy.clients.iris 2 3 4
+obspy.clients.neic - -
+obspy.clients.nrl - -
+obspy.clients.seedlink - -
+obspy.clients.seishub - -
+obspy.clients.syngine 1 5
+obspy.core - -
+obspy.db - -
+obspy.geodetics - -
+obspy.imaging - -
+obspy.io.ah - -
+obspy.io.arclink - -
+obspy.io.ascii - -
+obspy.io.cmtsolution - -
+obspy.io.cnv - -
+obspy.io.css - -
+obspy.io.gcf - -
+obspy.io.gse2 - -
+obspy.io.iaspei - -
+obspy.io.json - -
+obspy.io.kinemetrics - -
+obspy.io.kml - -
+obspy.io.mseed - -
+obspy.io.ndk - -
+obspy.io.nied - -
+obspy.io.nlloc - -
+obspy.io.nordic - -
+obspy.io.pdas - -
+obspy.io.pde - -
+obspy.io.quakeml - -
+obspy.io.reftek - -
+obspy.io.sac - -
+obspy.io.scardec - -
+obspy.io.seg2 - -
+obspy.io.segy - -
+obspy.io.seisan - -
+obspy.io.seiscomp - -
+obspy.io.sh - -
+obspy.io.shapefile - -
+obspy.io.stationtxt - -
+obspy.io.stationxml - -
+obspy.io.wav - -
+obspy.io.win - -
+obspy.io.xseed - -
+obspy.io.y - -
+obspy.io.zmap - -
+obspy.realtime - -
+obspy.scripts - -
+obspy.signal - -
+obspy.taup - -
+Summary 5 5
+
+Tracebacks (5)
+
+1 obspy.clients.arclink 
+
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/arclink/tests/test_client.py", line 527, in test_save_waveform_no_compression
+end, compressed=False)
+File "/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py", line 565, in save_waveforms
+data = self._fetch(rtype, rdata, route=route)
+File "/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py", line 260, in _fetch
+return self._request(request_type, request_data)
+File "/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py", line 324, in _request
+raise ArcLinkException("%s %s" % (err_code, msg))
+obspy.clients.arclink.client.ArcLinkException: b'UNSET'
+
+2 obspy.clients.fdsn 
+
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/tests/test_federator_routing_client.py", line 342, in test_get_stations_integration_test
+channel="LHZ", level="network")
+File "<string>", line 2, in get_stations
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py", line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/federator_routing_client.py", line 110, in get_stations
+return super(FederatorRoutingClient, self).get_stations(**kwargs)
+File "<string>", line 2, in get_stations
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py", line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py", line 344, in get_stations
+return self.get_stations_bulk([bulk], **kwargs)
+File "<string>", line 2, in get_stations_bulk
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py", line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/federator_routing_client.py", line 143, in get_stations_bulk
+r = self._download(self._url + "/query", data=bulk_str)
+File "/usr/lib/python3/dist-packages/obspy/clients/base.py", line 245, in _download
+self._handle_requests_http_error(r)
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py", line 280, in _handle_requests_http_error
+raise_on_error(r.status_code, get_reason_from_response(r))
+File "/usr/lib/python3/dist-packages/obspy/clients/fdsn/client.py", line 1710, in raise_on_error
+raise FDSNException(msg, server_info)
+obspy.clients.fdsn.header.FDSNException: Bad request. If you think your request was valid please contact the developers.
+
+3 obspy.clients.iris 
+
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 340, in timeseries
+data = self._fetch("timeseries", param_list=filter, **kwargs)
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 133, in _fetch
+response = urllib_request.urlopen(req, timeout=self.timeout)
+File "/usr/lib/python3.4/urllib/request.py", line 153, in urlopen
+return opener.open(url, data, timeout)
+File "/usr/lib/python3.4/urllib/request.py", line 461, in open
+response = meth(req, response)
+File "/usr/lib/python3.4/urllib/request.py", line 571, in http_response
+'http', request, response, code, msg, hdrs)
+File "/usr/lib/python3.4/urllib/request.py", line 499, in error
+return self._call_chain(*args)
+File "/usr/lib/python3.4/urllib/request.py", line 433, in _call_chain
+result = func(*args)
+File "/usr/lib/python3.4/urllib/request.py", line 579, in http_error_default
+raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/tests/test_client.py", line 256, in test_timeseries
+filter=["correct"])
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 344, in timeseries
+raise Exception(msg)
+Exception: No waveform data available (HTTPError: HTTP Error 400: Bad Request)
+
+4 obspy.clients.iris 
+
+Traceback (most recent call last):
+File "/usr/lib/python3.4/doctest.py", line 2193, in runTest
+raise self.failureException(self.format_failure(new.getvalue()))
+AssertionError: Failed doctest test for obspy.clients.iris.client.Client.timeseries
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 177, in timeseries
+----------------------------------------------------------------------
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 318, in obspy.clients.iris.client.Client.timeseries
+Failed example:
+st = client.timeseries("IU", "ANMO", "00", "BHZ", dt, dt+10,
+filter=["correct", "demean", "lp=2.0"])
+Exception raised:
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 340, in timeseries
+data = self._fetch("timeseries", param_list=filter, **kwargs)
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 133, in _fetch
+response = urllib_request.urlopen(req, timeout=self.timeout)
+File "/usr/lib/python3.4/urllib/request.py", line 153, in urlopen
+return opener.open(url, data, timeout)
+File "/usr/lib/python3.4/urllib/request.py", line 461, in open
+response = meth(req, response)
+File "/usr/lib/python3.4/urllib/request.py", line 571, in http_response
+'http', request, response, code, msg, hdrs)
+File "/usr/lib/python3.4/urllib/request.py", line 499, in error
+return self._call_chain(*args)
+File "/usr/lib/python3.4/urllib/request.py", line 433, in _call_chain
+result = func(*args)
+File "/usr/lib/python3.4/urllib/request.py", line 579, in http_error_default
+raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+File "/usr/lib/python3.4/doctest.py", line 1324, in __run
+compileflags, 1), test.globs)
+File "<doctest obspy.clients.iris.client.Client.timeseries[6]>", line 2, in <module>
+filter=["correct", "demean", "lp=2.0"])
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 344, in timeseries
+raise Exception(msg)
+Exception: No waveform data available (HTTPError: HTTP Error 400: Bad Request)
+----------------------------------------------------------------------
+File "/usr/lib/python3/dist-packages/obspy/clients/iris/client.py", line 320, in obspy.clients.iris.client.Client.timeseries
+Failed example:
+print(st[0].data) # doctest: +ELLIPSIS
+Expected:
+[ -1.57488682e-06 -1.26318002e-06 -7.84807128e-07 ...
+Got:
+[ 24 20 19 19 19 15 10 4 -4 -11 -19 -26 -35 -48 -60
+-72 -83 -95 -109 -121 -133 -147 -162 -179 -195 -208 -221 -238 -256 -272
+-285 -301 -314 -324 -333 -341 -350 -358 -365 -370 -376 -378 -378 -380 -381
+-381 -378 -376 -374 -370 -364 -359 -356 -352 -345 -337 -331 -328 -323 -316
+-310 -305 -301 -295 -290 -289 -283 -275 -271 -269 -267 -263 -258 -257 -253
+-248 -243 -240 -239 -237 -233 -229 -224 -218 -211 -208 -205 -202 -200 -195
+-191 -185 -181 -180 -179 -177 -177 -177 -176 -176 -179 -183 -185 -187 -189
+-192 -198 -204 -210 -216 -220 -227 -235 -241 -247 -253 -262 -270 -277 -284
+-294 -304 -313 -323 -332 -340 -345 -350 -355 -358 -361 -364 -369 -372 -371
+-372 -374 -373 -368 -364 -362 -357 -349 -344 -338 -331 -320 -311 -302 -291
+-280 -268 -255 -243 -231 -218 -203 -187 -173 -160 -147 -132 -119 -108 -97
+-86 -73 -62 -54 -48 -42 -37 -33 -29 -27 -27 -25 -26 -27 -29
+-31 -30 -31 -36 -40 -44 -52 -59 -68 -77 -83 -89 -95 -101 -108
+-116 -123 -130 -141 -150]
+
+5 obspy.clients.syngine 
+
+Traceback (most recent call last):
+File "/usr/lib/python3/dist-packages/obspy/clients/syngine/tests/test_client.py", line 456, in test_reading_saczip_files
+self.assertEqual(st, st_bulk)
+AssertionError: <obspy.core.stream.Stream object at 0xf29210ac> != <obspy.core.stream.Stream object at 0xf2a4e1ac>
+
+Skipped Tests (50)
+
+Submodule Test Skip Message
+taup test_compute_ray_paths (obspy.taup.tests.test_ray_paths.RayPathCalculationsTestCase) test needs geographiclib >= 1.34
+taup test_path_geo (obspy.taup.tests.test_taup_geo.TaupGeoTestCase) Module geographiclib is not installed or too old.
+taup test_path_resampling (obspy.taup.tests.test_taup_geo.TaupGeoTestCase) Module geographiclib is not installed or too old.
+taup test_p_iasp91_geo_manual (obspy.taup.tests.test_tau.TauPyModelTestCase) Module geographiclib is not installed
+taup test_pierce_p_iasp91_geo (obspy.taup.tests.test_tau.TauPyModelTestCase) test needs geographiclib >= 1.34
+taup test_single_path_geo_iasp91 (obspy.taup.tests.test_tau.TauPyModelTestCase) test needs geographiclib >= 1.34
+clients.seedlink test_info (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase) test must be started manually
+clients.seedlink test_issue708 (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase) test must be started manually
+clients.seedlink test_time_window (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase) test must be started manually
+clients.arclink test_m2crypto (obspy.clients.arclink.tests.test_decrypt.ClientTestCase) M2Crypto is not installed
+clients.arclink test_pycrypto (obspy.clients.arclink.tests.test_decrypt.ClientTestCase) PyCrypto is not installed
+clients.seishub test_get_channel_ids (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_coordinates (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_event_list (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_location_ids (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_network_ids (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_paz (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_preview (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_preview_by_ids (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_station_ids (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_waveform_with_metadata (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_get_waveforms (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_localcache (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+clients.seishub test_ping (obspy.clients.seishub.tests.test_client.ClientTestCase) Seishub test server not reachable.
+core test_combined_station_event_plot (obspy.core.tests.test_inventory.InventoryBasemapTestCase) basemap not installed
+core test_location_plot_global (obspy.core.tests.test_inventory.InventoryBasemapTestCase) basemap not installed
+core test_location_plot_local (obspy.core.tests.test_inventory.InventoryBasemapTestCase) basemap not installed
+core test_location_plot_ortho (obspy.core.tests.test_inventory.InventoryBasemapTestCase) basemap not installed
+core test_location_plot_global (obspy.core.tests.test_inventory.InventoryCartopyTestCase) cartopy not installed
+core test_location_plot_local (obspy.core.tests.test_inventory.InventoryCartopyTestCase) cartopy not installed
+core test_location_plot_ortho (obspy.core.tests.test_inventory.InventoryCartopyTestCase) cartopy not installed
+core test_catalog_plot_global (obspy.core.tests.test_event.CatalogBasemapTestCase) basemap not installed
+core test_catalog_plot_local (obspy.core.tests.test_event.CatalogBasemapTestCase) basemap not installed
+core test_catalog_plot_ortho (obspy.core.tests.test_event.CatalogBasemapTestCase) basemap not installed
+core test_catalog_plot_ortho_longitude_wrap (obspy.core.tests.test_event.CatalogBasemapTestCase) basemap not installed
+core test_catalog_plot_global (obspy.core.tests.test_event.CatalogCartopyTestCase) Cartopy not installed or too old
+core test_catalog_plot_local (obspy.core.tests.test_event.CatalogCartopyTestCase) Cartopy not installed or too old
+core test_catalog_plot_ortho (obspy.core.tests.test_event.CatalogCartopyTestCase) Cartopy not installed or too old
+core test_catalog_plot_ortho_longitude_wrap (obspy.core.tests.test_event.CatalogCartopyTestCase) Cartopy not installed or too old
+core test_plot_farfield_without_quiver_with_maps (obspy.core.tests.test_event.EventTestCase) basemap not installed
+core test_flake8 (obspy.core.tests.test_code_formatting.CodeFormattingTestCase) Formatting tests require at least flake8 3.0.
+core test_location_plot_global (obspy.core.tests.test_network.NetworkBasemapTestCase) basemap not installed
+core test_location_plot_local (obspy.core.tests.test_network.NetworkBasemapTestCase) basemap not installed
+core test_location_plot_ortho (obspy.core.tests.test_network.NetworkBasemapTestCase) basemap not installed
+core test_location_plot_global (obspy.core.tests.test_network.NetworkCartopyTestCase) cartopy not installed
+core test_location_plot_local (obspy.core.tests.test_network.NetworkCartopyTestCase) cartopy not installed
+core test_location_plot_ortho (obspy.core.tests.test_network.NetworkCartopyTestCase) cartopy not installed
+geodetics test_gps_2_dist_azimuth_with_geographiclib (obspy.geodetics.tests.test_util_geodetics.UtilGeodeticsTestCase) Module geographiclib is not installed
+geodetics test_issue_375 (obspy.geodetics.tests.test_util_geodetics.UtilGeodeticsTestCase) Module geographiclib is not installed
+imaging test_script_plot (obspy.imaging.tests.test_mopad_script.MopadTestCase) Currently broken until further review.
+
+Slowest Tests (20)
+
+Runtime Test
+30.049s test_save_waveform_no_compression (obspy.clients.arclink.tests.test_client.ClientTestCase)
+28.691s test_issue_372 (obspy.clients.arclink.tests.test_client.ClientTestCase)
+22.775s test_get_networks (obspy.clients.arclink.tests.test_client.ClientTestCase)
+13.287s test_get_waveform_instrument_change (obspy.clients.arclink.tests.test_client.ClientTestCase)
+10.036s test_redirection (obspy.clients.fdsn.tests.test_client.ClientTestCase)
+9.900s test_redirection_auth (obspy.clients.fdsn.tests.test_client.ClientTestCase)
+9.504s test_get_inventory (obspy.clients.arclink.tests.test_client.ClientTestCase)
+9.439s test_ppsd_restricted_stacks (obspy.signal.tests.test_spectral_estimation.PsdTestCase)
+9.035s test_dataselect_bulk (obspy.clients.fdsn.tests.test_client.ClientTestCase)
+8.478s test_get_waveform_with_metadata (obspy.clients.arclink.tests.test_client.ClientTestCase)
+8.288s test_get_routing (obspy.clients.arclink.tests.test_client.ClientTestCase)
+7.793s test_evalresp (obspy.clients.iris.tests.test_client.ClientTestCase)
+6.889s test_get_waveforms_integration_test (obspy.clients.fdsn.tests.test_federator_routing_client.FederatorRoutingClientTestCase)
+6.366s __init__ (obspy.taup)
+6.190s test_delayed_request (obspy.clients.arclink.tests.test_client.ClientTestCase)
+6.062s test_iris_example_queries_dataselect (obspy.clients.fdsn.tests.test_client.ClientTestCase)
+6.050s test_get_stations (obspy.clients.arclink.tests.test_client.ClientTestCase)
+6.009s test_response_calculation_from_seed_and_xseed (obspy.io.xseed.tests.test_core.CoreTestCase)
+5.907s test_issue_311 (obspy.clients.arclink.tests.test_client.ClientTestCase)
+5.733s __init__ (obspy.clients.fdsn.client.Client)
+
+Chuck Norris Fact
+
+Chuck Norris can access private methods.

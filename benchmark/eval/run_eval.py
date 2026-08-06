@@ -130,10 +130,13 @@ def default_tag():
 
 
 def cargo_build_release():
-    """Rebuild the Rust workspace so we never score a stale binary."""
-    print("[build] cargo build --release ...", flush=True)
+    """Rebuild the Rust extractor so we never score a stale binary."""
+    print("[build] cargo build --release -p resiliparse-extract-rs ...", flush=True)
     start = perf_counter()
-    proc = subprocess.run(["cargo", "build", "--release"], cwd=REPO_DIR)
+    env = dict(os.environ)
+    env.setdefault("VCPKG_ROOT", os.path.expanduser("~/vcpkg"))
+    proc = subprocess.run(["cargo", "build", "--release", "-p", "resiliparse-extract-rs"],
+                          cwd=REPO_DIR, env=env)
     if proc.returncode != 0:
         sys.exit("cargo build --release failed; refusing to run a stale binary")
     print(f"[build] done in {perf_counter() - start:.1f}s")

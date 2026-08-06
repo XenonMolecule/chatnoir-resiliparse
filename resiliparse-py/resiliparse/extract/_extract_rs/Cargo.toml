@@ -1,0 +1,16 @@
+[package]
+name = "resiliparse-extract-rs"
+edition.workspace = true
+publish = false
+
+[lib]
+name = "resiliparse_extract_rs"
+path = "lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[build-dependencies]
+pyo3-build-config.workspace = true
+
+[dependencies]
+resiliparse = { path = "../../../../resiliparse-rs" }
+pyo3 = { workspace = true, features = ["extension-module"] }

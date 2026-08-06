@@ -1,0 +1,36 @@
+Subscribe
+
+News Archive
+
+Looking for more information on how to do PHP the right way? Check out PHP: The Right Way
+
+Sematopia.com:
+How to - Backup MySQL database & email results using PHP
+by Chris Cornutt Feb 17, 2006 @ 07:06:03
+
+From Sematopia.com today, there's a quick example of how to backup a MySQL database and email results with the help of a bit of PHP.
+
+There are a bunch of scripts on the Internet that overly complicate the issue of automatically backing up your database. Here is a PHP script I wrote to backup a mysql database and email the results. Just set a cron job (/etc/crontab) to run this script with the following command: php dbBackUp.php
+
+You can either copy and paste the code from the post or download a copy. It uses the PEAR Mail and Mail_Mime packages to do a lot of the work, so you'll need those installed before it will cooperate.
+
+tagged: backup mysql database email results PEAR Mail Mime_Mail backup mysql database email results PEAR Mail Mime_Mail
+
+Link:
+
+Sematopia.com:
+How to - Backup MySQL database & email results using PHP
+by Chris Cornutt Feb 17, 2006 @ 07:06:03
+
+From Sematopia.com today, there's a quick example of how to backup a MySQL database and email results with the help of a bit of PHP.
+
+There are a bunch of scripts on the Internet that overly complicate the issue of automatically backing up your database. Here is a PHP script I wrote to backup a mysql database and email the results. Just set a cron job (/etc/crontab) to run this script with the following command: php dbBackUp.php
+
+You can either copy and paste the code from the post or download a copy. It uses the PEAR Mail and Mail_Mime packages to do a lot of the work, so you'll need those installed before it will cooperate.
+
+tagged: backup mysql database email results PEAR Mail Mime_Mail backup mysql database email results PEAR Mail Mime_Mail
+
+Link:
+
+
+Trending Topics: tutorial laravel symfony introduction language composer release opinion version series

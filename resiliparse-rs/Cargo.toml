@@ -12,6 +12,14 @@ license.workspace = true
 
 [dependencies]
 parking_lot = "0.12.5"
+regex = "1.11"
 
 [build-dependencies]
 bindgen.workspace = true
+
+[dev-dependencies]
+criterion = "0.7"
+
+[[bench]]
+name = "extract_bench"
+harness = false

@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<!--[if IE 7]>
+<html id="ie7" lang="en">
+<![endif]-->
+<!--[if IE 8]>
+<html id="ie8" lang="en">
+<![endif]-->
+<!--[if (!IE)]><!-->
+<html lang="en">
+<!--<![endif]-->
+<head>
+<meta charset="UTF-8" />
+<title>My letter to Santa 1984 | Coolest Family on the Block</title>
+<link rel="profile" href="http://gmpg.org/xfn/11" />
+<link rel="pingback" href="https://coolestfamilyontheblock.com/xmlrpc.php" />
+<meta name="google-site-verification" content="cPXeaPPatzucUKrA_R9BKAyv3dinw85dBgjzyLt5n8s" />
+<meta name="p:domain_verify" content="de24b1ec3aa33abce726406b232011d9" />
+
+<!-- Async WordPress.com Remote Login -->
+<script id="wpcom_remote_login_js">
+var wpcom_remote_login_extra_auth = '';
+function wpcom_remote_login_remove_dom_node_id( element_id ) {
+	var dom_node = document.getElementById( element_id );
+	if ( dom_node ) { dom_node.remove(); }
+}
+function wpcom_remote_login_remove_dom_node_classes( class_name ) {
+	var dom_nodes = document.querySelectorAll( '.' + class_name );
+	for ( var i = 0; i < dom_nodes.length; i++ ) {
+		dom_nodes[i].remove();
+	}
+}
+function wpcom_remote_login_final_cleanup() {
+	wpcom_remote_login_remove_dom_node_classes( "wpcom_remote_login_msg" );
+	wpcom_remote_login_remove_dom_node_id( "wpcom_remote_login_key" );
+	wpcom_remote_login_remove_dom_node_id( "wpcom_remote_login_validate" );
+	wpcom_remote_login_remove_dom_node_id( "wpcom_remote_login_js" );
+	wpcom_remote_login_remove_dom_node_id( "wpcom_request_access_iframe" );
+	wpcom_remote_login_remove_dom_node_id( "wpcom_request_access_styles" );
+}
+
+// Watch for messages back from the remote login
+window.addEventListener( "message", function( e ) {
+	if ( e.origin === "https://r-login.wordpress.com" ) {
+		var data = {};
+		try {
+			data = JSON.parse( e.data );
+		} catch( e ) {
+			wpcom_remote_login_final_cleanup();
+			return;
+		}
+
+		if ( data.msg === 'LOGIN' ) {
+			// Clean up the login check iframe
+			wpcom_remote_login_remove_dom_node_id( "wpcom_remote_login_key" );
+
+			var id_regex = new RegExp( /^[0-9]+$/ );
+			var token_regex = new RegExp( /^.*|.*|.*$/ );
+			if (
+				token_regex.test( data.token )
+				&& id_regex.test( data.wpcomid )
+			) {
+				// We have everything we need to ask for a login
+				var script = document.createElement( "script" );
+				script.setAttribute( "id", "wpcom_remote_login_validate" );
+				script.src = '/remote-login.php?wpcom_remote_login=validate'
+					+ '&wpcomid=' + data.wpcomid
+					+ '&token=' + encodeURIComponent( data.token )
+					+ '&host=' + window.location.protocol
+						+ '//' + window.location.hostname;
+				document.body.appendChild( script );
+			}
+
+			return;
+		}
+
+		// Safari ITP, not logged in, so redirect
+		if ( data.msg === 'LOGIN-REDIRECT' ) {
+			window.location = 'https://wordpress.com/log-in?redirect_to=' + window.location.href;
+			return;
+		}
+
+		// Safari ITP, storage access failed, remove the request
+		if ( data.msg === 'LOGIN-REMOVE' ) {
+			var css_zap = 'html { -webkit-transition: margin-top 1s; transition: margin-top 1s; } /* 9001 */ html { margin-top: 0 !important; } * html body { margin-top: 0 !important; } @media screen and ( max-width: 782px ) { html { margin-top: 0 !important; } * html body { margin-top: 0 !important; } }';
+			var style_zap = document.createElement( 'style' );
+			style_zap.type = 'text/css';
+			style_zap.appendChild( document.createTextNode( css_zap ) );
+			document.body.appendChild( style_zap );
+
+			var e = document.getElementById( 'wpcom_request_access_iframe' );
+			e.parentNode.removeChild( e );
+
+			document.cookie = 'wordpress_com_login_access=denied; path=/; max-age=31536000';
+
+			return;
+		}
+
+		// Safari ITP
+		if ( data.msg === 'REQUEST_ACCESS' ) {
+			console.log( 'request access: safari' );
+
+			// Check ITP iframe enable/disable knob
+			if ( wpcom_remote_login_extra_auth !== 'safari_itp_iframe' ) {
+				return;
+			}
+
+			// If we are in a "private window" there is no ITP.
+			var private_window = false;
+			try {
+				var opendb = window.openDatabase( null, null, null, null );
+			} catch( e ) {
+				private_window = true;
+			}
+
+			if ( private_window ) {
+				console.log( 'private window' );
+				return;
+			}
+
+			var iframe = document.createElement( 'iframe' );
+			iframe.id = 'wpcom_request_access_iframe';
+			iframe.setAttribute( 'scrolling', 'no' );
+			iframe.setAttribute( 'sandbox', 'allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-top-navigation-by-user-activation' );
+			iframe.src = 'https://r-login.wordpress.com/remote-login.php?wpcom_remote_login=request_access&origin=' + encodeURIComponent( data.origin ) + '&wpcomid=' + encodeURIComponent( data.wpcomid );
+
+			var css = 'html { -webkit-transition: margin-top 1s; transition: margin-top 1s; } /* 9001 */ html { margin-top: 46px !important; } * html body { margin-top: 46px !important; } @media screen and ( max-width: 660px ) { html { margin-top: 71px !important; } * html body { margin-top: 71px !important; } #wpcom_request_access_iframe { display: block; height: 71px !important; } } #wpcom_request_access_iframe { border: 0px; height: 46px; position: fixed; top: 0; left: 0; width: 100%; min-width: 100%; z-index: 99999; background: #23282d; } ';
+
+			var style = document.createElement( 'style' );
+			style.type = 'text/css';
+			style.id = 'wpcom_request_access_styles';
+			style.appendChild( document.createTextNode( css ) );
+			document.body.appendChild( style );
+
+			document.body.appendChild( iframe );
+		}
+
+		if ( data.msg === 'DONE' ) {
+			wpcom_remote_login_final_cleanup();
+		}
+	}
+}, false );
+
+// Inject the remote login iframe after the page has had a chance to load
+// more critical resources
+window.addEventListener( "DOMContentLoaded", function( e ) {
+	var iframe = document.createElement( "iframe" );
+	iframe.style.display = "none";
+	iframe.setAttribute( "scrolling", "no" );
+	iframe.setAttribute( "id", "wpcom_remote_login_key" );
+	iframe.src = "https://r-login.wordpress.com/remote-login.php"
+		+ "?wpcom_remote_login=key"
+		+ "&origin=aHR0cHM6Ly9jb29sZXN0ZmFtaWx5b250aGVibG9jay5jb20%3D"
+		+ "&wpcomid=14948247"
+		+ "&time=1563465226";
+	document.body.appendChild( iframe );
+}, false );
+</script>
+<link rel='dns-prefetch' href='//s2.wp.com' />
+<link rel='dns-prefetch' href='//s1.wp.com' />
+<link rel='dns-prefetch' href='//s0.wp.com' />
+<link rel='dns-prefetch' href='//coolestfamilyontheblock.wordpress.com' />
+<link rel='dns-prefetch' href='//wordpress.com' />
+<link rel='dns-prefetch' href='//s.pubmine.com' />
+<link rel='dns-prefetch' href='//x.bidswitch.net' />
+<link rel='dns-prefetch' href='//static.criteo.net' />
+<link rel='dns-prefetch' href='//ib.adnxs.com' />
+<link rel='dns-prefetch' href='//aax.amazon-adsystem.com' />
+<link rel='dns-prefetch' href='//bidder.criteo.com' />
+<link rel='dns-prefetch' href='//cas.criteo.com' />
+<link rel='dns-prefetch' href='//gum.criteo.com' />
+<link rel='dns-prefetch' href='//ads.pubmatic.com' />
+<link rel='dns-prefetch' href='//gads.pubmatic.com' />
+<link rel='dns-prefetch' href='//tpc.googlesyndication.com' />
+<link rel='dns-prefetch' href='//ad.doubleclick.net' />
+<link rel='dns-prefetch' href='//googleads.g.doubleclick.net' />
+<link rel='dns-prefetch' href='//www.googletagservices.com' />
+<link rel='dns-prefetch' href='//cdn.switchadhub.com' />
+<link rel='dns-prefetch' href='//delivery.g.switchadhub.com' />
+<link rel='dns-prefetch' href='//delivery.swid.switchadhub.com' />
+<link rel="alternate" type="application/rss+xml" title="Coolest Family on the Block &raquo; Feed" href="https://coolestfamilyontheblock.com/feed/" />
+<link rel="alternate" type="application/rss+xml" title="Coolest Family on the Block &raquo; Comments Feed" href="https://coolestfamilyontheblock.com/comments/feed/" />
+<link rel="alternate" type="application/rss+xml" title="Coolest Family on the Block &raquo; My letter to Santa&nbsp;1984 Comments Feed" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/feed/" />
+	<script type="text/javascript">
+		/* <![CDATA[ */
+		function addLoadEvent(func) {
+			var oldonload = window.onload;
+			if (typeof window.onload != 'function') {
+				window.onload = func;
+			} else {
+				window.onload = function () {
+					oldonload();
+					func();
+				}
+			}
+		}
+		/* ]]> */
+	</script>
+			<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s0.wp.com\/wp-content\/mu-plugins\/wpcom-smileys\/twemoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s0.wp.com\/wp-content\/mu-plugins\/wpcom-smileys\/twemoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"https:\/\/s2.wp.com\/wp-includes\/js\/wp-emoji-release.min.js?m=1556893897h&ver=5.2.2"}};
+			!function(a,b,c){function d(a,b){var c=String.fromCharCode;l.clearRect(0,0,k.width,k.height),l.fillText(c.apply(this,a),0,0);var d=k.toDataURL();l.clearRect(0,0,k.width,k.height),l.fillText(c.apply(this,b),0,0);var e=k.toDataURL();return d===e}function e(a){var b;if(!l||!l.fillText)return!1;switch(l.textBaseline="top",l.font="600 32px Arial",a){case"flag":return!(b=d([55356,56826,55356,56819],[55356,56826,8203,55356,56819]))&&(b=d([55356,57332,56128,56423,56128,56418,56128,56421,56128,56430,56128,56423,56128,56447],[55356,57332,8203,56128,56423,8203,56128,56418,8203,56128,56421,8203,56128,56430,8203,56128,56423,8203,56128,56447]),!b);case"emoji":return b=d([55357,56424,55356,57342,8205,55358,56605,8205,55357,56424,55356,57340],[55357,56424,55356,57342,8203,55358,56605,8203,55357,56424,55356,57340]),!b}return!1}function f(a){var c=b.createElement("script");c.src=a,c.defer=c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var g,h,i,j,k=b.createElement("canvas"),l=k.getContext&&k.getContext("2d");for(j=Array("flag","emoji"),c.supports={everything:!0,everythingExceptFlag:!0},i=0;i<j.length;i++)c.supports[j[i]]=e(j[i]),c.supports.everything=c.supports.everything&&c.supports[j[i]],"flag"!==j[i]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[j[i]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(h=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",h,!1),a.addEventListener("load",h,!1)):(a.attachEvent("onload",h),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),g=c.source||{},g.concatemoji?f(g.concatemoji):g.wpemoji&&g.twemoji&&(f(g.twemoji),f(g.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+	<link rel='stylesheet' id='all-css-0-1' href='https://s0.wp.com/_static/??-eJyNU1tywyAMvFApk07imX50ehawFUcJryJRx7cvhubp1M2PLQntaiWEHIJovWNwLG0SwaQeHckhtN4KsmhgvPNeW6IXeQXTxvcXoI+d6kj2xmtlnsu1IzF+JRDfbzPAlaYIRjF0InjiO28JZvAAJPfAQbUHUbxzOrrWpC4f54DskIrAkqWjiqMkHg28WnSzAif2bTJGEDII6JDRnbqTRVcmIhaFs9LfR5eEtz5CjtugeMqwuYACAzanLcEG7Hrg2lK1BcNxEWJDcyo0mbs8qMWR1n3QOkQgEvlrMVnBu6xtEZdRk/p6CUXgTaRCUTrPmNF0NmactZQMSZ+X5/eunslsvfGR6i9fQ5qjHowTUj71BwRh1CAZbJj2j/4o+4Bgq1rQmaH0qv3xf2QPXuQlUYze3ThiaxTG5bcyvbRs9mXMF3cCfdqP1aZZrd8366bZ/wDdEYQG?cssminify=yes' type='text/css' media='all' />
+<link rel='stylesheet' id='print-css-1-1' href='https://s2.wp.com/wp-content/mu-plugins/global-print/global-print.css?m=1465851035h&cssminify=yes' type='text/css' media='print' />
+<link rel='stylesheet' id='all-css-2-1' href='https://s1.wp.com/_static/??-eJx9i9EKwjAMRX/IGgfbYA/it2SlayNpUpoMf198EBmKT/dcOAceLUQVT+JQ99B4zyQGGJ1UVuwfOkezE/zWm5qHjZE6WMFOkt/7rzKNhBxYsx7PV+Ql1WRQRsisK/JLuNXrMM2XcV6GZbo/AcVpSbo=?cssminify=yes' type='text/css' media='all' />
+<script type='text/javascript'>
+/* <![CDATA[ */
+var related_posts_js_options = {"post_heading":"h4"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='https://s1.wp.com/_static/??-eJyFj9EKwjAMRX/IWmRs+CJ+y9ZlM3VNa5M65tfbgj44h0IghJzc3KvnoJDMlHpgbXPdEsTl1faWd/oXoByOsRXYO6Q3bDwJkBQ2eBYHzO0IG1vnO5xAJYaYAZL8ZvBrziUVpjQisY4w5Ve9KqqraUP9MwjSHWH+i1mQ0JqrisD4+PIsF8hpdEiddgsL5psiMSQygp6Ki7M7Her6WNVNU1f2CWK3gt4='></script>
+<link rel='stylesheet' id='all-css-0-2' href='https://s0.wp.com/wp-content/mu-plugins/highlander-comments/style.css?m=1530132353h&cssminify=yes' type='text/css' media='all' />
+<!--[if lt IE 8]>
+<link rel='stylesheet' id='highlander-comments-ie7-css'  href='https://s2.wp.com/wp-content/mu-plugins/highlander-comments/style-ie7.css?m=1351637563h&#038;ver=20110606' type='text/css' media='all' />
+<![endif]-->
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://coolestfamilyontheblock.wordpress.com/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="https://s1.wp.com/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Wordless Wednesday: First snow fall&nbsp;2010' href='https://coolestfamilyontheblock.com/2010/12/01/wordless-wednesday-first-snow-fall-2010/' />
+<link rel='next' title='Dear Santa: Writing a letter to&nbsp;Santa' href='https://coolestfamilyontheblock.com/2010/12/03/writing-a-letter-to-santa/' />
+<meta name="generator" content="WordPress.com" />
+<link rel="canonical" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/" />
+<link rel='shortlink' href='https://wp.me/p10IIL-wa' />
+<meta name='robots' content='noindex,follow' />
+<link rel="alternate" type="application/json+oembed" href="https://public-api.wordpress.com/oembed/?format=json&amp;url=https%3A%2F%2Fcoolestfamilyontheblock.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F&amp;for=wpcom-auto-discovery" /><link rel="alternate" type="application/xml+oembed" href="https://public-api.wordpress.com/oembed/?format=xml&amp;url=https%3A%2F%2Fcoolestfamilyontheblock.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F&amp;for=wpcom-auto-discovery" />
+<!-- Jetpack Open Graph Tags -->
+<meta property="og:type" content="article" />
+<meta property="og:title" content="My letter to Santa 1984" />
+<meta property="og:url" content="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/" />
+<meta property="og:description" content="*Writing a letter to Santa to mail or email can be a memorable family tradition using my tips and ideas for making the experience special. The “Dear Santa” series will tell you everything you need …" />
+<meta property="article:published_time" content="2010-12-01T23:00:21+00:00" />
+<meta property="article:modified_time" content="2016-01-01T08:47:25+00:00" />
+<meta property="og:site_name" content="Coolest Family on the Block" />
+<meta property="og:image" content="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=300" />
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="228" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:creator" content="@coolfamilyblog" />
+<meta name="twitter:site" content="@coolfamilyblog" />
+<meta name="twitter:text:title" content="My letter to Santa&nbsp;1984" />
+<meta name="twitter:card" content="summary" />
+<meta property="article:publisher" content="https://www.facebook.com/WordPresscom" />
+
+<!-- End Jetpack Open Graph Tags -->
+<link rel="shortcut icon" type="image/x-icon" href="https://secure.gravatar.com/blavatar/92b1c9bf8e54ce538759f5b500cb5ea8?s=32" sizes="16x16" />
+<link rel="icon" type="image/x-icon" href="https://secure.gravatar.com/blavatar/92b1c9bf8e54ce538759f5b500cb5ea8?s=32" sizes="16x16" />
+<link rel="apple-touch-icon-precomposed" href="https://secure.gravatar.com/blavatar/92b1c9bf8e54ce538759f5b500cb5ea8?s=114" />
+<link rel='openid.server' href='https://coolestfamilyontheblock.wordpress.com/?openidserver=1' />
+<link rel='openid.delegate' href='https://coolestfamilyontheblock.wordpress.com/' />
+<link rel="search" type="application/opensearchdescription+xml" href="https://coolestfamilyontheblock.com/osd.xml" title="Coolest Family on the Block" />
+<link rel="search" type="application/opensearchdescription+xml" href="https://s1.wp.com/opensearch.xml" title="WordPress.com" />
+<meta name="theme-color" content="#f4f4f4" />
+<script type="text/javascript" id="webfont-output">
+  
+  WebFontConfig = {"typekit":{"id":"ncg5fxf"}};
+  (function() {
+    var wf = document.createElement('script');
+    wf.src = ('https:' == document.location.protocol ? 'https' : 'http') +
+      '://ajax.googleapis.com/ajax/libs/webfont/1/webfont.js';
+    wf.type = 'text/javascript';
+    wf.async = 'true';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(wf, s);
+	})();
+</script>	<style type="text/css">
+			#page {
+			background: none;
+		}
+				#branding {
+			margin-top: 1em;
+			padding: 0;
+		}
+		#branding #logo {
+			border-width: 0;
+			padding-right: .1em;
+		}
+		</style>
+	<meta name="application-name" content="Coolest Family on the Block" /><meta name="msapplication-window" content="width=device-width;height=device-height" /><meta name="msapplication-tooltip" content="We put the &quot;fun&quot; in dysFUNctional!" /><meta name="msapplication-task" content="name=Subscribe;action-uri=https://coolestfamilyontheblock.com/feed/;icon-uri=https://secure.gravatar.com/blavatar/92b1c9bf8e54ce538759f5b500cb5ea8?s=16" /><meta name="msapplication-task" content="name=Sign up for a free blog;action-uri=http://wordpress.com/signup/;icon-uri=https://s1.wp.com/i/favicon.ico" /><meta name="msapplication-task" content="name=WordPress.com Support;action-uri=http://support.wordpress.com/;icon-uri=https://s1.wp.com/i/favicon.ico" /><meta name="msapplication-task" content="name=WordPress.com Forums;action-uri=http://forums.wordpress.com/;icon-uri=https://s1.wp.com/i/favicon.ico" /><meta name="description" content="*Writing a letter to Santa to mail or email can be a memorable family tradition using my tips and ideas for making the experience special. The “Dear Santa” series will tell you everything you need to know about writing to Santa. Please subscribe to receive email updates.* In 1984 I wrote a letter to Santa&hellip;" />
+	<style type="text/css">
+			#branding {
+			background: url('https://coolestfamilyontheblock.files.wordpress.com/2014/06/cropped-cfotbheaderstripes01.jpg');
+			width: 940px;
+			height: 148px; /* 200 - 52 for top padding */
+		}
+		#page {
+			background: none;
+		}
+		#branding {
+			padding: 4em 0 0;
+		}
+		.home-link{
+			width:920px;
+			height:148px;
+			display: block;
+		}
+		#branding #logo {
+			margin: 0 0 0 .3em;
+			padding-right: .3em;
+		}
+		#site-description {
+			margin: 0.2em 0 0 1em;
+			padding: .8em 0.2em;
+		}
+			#logo,
+		#site-description {
+ 	 		position: absolute !important;
+			clip: rect(1px 1px 1px 1px); /* IE6, IE7 */
+			clip: rect(1px, 1px, 1px, 1px);
+		}
+		</style>
+	<style type="text/css" id="custom-background-css">
+body.custom-background { background-color: #f4f4f4; }
+</style>
+			<script type="text/javascript">
+		function __ATA_CC() {var v = document.cookie.match('(^|;) ?personalized-ads-consent=([^;]*)(;|$)');return v ? 1 : 0;}
+		var __ATA_PP = { pt: 1, ht: 1, tn: 'mystique', amp: false, siteid: 14948247, consent: __ATA_CC() };
+		var __ATA = __ATA || {};
+		__ATA.cmd = __ATA.cmd || [];
+		__ATA.criteo = __ATA.criteo || {};
+		__ATA.criteo.cmd = __ATA.criteo.cmd || [];
+		</script>
+		<script type="text/javascript" src="//s.pubmine.com/head.js" async></script><link rel="amphtml" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/amp/"><style type="text/css" id="syntaxhighlighteranchor"></style>
+</head>
+
+<body class="post-template-default single single-post postid-1994 single-format-standard custom-background mp6 customizer-styles-applied content-sidebar highlander-enabled highlander-light">
+<div id="page">
+		<div class="wpcnt">
+			<div class="wpa top">
+				<span class="wpa-about">Advertisements</span>
+				<div class="u">
+						<div style="padding-bottom:15px;width:728px;height:90px;">
+			<div id="atatags-149482472-5d30960a662d8">
+				<script type="text/javascript">
+				__ATA.cmd.push(function() {
+					__ATA.initSlot('atatags-149482472-5d30960a662d8',  {
+						collapseEmpty: 'before',
+						sectionId: '149482472',
+						location: 110,
+						width: 728,
+						height: 90
+					});
+				});
+				</script>
+			</div>
+		</div>
+				</div>
+				
+			</div>
+		</div>
+		
+	<div id="container">
+
+		<ul class="skip">
+			<li><a href="#access">Skip to navigation</a></li>
+			<li><a href="#main">Skip to main content</a></li>
+			<li><a href="#sidebar">Skip to primary sidebar</a></li>
+			<li><a href="#sidebar2">Skip to secondary sidebar</a></li>
+			<li><a href="#footer">Skip to footer</a></li>
+		</ul>
+
+		<div id="header">
+			<div id="branding" class="clear-block">
+				<a class="home-link" href="https://coolestfamilyontheblock.com/" title="Coolest Family on the Block" rel="home">
+					<h1 id="logo">Coolest Family on the Block</h1>
+					<h2 id="site-description">We put the &quot;fun&quot; in dysFUNctional!</h2>
+				</a>
+			</div><!-- #branding-->
+
+			<div id="access" class="clear-block" role="navigation">
+				<ul id="menu-main-menu" class="menu"><li id="menu-item-4589" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-4589"><a href="http://www.coolestfamilyontheblock.com">HOME</a>
+<ul class="sub-menu">
+	<li id="menu-item-10642" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-10642"><a href="http://coolestfamilyontheblock.com">Coolest Family on the Block</a></li>
+	<li id="menu-item-10643" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10643"><a href="http://jennrian.com">JennRian.com</a></li>
+</ul>
+</li>
+<li id="menu-item-10959" class="menu-item menu-item-type-post_type menu-item-object-page current_page_parent menu-item-10959"><a href="https://coolestfamilyontheblock.com/fun-and-dysfunction-blog/">Blog</a></li>
+<li id="menu-item-1930" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-1930"><a href="https://coolestfamilyontheblock.com/about-cool-mama/">About</a>
+<ul class="sub-menu">
+	<li id="menu-item-1941" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1941"><a href="https://coolestfamilyontheblock.wordpress.com/about-cool-mama/">About Jenn</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10179" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10179"><a href="https://coolestfamilyontheblock.com/category/infertility/">Infertility</a></li>
+		<li id="menu-item-10180" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10180"><a href="https://coolestfamilyontheblock.com/category/miscarriage/">Miscarriage</a></li>
+		<li id="menu-item-10181" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-10181"><a href="https://coolestfamilyontheblock.com/category/pregnancy/birth-stories/">Cesarean / VBAC</a>
+		<ul class="sub-menu">
+			<li id="menu-item-10182" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10182"><a href="https://coolestfamilyontheblock.com/2012/04/27/adalines-cesarean-birth-story/">Adaline&#8217;s Cesarean Birth Story</a></li>
+			<li id="menu-item-10183" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10183"><a href="http://imakemyselfthequeen.com/2014/02/08/vbac-to-the-future/">Jonathan&#8217;s (Illustrated) VBAC Birth Story</a></li>
+		</ul>
+</li>
+	</ul>
+</li>
+	<li id="menu-item-1944" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1944"><a href="https://coolestfamilyontheblock.com/2011/03/18/why-coolest-family-on-the-block/">About the blog</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10375" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10375"><a href="https://coolestfamilyontheblock.com/2011/03/18/why-coolest-family-on-the-block/">Why &#8220;Coolest Family on the Block&#8221;?</a></li>
+		<li id="menu-item-10374" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10374"><a href="https://coolestfamilyontheblock.com/2010/11/11/31dbbb-day-1-my-blog-in-30-seconds-or-less/">My blog in 30 seconds or less</a></li>
+	</ul>
+</li>
+	<li id="menu-item-8972" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8972"><a href="http://jennrian.com/vlog-magic/">Vlogs</a></li>
+	<li id="menu-item-8973" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8973"><a href="http://jennrian.com">JennRian.com: I Make Myself the Queen</a></li>
+</ul>
+</li>
+<li id="menu-item-1935" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-has-children menu-item-1935"><a href="https://coolestfamilyontheblock.com/category/birthdays/">Birthdays</a>
+<ul class="sub-menu">
+	<li id="menu-item-8431" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8431"><a href="https://coolestfamilyontheblock.com/category/birthdays/birthday-traditions-birthdays/">Birthday Traditions</a></li>
+	<li id="menu-item-8430" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-8430"><a href="https://coolestfamilyontheblock.com/?cat=1381">Birthday Parties</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10494" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10494"><a href="https://coolestfamilyontheblock.com/2010/08/17/adalines-1st-birthday-party-pink--and-green-polka-dots-and-cupcakes/">Pink &amp; Green Polka Dots &amp; Cupcakes</a></li>
+		<li id="menu-item-10495" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10495"><a href="https://coolestfamilyontheblock.com/2011/08/12/ladybug-picnic-2nd-birthday/">Ladybug Picnic</a></li>
+		<li id="menu-item-10493" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10493"><a href="https://coolestfamilyontheblock.com/2014/02/05/little-man-mustache-bash/">Tie-riffic Little Man Mustache Bash</a></li>
+	</ul>
+</li>
+	<li id="menu-item-8432" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8432"><a href="https://coolestfamilyontheblock.com/2013/02/05/half-birthday-celebrations/">Half Birthday Celebrations</a></li>
+	<li id="menu-item-10367" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10367"><a href="https://coolestfamilyontheblock.com/category/pregnancy/birth-stories/">Birth Stories</a></li>
+</ul>
+</li>
+<li id="menu-item-1936" class="menu-item menu-item-type-taxonomy menu-item-object-category current-post-ancestor menu-item-has-children menu-item-1936"><a href="https://coolestfamilyontheblock.com/category/holidays/">Holidays</a>
+<ul class="sub-menu">
+	<li id="menu-item-10492" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10492"><a href="https://coolestfamilyontheblock.com/2013/12/31/noon-years-eve-2013/">New Years (01/01)</a></li>
+	<li id="menu-item-10168" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10168"><a href="https://coolestfamilyontheblock.com/category/holidays/groundhog-day-holidays/">Groundhog Day (02/02)</a></li>
+	<li id="menu-item-10169" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10169"><a href="https://coolestfamilyontheblock.com/category/holidays/valentines-day/">Valentine&#8217;s Day (02/14)</a></li>
+	<li id="menu-item-10170" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10170"><a href="https://coolestfamilyontheblock.com/category/holidays/st-patricks-day/">St. Patrick&#8217;s Day (03/17)</a></li>
+	<li id="menu-item-10172" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10172"><a href="https://coolestfamilyontheblock.com/category/holidays/april-fools-day/">April Fools Day (04/01)</a></li>
+	<li id="menu-item-10156" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-has-children menu-item-10156"><a href="https://coolestfamilyontheblock.com/category/holidays/easter-holidays/easter-traditions/">Easter</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10372" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10372"><a href="https://coolestfamilyontheblock.com/2014/04/03/magic-jellybean-lollipop-garden/">Magic Jellybean Prayer &amp; Lollipop Garden</a></li>
+		<li id="menu-item-10370" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-10370"><a href="https://coolestfamilyontheblock.com/2014/04/10/free-printable-easter-bunny-paw-print-template/">How to Make Easter Bunny Paw Prints</a>
+		<ul class="sub-menu">
+			<li id="menu-item-10371" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10371"><a href="https://coolestfamilyontheblock.com/2014/04/10/free-printable-easter-bunny-paw-print-template/">FREE Printable Easter Bunny Paw Print Template and Video Tutorial</a></li>
+			<li id="menu-item-10163" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10163"><a href="https://coolestfamilyontheblock.com/2012/03/27/easter-bunny-tracks/">Easter Bunny Paw Prints (2011)</a></li>
+			<li id="menu-item-10368" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10368"><a href="https://coolestfamilyontheblock.com/2012/04/10/easter-bunny-pawprints/">Easter Bunny Paw Prints (2012)</a></li>
+			<li id="menu-item-10369" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10369"><a href="https://coolestfamilyontheblock.com/2013/04/02/bunny-paw-print-trail/">Easter Bunny Paw Prints (2013)</a></li>
+		</ul>
+</li>
+		<li id="menu-item-10164" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10164"><a href="https://coolestfamilyontheblock.com/2011/04/19/easter-egg-decorating-ideas/">50+ Easter Egg Decorating Ideas</a></li>
+		<li id="menu-item-10165" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10165"><a href="https://coolestfamilyontheblock.com/2011/04/19/natural-dyed-easter-eggs/">Natural Dyes for Easter Eggs</a></li>
+	</ul>
+</li>
+	<li id="menu-item-10490" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10490"><a href="https://coolestfamilyontheblock.com/2014/04/30/may-day-round-up/">May Day (05/01)</a></li>
+	<li id="menu-item-10644" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10644"><a href="https://coolestfamilyontheblock.com/2014/05/21/traditions-celebrating-patriotic-holidays/">Patriotic Holidays (05/31, 06/14, 07/04, 11)</a></li>
+	<li id="menu-item-10174" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10174"><a href="https://coolestfamilyontheblock.com/category/seasons/fall/">Fall: Halloween and Thanksgiving</a></li>
+	<li id="menu-item-10173" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10173"><a href="https://coolestfamilyontheblock.com/category/holidays/christmas/">Christmas (12/25)</a></li>
+</ul>
+</li>
+<li id="menu-item-1937" class="menu-item menu-item-type-taxonomy menu-item-object-category current-post-ancestor current-menu-parent current-post-parent menu-item-has-children menu-item-1937"><a href="https://coolestfamilyontheblock.com/category/holidays/traditions/">Traditions</a>
+<ul class="sub-menu">
+	<li id="menu-item-10496" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10496"><a href="https://coolestfamilyontheblock.com/category/birthdays/birthday-traditions-birthdays/">Birthday Traditions</a></li>
+	<li id="menu-item-10491" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10491"><a href="https://coolestfamilyontheblock.com/2013/12/31/noon-years-eve-2013/">January Holiday Traditions</a></li>
+	<li id="menu-item-10162" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10162"><a href="https://coolestfamilyontheblock.com/2014/01/20/february-holiday-traditions/">February Holiday Traditions</a></li>
+	<li id="menu-item-10161" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10161"><a href="https://coolestfamilyontheblock.com/2014/02/18/march-holiday-traditions/">March Holiday Traditions</a></li>
+	<li id="menu-item-10186" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-10186"><a href="https://coolestfamilyontheblock.com/2014/03/22/april-holiday-traditions/">April Holiday Traditions</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10366" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10366"><a href="https://coolestfamilyontheblock.com/category/holidays/easter-holidays/easter-traditions/">Easter</a></li>
+		<li id="menu-item-10035" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-10035"><a href="https://coolestfamilyontheblock.com/category/holidays/april-fools-day/">April 1: April Fools Day</a></li>
+		<li id="menu-item-10178" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-10178"><a href="https://coolestfamilyontheblock.com/no-housework-party/">April 7: No Housework Day</a>
+		<ul class="sub-menu">
+			<li id="menu-item-10185" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-10185"><a href="https://coolestfamilyontheblock.com/category/blog-stuff/blog-hops/no-housework-party/">No Housework Party</a></li>
+			<li id="menu-item-10184" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10184"><a href="https://coolestfamilyontheblock.com/category/domestically-challenged/">Domestically Challenged</a></li>
+		</ul>
+</li>
+	</ul>
+</li>
+	<li id="menu-item-10489" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-10489"><a href="https://coolestfamilyontheblock.com/2014/04/30/may-day-round-up/">May Holiday Traditions</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10645" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10645"><a href="https://coolestfamilyontheblock.com/2014/05/21/traditions-celebrating-patriotic-holidays/">Memorial Day Traditions</a></li>
+	</ul>
+</li>
+</ul>
+</li>
+<li id="menu-item-1942" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1942"><a href="http://feeds.feedburner.com/CoolestFamilyOnTheBlock">Subscribe</a>
+<ul class="sub-menu">
+	<li id="menu-item-1949" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1949"><a href="http://feeds.feedburner.com/CoolestFamilyOnTheBlock">Subscribe through a feed</a></li>
+	<li id="menu-item-1946" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1946"><a href="http://feedburner.google.com/fb/a/mailverify?uri=CoolestFamilyOnTheBlock&#038;loc=en_US">Subscribe via Email</a></li>
+	<li id="menu-item-5606" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-5606"><a href="https://coolestfamilyontheblock.com/2010/08/24/do-you-%E2%80%9Clike%E2%80%9D-me-i%E2%80%99m-on-facebook/">Follow Me!</a>
+	<ul class="sub-menu">
+		<li id="menu-item-10167" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10167"><a href="https://www.bloglovin.com/blog/6218791/coolest-family-on-the-block">Bloglovin</a></li>
+		<li id="menu-item-1920" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1920"><a href="http://www.facebook.com/pages/Coolest-Family-on-the-Block/143223165717640">Facebook</a></li>
+		<li id="menu-item-1931" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1931"><a href="http://twitter.com/coolfamilyblog">Twitter @coolfamilyblog</a></li>
+		<li id="menu-item-8906" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8906"><a href="http://pinterest.com/coolfamilyblog/">Pinterest @coolfamilyblog</a></li>
+		<li id="menu-item-10166" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10166"><a href="http://instagram.com/jennrianblogs">Instagram @jennrianblogs</a></li>
+		<li id="menu-item-8908" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8908"><a href="https://plus.google.com/109549440334908625710/about">Google+ (Jenn Rian)</a></li>
+		<li id="menu-item-8909" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8909"><a href="https://www.youtube.com/user/coolfamilyblog">You Tube (coolfamilyblog)</a></li>
+	</ul>
+</li>
+</ul>
+</li>
+<li id="menu-item-3393" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-3393"><a href="https://coolestfamilyontheblock.com/contact/">Contact</a>
+<ul class="sub-menu">
+	<li id="menu-item-10373" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10373"><a href="https://coolestfamilyontheblock.com/contact/">Contact Jenn</a></li>
+	<li id="menu-item-10641" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10641"><a href="http://jennrian.com">JennRian.com</a></li>
+</ul>
+</li>
+<li id="menu-item-7885" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-7885"><a href="https://coolestfamilyontheblock.com/local/">Pittsburgh</a>
+<ul class="sub-menu">
+	<li id="menu-item-8971" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8971"><a href="https://www.facebook.com/pages/Beaver-County-Family-Fun/396582963787919">Beaver County and Pittsburgh Family Fun on Facebook</a></li>
+	<li id="menu-item-10229" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10229"><a href="https://coolestfamilyontheblock.com/local/beaver-county-links/">Beaver County Links</a></li>
+	<li id="menu-item-10819" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10819"><a href="https://coolestfamilyontheblock.com/local/pittsburgh-area-tree-farms/">Pittsburgh Area Christmas Tree Farms</a></li>
+</ul>
+</li>
+<li id="menu-item-10647" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10647"><a href="http://jennrian.com">JennRian.com</a></li>
+</ul>
+				<div class="social-icons">
+
+											<a href="http://www.youtube.com/user/coolfamilyblog" class="youtube">YouTube</a>
+					
+					
+											<a href="http://twitter.com/coolfamilyblog" class="twitter">Twitter</a>
+					
+											<a href="http://www.facebook.com/coolestfamilyontheblockblog" class="facebook">Facebook</a>
+					
+											<a href="https://coolestfamilyontheblock.com/feed/" class="rss">RSS Feed</a>
+					
+				</div><!-- .social-icons -->
+
+			</div><!-- #access -->
+
+			
+			</div><!-- #header-->
+
+			<div id="main">
+
+ 			<div id="content-container">
+	 			<div id="content">
+					
+						<div class="post-navigation nav-above">
+							<div class="nav-previous">
+								<a href="https://coolestfamilyontheblock.com/2010/12/01/wordless-wednesday-first-snow-fall-2010/" rel="prev">&larr; Wordless Wednesday: First snow fall&nbsp;2010</a>							</div>
+							<div class="nav-next">
+								<a href="https://coolestfamilyontheblock.com/2010/12/03/writing-a-letter-to-santa/" rel="next">Dear Santa: Writing a letter to&nbsp;Santa &rarr;</a>							</div>
+						</div><!-- .post-navigation -->
+
+						<div class="post-wrapper clear-block post-1994 post type-post status-publish format-standard hentry category-christmas category-dear-santa category-flashbacks category-traditions tag-cabbage-patch-dolls tag-christmas tag-flashbacks-2 tag-holidays tag-letters-to-santa-2 tag-photos-2 tag-tradition">
+
+	
+			<h1 class="single-title">My letter to Santa&nbsp;1984</h1>	
+	<div class="post-date">
+		<p class="day"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/" rel="bookmark" title="Permanent Link to My letter to Santa&nbsp;1984">Dec 1</a></p>
+	</div><!-- .post-date -->
+
+	<div class="post-info clear-block">
+		<p class="author alignleft">Posted by <a href="https://coolestfamilyontheblock.com/author/jennrianblogs/" title="Posts by Jenn Rian" rel="author">Jenn Rian</a></p>
+	</div><!-- .post-info clear-block" -->
+
+	<div class="entry clear-block">
+		<p><font color="red"><i>*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/03/dear-santa-series-part-1-writing-a-letter-to-santa/" />Writing</a> a letter to Santa to <a href="https://coolestfamilyontheblock.wordpress.com/2010/12/04/dear-santa-series-part-2-mailing-a-letter-to-santa/" />mail</a> or <a href="https://coolestfamilyontheblock.wordpress.com/2010/12/10/dear-santa-part-4-emailing-a-letter-to-santa/" />email</a> can be a memorable family tradition using my tips and ideas for making the experience special.  The “Dear Santa” series will tell you everything you need to know about writing to Santa.  Please <a href="http://feedburner.google.com/fb/a/mailverify?uri=CoolestFamilyOnTheBlock&amp;loc=en_US">subscribe</a> to receive email updates.*</i></font></p>
+<p><a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg"><img data-attachment-id="2000" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-granda-the-birth-of-my-preemie-imgp6401/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg" data-orig-size="2459,3064" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;2.8&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;PENTAX Optio S12&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;1291215299&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;7.9&quot;,&quot;iso&quot;:&quot;400&quot;,&quot;shutter_speed&quot;:&quot;0.025&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984 Grandma &#8211; The Birth of my Preemie IMGP6401" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=241" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=604" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=240&#038;h=300" alt="" title="1984 Grandma - The Birth of my Preemie IMGP6401" width="240" height="300" class="aligncenter size-medium wp-image-2000" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=240&amp;h=300 240w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=480&amp;h=598 480w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-granda-the-birth-of-my-preemie-imgp6401.jpg?w=120&amp;h=150 120w" sizes="(max-width: 240px) 100vw, 240px" /></a></p>
+<p>In 1984 I wrote a letter to Santa when Cabbage Patch dolls were the must-have toy of the year.  While looking through some of my memorabilia I found a typed story that my paternal grandmother had written about my letter to Santa that year.  Here is the story in my grandmother’s words:</p>
+<p>THE BIRTH OF MY PREEMIE</p>
+<p><i>I am a grandmother with three grown children and three grandchildren.  I am also a serious Precious Moments collector.  And although my kids think Mom has gone bananas, I have over one hundred Precious Moments to help me relive those <u>very</u> special precious moments that are but a memory when our children grow and leave home.  To add more fuel to the fire of their minds that told them Mom is stepping off the deep end, I announced to everyone that I wanted to adopt my own Preemie: Not one that belonged to my granddaughters, but one of my very own.</p>
+<p>	As an avid Precious Moments collector, I have become accustomed to looking for those hard to find-just have to have figurines.  And so…my search began.  Sear’s, Penny’s, and Montgomery Wards were all among my list of places to call in my unrelenting search for my very own Preemie; but my pleas fell on deaf ears.  They wouldn’t even take my order!  I followed every lead, every hint of a lead, only to be disappointed time and time again.</p>
+<p>	Disappointed, but not yet defeated, I continued my search.  My desire to adopt my very own Preemie prompted me to call my two daughters, who live in Florida, to have them place orders there.  They did so, but again, no promises.  No closer to my goal, the summer ended.</p>
+<p>	The holidays were upon us.  In November our local newspaper was printing letters from children to Santa Claus.  My two granddaughters, Jenny, five, and Jessie, four, insisted that I help them write their letter to Santa.  Now, the newspaper, having been flooded with letters from anxious children said they had all the letters they could print for the remaining days until Christmas.  I explained this to the girls, but they, like their grandma, were persistent.  I, being a grandma who loves and spoils her grandchildren, gave in.  I sat with pen and paper in hand and they began telling me what to write, …”We would like Cabbage Patch dolls, and please bring Grandma a Preemie too”.  There, it was done!  The girls, however, wanted to go one step further, “Mail it in Grandma.  Please!” were now the words I was hearing.  Even though I was sure that the letter would not get into the paper, how could I resist those four, big, beautiful, pleading eyes looking up at me?  Well, I couldn’t (a weakness I’m sure all grandmas are familiar with); to make them happy, I mailed it in.</p>
+<p>Good news for grandmas all over the world.  Somehow it worked!  One week later as I was reading the newspaper, there among all of the letters to Santa, in bold type, the caption, BRING GRANDMA A PREEMIE TOO, caught my eye.  They printed it!  I immediately called the girls to tell them the good news.  They came over and needless to say, they were very excited, and quite impressed to see their names in the paper.  Of course, I was excited for them, and naturally, I received many comments from friends who also read the letter.  Maybe I should have written my own letter to Santa?  Oh, well…</p>
+<p><a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg"><img data-attachment-id="2002" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-12-19-bct-letter-to-santa-scan0094/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg" data-orig-size="378,987" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;0&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;0&quot;,&quot;iso&quot;:&quot;0&quot;,&quot;shutter_speed&quot;:&quot;0&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984-12-19 BCT Letter to Santa Scan0094" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg?w=115" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg?w=378" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg?w=604" alt="" title="1984-12-19 BCT Letter to Santa Scan0094"   class="aligncenter size-full wp-image-2002" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg 378w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg?w=57 57w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-19-bct-letter-to-santa-scan0094.jpg?w=115 115w" sizes="(max-width: 378px) 100vw, 378px" /></a></p>
+<p>Christmas was almost here and even though my search for my Preemie had still not seen it’s end, my oldest granddaughter, Jenny, kept telling me not to worry because she prayed and knew that I was going to get my Preemie.  The faith of a child!  It worked with their letter and considering I was getting no where fast with all my efforts, maybe…</p>
+<p>Christmas came and with it, courtesy of my youngest daughter in Florida, came two Cabbage Patch dolls for my two very special granddaughters!  Me?  Well, thanks to my oldest daughter, on December 25, 1984, my beautiful (?), little Preemie, Jenny Lynn was born, and I couldn’t be happier.  Of course, I still love my Precious Moments.</i></p>
+<p><a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg"><img data-attachment-id="2003" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-12-24-christmas-eve-cabbage-patch-01/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg" data-orig-size="891,696" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;0&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;0&quot;,&quot;iso&quot;:&quot;0&quot;,&quot;shutter_speed&quot;:&quot;0&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984-12-24 Christmas Eve Cabbage patch 01" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=300" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=604" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=604" alt="" title="1984-12-24 Christmas Eve Cabbage patch 01"   class="aligncenter size-full wp-image-2003" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=604 604w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=150 150w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=300 300w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg?w=768 768w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-01.jpg 891w" sizes="(max-width: 604px) 100vw, 604px" /></a><a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg"><img data-attachment-id="2004" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-12-24-christmas-eve-cabbage-patch-02/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg" data-orig-size="887,695" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;0&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;0&quot;,&quot;iso&quot;:&quot;0&quot;,&quot;shutter_speed&quot;:&quot;0&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984-12-24 Christmas Eve Cabbage Patch 02" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=300" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=604" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=604" alt="" title="1984-12-24 Christmas Eve Cabbage Patch 02"   class="aligncenter size-full wp-image-2004" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=604 604w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=150 150w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=300 300w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg?w=768 768w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-24-christmas-eve-cabbage-patch-02.jpg 887w" sizes="(max-width: 604px) 100vw, 604px" /></a><br />
+<a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg"><img data-attachment-id="2006" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-12-25-christmas-1/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg" data-orig-size="884,692" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;0&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;0&quot;,&quot;iso&quot;:&quot;0&quot;,&quot;shutter_speed&quot;:&quot;0&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984-12-25 Christmas 1" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=300" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=604" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=604" alt="" title="1984-12-25 Christmas 1"   class="aligncenter size-full wp-image-2006" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=604 604w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=150 150w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=300 300w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg?w=768 768w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-christmas-1.jpg 884w" sizes="(max-width: 604px) 100vw, 604px" /></a><br />
+The adoption papers for my Cabbage Patch Kid<br />
+<a href="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg"><img data-attachment-id="2005" data-permalink="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/1984-12-25-cabbage-patch-adoption-certificate-imgp6402/" data-orig-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg" data-orig-size="3201,2436" data-comments-opened="1" data-image-meta="{&quot;aperture&quot;:&quot;0&quot;,&quot;credit&quot;:&quot;&quot;,&quot;camera&quot;:&quot;&quot;,&quot;caption&quot;:&quot;&quot;,&quot;created_timestamp&quot;:&quot;1291217024&quot;,&quot;copyright&quot;:&quot;&quot;,&quot;focal_length&quot;:&quot;0&quot;,&quot;iso&quot;:&quot;0&quot;,&quot;shutter_speed&quot;:&quot;0&quot;,&quot;title&quot;:&quot;&quot;}" data-image-title="1984-12-25 Cabbage Patch Adoption Certificate IMGP6402" data-image-description="" data-medium-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=300" data-large-file="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=604" src="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=300&#038;h=228" alt="" title="1984-12-25 Cabbage Patch Adoption Certificate IMGP6402" width="300" height="228" class="aligncenter size-medium wp-image-2005" srcset="https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=300&amp;h=228 300w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=600&amp;h=456 600w, https://coolestfamilyontheblock.files.wordpress.com/2010/12/1984-12-25-cabbage-patch-adoption-certificate-imgp6402.jpg?w=150&amp;h=114 150w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p><b>Dear Santa Series</b>:<br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/03/dear-santa-series-part-1-writing-a-letter-to-santa/" />Dear Santa: Part 1 Writing a Letter to Santa</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/04/dear-santa-series-part-2-mailing-a-letter-to-santa/" />Dear Santa: Part 2 Mailing a Letter to Santa</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/07/dear-santa-part-3-paper-for-writing-a-letter-to-santa/" />Dear Santa: Part 3 Paper for Writing to Santa</a>: Free printables and more!<br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/10/dear-santa-part-4-emailing-a-letter-to-santa/" />Dear Santa: Part 4 Emailing a Letter to Santa</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/01/my-letter-to-santa-1984/" />My Letter to Santa 1984</a> <i>You are here</i><br />
+<b>Other Christmas Posts</b><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/14/10-ways-to-shake-up-your-christmas-pajamas-tradition/" />10 Ways to Shake Up Your Christmas Pajamas Tradition</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/17/free-phone-calls-from-santa-claus/" />Phone Calls from Santa</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/11/uncle-uglys-christmas-sweater-jamboree/" />Uncle Ugly’s Christmas Sweater Jamboree Rules</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/29/uncle-uglys-christmas-sweater-jamboree-2010/" />Uncle Ugly’s Christmas Sweater Jamboree 2010 Photos and Winners</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/06/traditions-truces-and-cartoon-moments/" />Traditions, Truces, and Cartoon Moments</a><br />
+*<a href="https://coolestfamilyontheblock.wordpress.com/2010/12/10/food-as-tradition-norwegian-butter-cookies/" />Food as Tradition: Norwegian Butter Cookies</a></p>
+<p><font color="red"><i>Coolest Family on the Block is committed to helping you find creative ways to have fun and make memories with your family this holiday season.  Don’t miss an idea, tip, or trick…<a href="http://feedburner.google.com/fb/a/mailverify?uri=CoolestFamilyOnTheBlock&amp;loc=en_US">subscribe</a> and have updates sent directly to your email!</i></font><br />
+*<a href="http://feedburner.google.com/fb/a/mailverify?uri=CoolestFamilyOnTheBlock&amp;loc=en_US">Subscribe via email</a>*<a href="http://feeds.feedburner.com/CoolestFamilyOnTheBlock">RSS</a>*<a href="http://www.facebook.com/pages/Coolest-Family-on-the-Block/143223165717640">Facebook</a>*<a href="http://twitter.com/coolfamilyblog">Twitter</a>*<a href="http://networkedblogs.com/blog/coolestfamilyontheblock/" />Networked Blogs</a>*<a href="http://theblogfrog.com/user/25137">Blog Frog</a>* </p>
+		<div class="wpcnt">
+			<div class="wpa wpmrec">
+				<span class="wpa-about">Advertisements</span>
+				<div class="u">		<div style="padding-bottom:15px;width:300px;height:250px;float:left;margin-right:5px;margin-top:0px">
+			<div id="atatags-149482471-5d30960a6e8a7">
+				<script type="text/javascript">
+				__ATA.cmd.push(function() {
+					__ATA.initSlot('atatags-149482471-5d30960a6e8a7',  {
+						collapseEmpty: 'before',
+						sectionId: '149482471',
+						location: 120,
+						width: 300,
+						height: 250
+					});
+				});
+				</script>
+			</div>
+		</div>		<div style="padding-bottom:15px;width:300px;height:250px;float:left;margin-top:0px">
+			<div id="atatags-149482474-5d30960a6e8ac">
+				<script type="text/javascript">
+				__ATA.cmd.push(function() {
+					__ATA.initSlot('atatags-149482474-5d30960a6e8ac',  {
+						collapseEmpty: 'before',
+						sectionId: '149482474',
+						location: 130,
+						width: 300,
+						height: 250
+					});
+				});
+				</script>
+			</div>
+		</div></div>
+				
+			</div>
+		</div><div id="atatags-149482475-5d30960a6e8cd">
+        <script type="text/javascript">
+            __ATA.cmd.push(function() {
+                __ATA.initVideoSlot('atatags-149482475-5d30960a6e8cd', {
+                    sectionId: '149482475',
+                    format: 'inread'
+                });
+            });
+        </script>
+    </div><div id="jp-post-flair" class="sharedaddy sd-rating-enabled sd-like-enabled sd-sharing-enabled"><div class="sd-block sd-rating"><h3 class="sd-title">Rate this:</h3><div class="cs-rating pd-rating" id="pd_rating_holder_2974363_post_1994"></div></div><div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><h3 class="sd-title">Like this post? Please share:</h3><div class="sd-content"><ul><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-1994" class="share-facebook sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=facebook" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-1994" class="share-twitter sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=twitter" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-pinterest"><a rel="nofollow noopener noreferrer" data-shared="sharing-pinterest-1994" class="share-pinterest sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=pinterest" target="_blank" title="Click to share on Pinterest"><span>Pinterest</span></a></li><li><a href="#" class="sharing-anchor sd-button share-more"><span>More</span></a></li><li class="share-end"></li></ul><div class="sharing-hidden"><div class="inner" style="display: none;"><ul><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=email" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-tumblr"><a rel="nofollow noopener noreferrer" data-shared="" class="share-tumblr sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=tumblr" target="_blank" title="Click to share on Tumblr"><span>Tumblr</span></a></li><li class="share-end"></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-1994" class="share-linkedin sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=linkedin" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-reddit"><a rel="nofollow noopener noreferrer" data-shared="" class="share-reddit sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=reddit" target="_blank" title="Click to share on Reddit"><span>Reddit</span></a></li><li class="share-end"></li><li class="share-pocket"><a rel="nofollow noopener noreferrer" data-shared="" class="share-pocket sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?share=pocket" target="_blank" title="Click to share on Pocket"><span>Pocket</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></li><li class="share-end"></li></ul></div></div></div></div></div><div class='sharedaddy sd-block sd-like jetpack-likes-widget-wrapper jetpack-likes-widget-unloaded' id='like-post-wrapper-14948247-1994-5d30960a6f91b' data-src='//widgets.wp.com/likes/index.html?ver=20190321#blog_id=14948247&amp;post_id=1994&amp;origin=coolestfamilyontheblock.wordpress.com&amp;obj_id=14948247-1994-5d30960a6f91b&amp;domain=coolestfamilyontheblock.com' data-name='like-post-frame-14948247-1994-5d30960a6f91b'><h3 class='sd-title'>Like this:</h3><div class='likes-widget-placeholder post-likes-widget-placeholder' style='height: 55px;'><span class='button'><span>Like</span></span> <span class="loading">Loading...</span></div><span class='sd-text-color'></span><a class='sd-link-color'></a></div>
+<div id='jp-relatedposts' class='jp-relatedposts' >
+	<h3 class="jp-relatedposts-headline"><em>Related</em></h3>
+</div></div>			</div><!-- .entry -->
+
+	
+			<div id="author-info-box">
+			<div id="author-avatar">
+				<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=60&#038;d=identicon&#038;r=G' class='avatar avatar-60' height='60' width='60' />			</div><!-- #author-avatar -->
+			<div id="author-description">
+				<h2 id="author-info-title">About Jenn Rian</h2>
+				Jenn is a bored and sarcastic divorced mom of two who blogs and vlogs because the voices in her head tell her to.  She blogs about as often as she showers, which isn't very often.
+Author of jennrian.com and funanddysfunction.com (coolestfamilyontheblock.com)			</div><!-- #author-description -->
+			<div id="author-link">
+				<a href="https://coolestfamilyontheblock.com/author/jennrianblogs/">
+					View all posts by Jenn Rian <span class="meta-nav">&raquo;</span>				</a>
+			</div><!-- #author-link -->
+		</div><!-- # author-info-box -->
+	
+</div><!-- .post-wrapper -->
+						<div class="post-utility">
+							<p class="details">
+								Posted on December 1, 2010, in <a href="https://coolestfamilyontheblock.com/category/holidays/christmas/" rel="category tag">Christmas</a>, <a href="https://coolestfamilyontheblock.com/category/holidays/christmas/dear-santa/" rel="category tag">Dear Santa</a>, <a href="https://coolestfamilyontheblock.com/category/flashbacks/" rel="category tag">Flashbacks</a>, <a href="https://coolestfamilyontheblock.com/category/holidays/traditions/" rel="category tag">Traditions</a> and tagged <a href="https://coolestfamilyontheblock.com/tag/cabbage-patch-dolls/" rel="tag">Cabbage Patch Dolls</a>, <a href="https://coolestfamilyontheblock.com/tag/christmas/" rel="tag">Christmas</a>, <a href="https://coolestfamilyontheblock.com/tag/flashbacks-2/" rel="tag">flashbacks</a>, <a href="https://coolestfamilyontheblock.com/tag/holidays/" rel="tag">Holidays</a>, <a href="https://coolestfamilyontheblock.com/tag/letters-to-santa-2/" rel="tag">letters to Santa</a>, <a href="https://coolestfamilyontheblock.com/tag/photos-2/" rel="tag">photos</a>, <a href="https://coolestfamilyontheblock.com/tag/tradition/" rel="tag">tradition</a>. Bookmark the <a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/" title="Permalink to My letter to Santa&nbsp;1984" rel="bookmark">permalink</a>.								<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comments">20 Comments</a>.															</p>
+						</div><!-- .post-utility -->
+
+						<div class="post-navigation nav-below">
+							<div class="nav-previous">
+								<a href="https://coolestfamilyontheblock.com/2010/12/01/wordless-wednesday-first-snow-fall-2010/" rel="prev">&larr; Wordless Wednesday: First snow fall&nbsp;2010</a>							</div>
+							<div class="nav-next">
+								<a href="https://coolestfamilyontheblock.com/2010/12/03/writing-a-letter-to-santa/" rel="next">Dear Santa: Writing a letter to&nbsp;Santa &rarr;</a>							</div>
+						</div><!-- .post-navigation -->
+
+					
+<div id="post-extra-content" class="clear-block">
+	
+		<div id="secondary-tabs">
+		<ul class="comment-tabs">
+						<li class="leave-a-comment">
+				<h3 class="comment-tab-title">
+					<a href="#respond" title="Leave a comment"> Leave a comment</a>
+				</h3>
+			</li>
+												<li>
+				<h3 class="comment-tab-title">
+					<a href="#comments">Comments 20</a>
+				</h3>
+			</li>
+					</ul><!-- .comment-tabs -->
+	</div><!-- #secondary-tabs -->
+
+
+	
+	
+		
+
+		<div id="commentlist">
+
+			<ol id="comments">
+								<li class="comment even thread-even depth-1 highlander-comment" id="li-comment-792">
+		<div id="comment-792" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/a36a702c862655cc40dab1a1a6038330?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www,UWriteSanta.com' rel='external nofollow' class='url'>Santa</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-792">
+				December 1, 2010 at 10:22 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Writing to Santa is so magical and it&#8217;s easy to think that anything is possible when you believe, truly believe. What a dynamic Grandma who was courageous in sharing her wishes and hopes for a soon-to-be treasured doll with her precious granddaughters and helping them write and submit their letters. Thanks for sharing this heartwarming story that is such a testament of faith. </p>
+<p>Wishing you the happiest of holidays.<br />
+Love,<br />
+Santa</p>
+<p id="comment-like-792" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=792&#038;_wpnonce=673fdb4acb" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-792" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_792"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=792#respond' data-commentid="792" data-postid="1994" data-belowelement="comment-792" data-respondelement="respond" aria-label='Reply to Santa'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1130">
+		<div id="comment-1130" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1130">
+				December 14, 2010 at 11:35 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Santa!  I&#8217;m sooo excited that Santa replied on my blog!  I love you, Santa!  I DO have an awesome Grandma.</p>
+<p id="comment-like-1130" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1130&#038;_wpnonce=58fcfceb7a" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1130" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1130"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1130#respond' data-commentid="1130" data-postid="1994" data-belowelement="comment-1130" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-odd thread-alt depth-1 highlander-comment" id="li-comment-793">
+		<div id="comment-793" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://2.gravatar.com/avatar/578d63cf31a560e8574d0ae2480e0baf?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.thehickmanfour.blogspot.com' rel='external nofollow' class='url'>sara</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-793">
+				December 1, 2010 at 10:45 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>I still use my Cabbage Patch Kids for Touch of Home Learning, In-School Events.  I was getting ready for our Crime Scene class (the dolls are the suspects of a crime) and my dad was here.  He told me about how I wanted a Cabbage Patch kid so bad when I was younger.  They found one that looked just like me and was going to get it for me.  There was one last one on a shelf (other than the one my dad had), this little girl was looking at it about to ask her mom and dad to get it.  Some adult snatched it off the shelf and she just started to cry.  Now my parents don&#8217;t know what the parents were going to do.  Get it for her or say, no Santa might bring you one. They had no clue.  But the one that looked like me was given to this other family so another little girls Christmas would not be ruined.  I still ended up with one so everyone was happy.  </p>
+<p>I love your site and I am following from Blog Frog.  I would love it if you stop by sometime and follow back if you like what you see.</p>
+<p><a href="http://www.thehickmanfour.blogspot.com" rel="nofollow">http://www.thehickmanfour.blogspot.com</a><br />
+<a href="http://www.touchofhomelearning.blogspot.com" rel="nofollow">http://www.touchofhomelearning.blogspot.com</a> (mostly handmade gifts from now until Christmas)</p>
+<p id="comment-like-793" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=793&#038;_wpnonce=4cca0328f4" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-793" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_793"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=793#respond' data-commentid="793" data-postid="1994" data-belowelement="comment-793" data-respondelement="respond" aria-label='Reply to sara'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1131">
+		<div id="comment-1131" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1131">
+				December 14, 2010 at 11:37 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Sara, I LOVE your story!  Wouldn&#8217;t it be awesome if you could find out whatever happened with that doll?!  I bet that little girl was truly blessed 🙂  I&#8217;ll stop by your blog soon and I appreciate you following.  Things have been a little crazy around here lately and I&#8217;m sooo behind!</p>
+<p id="comment-like-1131" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1131&#038;_wpnonce=a14a963124" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1131" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1131"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1131#respond' data-commentid="1131" data-postid="1994" data-belowelement="comment-1131" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-even depth-1 highlander-comment" id="li-comment-794">
+		<div id="comment-794" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://0.gravatar.com/avatar/f1f82898a6f097ec64b9aad084e15ed5?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.theunsells.blogspot.com' rel='external nofollow' class='url'>Jennifer Unsell</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-794">
+				December 1, 2010 at 10:48 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>I love it! This is so sweet! I had cabbage patch twins one year. 🙂</p>
+<p id="comment-like-794" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=794&#038;_wpnonce=6671ab714b" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-794" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_794"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=794#respond' data-commentid="794" data-postid="1994" data-belowelement="comment-794" data-respondelement="respond" aria-label='Reply to Jennifer Unsell'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1132">
+		<div id="comment-1132" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1132">
+				December 14, 2010 at 11:37 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Wow, twins!  You lucky duck 😉</p>
+<p id="comment-like-1132" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1132&#038;_wpnonce=5904954f86" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1132" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1132"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1132#respond' data-commentid="1132" data-postid="1994" data-belowelement="comment-1132" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-odd thread-alt depth-1 highlander-comment" id="li-comment-795">
+		<div id="comment-795" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://0.gravatar.com/avatar/903d2e9323b570f9af6a84e9da39b2d8?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.wonderwomanwannabe.com' rel='external nofollow' class='url'>heidi @ wonder woman wannabe</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-795">
+				December 2, 2010 at 10:32 am</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Cabbage Patch Kids were so fun!  I had 2 &#8216;real&#8217; ones from the store and several hand made ones by my grandma.  I think I got a corn silk doll (with the hair you could brush vs. yarn) for Christmas one year. 🙂</p>
+<p id="comment-like-795" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=795&#038;_wpnonce=43f4c784e7" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-795" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_795"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=795#respond' data-commentid="795" data-postid="1994" data-belowelement="comment-795" data-respondelement="respond" aria-label='Reply to heidi @ wonder woman wannabe'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1133">
+		<div id="comment-1133" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1133">
+				December 14, 2010 at 11:38 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Yeah, we had the yarn-haired dolls.  The corn silk hair definitely looked fun to brush!  Aren&#8217;t they just the ugliest dolls&#8230;why were they so popular?!  We sure loved them!</p>
+<p id="comment-like-1133" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1133&#038;_wpnonce=22f80ec1bf" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1133" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1133"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1133#respond' data-commentid="1133" data-postid="1994" data-belowelement="comment-1133" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-even depth-1 highlander-comment" id="li-comment-797">
+		<div id="comment-797" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://2.gravatar.com/avatar/534970ebb6fd5d5937acf7883ecabf7a?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://sofiasideas.com/' rel='external nofollow' class='url'>Sofia's Ideas</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-797">
+				December 2, 2010 at 11:03 am</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Hey there!  I just wanted to stop by to thank you for your awesome comment on Sofia&#8217;s Ideas!  I replied to you so I hope that when you get a moment, you&#8217;ll come on back&#8230;</p>
+<p id="comment-like-797" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=797&#038;_wpnonce=d6d8a1303b" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-797" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_797"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=797#respond' data-commentid="797" data-postid="1994" data-belowelement="comment-797" data-respondelement="respond" aria-label='Reply to Sofia&#039;s Ideas'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1134">
+		<div id="comment-1134" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1134">
+				December 14, 2010 at 11:39 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Thanks, Sofia!  I&#8217;ll have to stop back soon&#8230;this has been a crazy month!  I sure appreciate you following up with me 🙂  You&#8217;ve got an awesome blog!</p>
+<p id="comment-like-1134" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1134&#038;_wpnonce=9ddbf89119" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1134" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1134"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1134#respond' data-commentid="1134" data-postid="1994" data-belowelement="comment-1134" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment byuser comment-author-donnaperugini even thread-odd thread-alt depth-1 highlander-comment" id="li-comment-798">
+		<div id="comment-798" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://2.gravatar.com/avatar/b3e5e3a9614ef09427e3ee898117792b?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.DonnaPerugini.wordpress.com' rel='external nofollow' class='url'>Donna Perugini</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-798">
+				December 2, 2010 at 11:28 am</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Does Grandma still have her preemie? You looked so happy on Christmas day! You must have totally wound down later when you were dangling your doll in the air by her ponytail. A Christmas morning &#8216;explosion of gifts&#8217; will do that to you!</p>
+<p id="comment-like-798" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=798&#038;_wpnonce=be86d9e559" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-798" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_798"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=798#respond' data-commentid="798" data-postid="1994" data-belowelement="comment-798" data-respondelement="respond" aria-label='Reply to Donna Perugini'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1135">
+		<div id="comment-1135" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1135">
+				December 14, 2010 at 11:41 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Grandma does indeed still have her preemie and I believe it&#8217;s still in the box too!  We actually received the dolls on Christmas Eve at my Grandma&#8217;s house and the other photo is on Christmas morning after we woke up.  Poor dolly, I&#8217;m so not a morning person 😉</p>
+<p id="comment-like-1135" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1135&#038;_wpnonce=5cfc082534" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1135" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1135"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1135#respond' data-commentid="1135" data-postid="1994" data-belowelement="comment-1135" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment byuser comment-author-vivienegrace even thread-even depth-1 highlander-comment" id="li-comment-804">
+		<div id="comment-804" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://0.gravatar.com/avatar/31c9022cece7d2f848fe139363912948?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://journeyofawoman.wordpress.com' rel='external nofollow' class='url'>viviene</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-804">
+				December 2, 2010 at 10:54 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Hi Jenn! I gave you a blog award. =D Check it out and pass it on =)</p>
+<p id="comment-like-804" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=804&#038;_wpnonce=61f7853f8c" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-804" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_804"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=804#respond' data-commentid="804" data-postid="1994" data-belowelement="comment-804" data-respondelement="respond" aria-label='Reply to viviene'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1136">
+		<div id="comment-1136" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1136">
+				December 14, 2010 at 11:42 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Viviene, THANK YOU SO MUCH!  I truly appreciate it.  As you can probably see I&#8217;ve been totally out of it lately and really busy this month&#8230;when things calm down around here I&#8217;ll officially accept my award and pass it on to some awesome bloggers.  Thanks so much for your support, I always enjoy your blog 🙂</p>
+<p id="comment-like-1136" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1136&#038;_wpnonce=58ca951a30" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1136" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1136"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1136#respond' data-commentid="1136" data-postid="1994" data-belowelement="comment-1136" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-odd thread-alt depth-1 highlander-comment" id="li-comment-833">
+		<div id="comment-833" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/1f904548aa777cecf0db49e1c81a977c?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.mommybeewisdom.com' rel='external nofollow' class='url'>Retha</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-833">
+				December 8, 2010 at 12:37 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>I love this story!!!</p>
+<p id="comment-like-833" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=833&#038;_wpnonce=f5f3a02111" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-833" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_833"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=833#respond' data-commentid="833" data-postid="1994" data-belowelement="comment-833" data-respondelement="respond" aria-label='Reply to Retha'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1137">
+		<div id="comment-1137" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1137">
+				December 14, 2010 at 11:44 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Thanks, Retha 🙂<br />
+It&#8217;s funny I&#8217;d almost forgotten about this until I came across my grandma&#8217;s typed story and then it all came back to me!  I can still see that preemie in the box inside her closet in my mind&#8217;s eye!  Sure wish I had a picture of it!</p>
+<p id="comment-like-1137" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1137&#038;_wpnonce=514a869a48" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1137" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1137"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1137#respond' data-commentid="1137" data-postid="1994" data-belowelement="comment-1137" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-even depth-1 highlander-comment" id="li-comment-1124">
+		<div id="comment-1124" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/a2c72ba825925f2450f0a1a9f2bbe3bc?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://www.zeemaid.blogspot.com' rel='external nofollow' class='url'>zeemaid</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1124">
+				December 14, 2010 at 11:07 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>AWw I love this story and the photos too! I&#8217;d have loved to see a photo of your grandma with the preemie!   I have to say I never got one.  I was 12 when the big craze hit and I don&#8217;t know if I just thought I was too big for a doll at that age or what or they were just too hard to get in Canada.  Now we walk by them in the store and say&#8230; do you remember when&#8230;.  *L*</p>
+<p>Merry Christmas!</p>
+<p id="comment-like-1124" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1124&#038;_wpnonce=2a6d85d0d4" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1124" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1124"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1124#respond' data-commentid="1124" data-postid="1994" data-belowelement="comment-1124" data-respondelement="respond" aria-label='Reply to zeemaid'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+<ul class="children">
+	<li class="comment byuser comment-author-jennrianblogs bypostauthor odd alt depth-2 highlander-comment" id="li-comment-1138">
+		<div id="comment-1138" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://1.gravatar.com/avatar/439098ef7ceffa48f2ddb3f5a2bae889?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='https://coolestfamilyontheblock.wordpress.com' rel='external nofollow' class='url'>CoolMama</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-1138">
+				December 14, 2010 at 11:47 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>Thanks, zeemaid!  I sooo wish that I had a picture of Grandma with her preemie!  She still has it, I think, so if I ever go and visit her in Florida again I&#8217;ll have to ask her to pose for a photo with Jenny Lynn!</p>
+<p>Yeah, I didn&#8217;t have many new dolls at 12.  As you can see they were near impossible to get here in the U.S. in &#8217;84, so I&#8217;m not sure how difficult it would&#8217;ve been to get one in Canada!  If I still had my cabbage patch kid, I&#8217;d share her with you&#8230;but she disappeared over the years, like many of my toys.  I wish I still had her&#8230;they went through so much trouble to get her!</p>
+<p id="comment-like-1138" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=1138&#038;_wpnonce=81b6b2a599" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-1138" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_1138"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=1138#respond' data-commentid="1138" data-postid="1994" data-belowelement="comment-1138" data-respondelement="respond" aria-label='Reply to CoolMama'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+</ul><!-- .children -->
+</li><!-- #comment-## -->
+	<li class="comment even thread-odd thread-alt depth-1 highlander-comment" id="li-comment-2430">
+		<div id="comment-2430" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://2.gravatar.com/avatar/81460b3dbf12aed7c03a7fb3588a313f?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://alisongolden.com' rel='external nofollow' class='url'>Alison Golden</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-2430">
+				February 15, 2011 at 7:19 pm</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>What a cute story! Your Grandma was a good writer like you. I have no idea what a Preemie is but that didn&#8217;t matter. I understood and enjoyed the sentiment.</p>
+<p id="comment-like-2430" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=2430&#038;_wpnonce=401eb18bad" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-2430" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_2430"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=2430#respond' data-commentid="2430" data-postid="1994" data-belowelement="comment-2430" data-respondelement="respond" aria-label='Reply to Alison Golden'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+	<li class="comment odd alt thread-even depth-1 highlander-comment" id="li-comment-9569">
+		<div id="comment-9569" class="tiptrigger">
+		<div class="comment-head comment-author vcard">
+			<img alt='' src='https://2.gravatar.com/avatar/839b8aed4d3dd7791745fc79a4bd479b?s=48&#038;d=identicon&#038;r=G' class='avatar avatar-48' height='48' width='48' />
+			<cite class="fn"><a href='http://bynssillymonkey.blogspot.com' rel='external nofollow' class='url'>Byn</a></cite>
+
+			<span class="comment-meta commentmetadata">
+				|
+				<a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/#comment-9569">
+				January 18, 2012 at 10:28 am</a>
+								</span><!-- .comment-meta .commentmetadata -->
+		</div><!-- .comment-head .comment-author .vcard -->
+		
+		<div class="comment-body">
+			<p>That is so so sweet.  I remember Cabbage Patch kids being all the rage, but I was in Middle/High School by that time.  So I was surely too cool for that!:)</p>
+<p id="comment-like-9569" data-liked=comment-not-liked class="comment-likes comment-not-liked"><a href="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?like_comment=9569&#038;_wpnonce=01708fe01c" class="comment-like-link needs-login" rel="nofollow" data-blog="14948247"><span>Like</span></a><span id="comment-like-count-9569" class="comment-like-feedback">Like</span></p>
+<div class="cs-rating pd-rating" id="pd_rating_holder_2974366_comm_9569"></div>		</div><!-- .comment-body -->
+
+		 <div class="act tip">
+				 		<a rel='nofollow' class='comment-reply-link' href='/2010/12/01/my-letter-to-santa-1984/?replytocom=9569#respond' data-commentid="9569" data-postid="1994" data-belowelement="comment-9569" data-respondelement="respond" aria-label='Reply to Byn'>Reply</a></span>
+								 </div><!-- .act .tip -->
+
+	</div><!-- #comment-## -->
+</li><!-- #comment-## -->
+						</ol><!-- #comments -->
+
+			
+			
+		</div><!-- #comment-list -->
+
+	
+		<div id="respond" class="comment-respond">
+		<h3 id="reply-title" class="comment-reply-title">Leave a Reply to <a href="#comment-833">Retha</a> <small><a rel="nofollow" id="cancel-comment-reply-link" href="/2010/12/01/my-letter-to-santa-1984/#respond">Cancel reply</a></small></h3>			<form action="https://coolestfamilyontheblock.com/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+				<input type="hidden" id="highlander_comment_nonce" name="highlander_comment_nonce" value="b2f999cfbc" /><input type="hidden" name="_wp_http_referer" value="/2010/12/01/my-letter-to-santa-1984/?replytocom=833" />
+<input type="hidden" name="hc_post_as" id="hc_post_as" value="guest" />
+
+<div class="comment-form-field comment-textarea">
+	<label for="comment">Enter your comment here...</label>
+	<div id="comment-form-comment"><textarea id="comment" name="comment" title="Enter your comment here..."></textarea></div>
+</div>
+
+<div id="comment-form-identity">
+	<div id="comment-form-nascar">
+		<p>Fill in your details below or click an icon to log in:</p>
+		<ul>
+			<li class="selected" style="display:none;">
+				<a href="#comment-form-guest" id="postas-guest" class="nascar-signin-link"
+                   title="Login via Guest">
+									</a>
+			</li>
+			<li>
+				<a href="#comment-form-load-service:WordPress.com" id="postas-wordpress" class="nascar-signin-link"
+                   title="Login via WordPress.com">
+					<svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#0087be" d="M12.158 12.786l-2.698 7.84c.806.236 1.657.365 2.54.365 1.047 0 2.05-.18 2.986-.51-.024-.037-.046-.078-.065-.123l-2.762-7.57zM3.008 12c0 3.56 2.07 6.634 5.068 8.092L3.788 8.342c-.5 1.117-.78 2.354-.78 3.658zm15.06-.454c0-1.112-.398-1.88-.74-2.48-.456-.74-.883-1.368-.883-2.11 0-.825.627-1.595 1.51-1.595.04 0 .078.006.116.008-1.598-1.464-3.73-2.36-6.07-2.36-3.14 0-5.904 1.613-7.512 4.053.21.008.41.012.58.012.94 0 2.395-.114 2.395-.114.484-.028.54.684.057.74 0 0-.487.058-1.03.086l3.275 9.74 1.968-5.902-1.4-3.838c-.485-.028-.944-.085-.944-.085-.486-.03-.43-.77.056-.742 0 0 1.484.114 2.368.114.94 0 2.397-.114 2.397-.114.486-.028.543.684.058.74 0 0-.488.058-1.03.086l3.25 9.665.897-2.997c.456-1.17.684-2.137.684-2.907zm1.82-3.86c.04.286.06.593.06.924 0 .912-.17 1.938-.683 3.22l-2.746 7.94c2.672-1.558 4.47-4.454 4.47-7.77 0-1.564-.4-3.033-1.1-4.314zM12 22C6.486 22 2 17.514 2 12S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></g></svg>				</a>
+			</li>
+			<li>
+			<li>
+				<a href="#comment-form-load-service:Twitter" id="postas-twitter" class="nascar-signin-link"
+                   title="Login via Twitter">
+					<svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#1DA1F2" d="M22.23 5.924c-.736.326-1.527.547-2.357.646.847-.508 1.498-1.312 1.804-2.27-.793.47-1.67.812-2.606.996C18.325 4.498 17.258 4 16.078 4c-2.266 0-4.103 1.837-4.103 4.103 0 .322.036.635.106.935-3.41-.17-6.433-1.804-8.457-4.287-.353.607-.556 1.312-.556 2.064 0 1.424.724 2.68 1.825 3.415-.673-.022-1.305-.207-1.86-.514v.052c0 1.988 1.415 3.647 3.293 4.023-.344.095-.707.145-1.08.145-.265 0-.522-.026-.773-.074.522 1.63 2.038 2.817 3.833 2.85-1.404 1.1-3.174 1.757-5.096 1.757-.332 0-.66-.02-.98-.057 1.816 1.164 3.973 1.843 6.29 1.843 7.547 0 11.675-6.252 11.675-11.675 0-.178-.004-.355-.012-.53.802-.578 1.497-1.3 2.047-2.124z"/></g></svg>				</a>
+			</li>
+			<li>
+				<a href="#comment-form-load-service:Facebook" id="postas-facebook" class="nascar-signin-link"
+                   title="Login via Facebook">
+					<svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#3B5998" d="M20.007 3H3.993C3.445 3 3 3.445 3 3.993v16.013c0 .55.445.994.993.994h8.62v-6.97H10.27V11.31h2.346V9.31c0-2.325 1.42-3.59 3.494-3.59.993 0 1.847.073 2.096.106v2.43h-1.438c-1.128 0-1.346.537-1.346 1.324v1.734h2.69l-.35 2.717h-2.34V21h4.587c.548 0 .993-.445.993-.993V3.993c0-.548-.445-.993-.993-.993z"/></g></svg>				</a>
+			</li>
+		</ul>
+	</div>
+
+	<div id="comment-form-guest" class="comment-form-service selected">
+		<div class="comment-form-padder">
+			<div class="comment-form-avatar">
+<a href="https://gravatar.com/site/signup/" target="_blank">				<img src="https://1.gravatar.com/avatar/ad516503a11cd5ca435acc9bb6523536?s=25&amp;d=identicon&amp;forcedefault=y&amp;r=G" alt="Gravatar" width="25" class="no-grav" />
+</a>			</div>
+
+				<div class="comment-form-fields">
+				<div class="comment-form-field comment-form-email">
+					<label for="email">Email <span class="required">(required)</span> <span class="nopublish">(Address never made public)</span></label>
+					<div class="comment-form-input"><input id="email" name="email" type="email" value="" /></div>
+				</div>
+				<div class="comment-form-field comment-form-author">
+					<label for="author">Name <span class="required">(required)</span></label>
+					<div class="comment-form-input"><input id="author" name="author" type="text" value="" /></div>
+				</div>
+				<div class="comment-form-field comment-form-url">
+					<label for="url">Website</label>
+					<div class="comment-form-input"><input id="url" name="url" type="url" value="" /></div>
+				</div>
+			</div>
+			
+		</div>
+	</div>
+
+	<div id="comment-form-wordpress" class="comment-form-service">
+		<div class="comment-form-padder">
+			<div class="comment-form-avatar">
+				<img src="https://1.gravatar.com/avatar/ad516503a11cd5ca435acc9bb6523536?s=25&amp;d=identicon&amp;forcedefault=y&amp;r=G" alt="WordPress.com Logo" width="25" class="no-grav" />
+			</div>
+
+				<div class="comment-form-fields">
+				<input type="hidden" name="wp_avatar" id="wordpress-avatar" class="comment-meta-wordpress" value="" />
+				<input type="hidden" name="wp_user_id" id="wordpress-user_id" class="comment-meta-wordpress" value="" />
+				<input type="hidden" name="wp_access_token" id="wordpress-access_token" class="comment-meta-wordpress" value="" />
+						<p class="comment-form-posting-as pa-wordpress">
+			<strong></strong>
+			You are commenting using your WordPress.com account.			<span class="comment-form-log-out">
+				(&nbsp;<a href="javascript:HighlanderComments.doExternalLogout( 'wordpress' );">Log&nbsp;Out</a>&nbsp;/&nbsp;
+				<a href="#" onclick="javascript:HighlanderComments.switchAccount();return false;">Change</a>&nbsp;)
+			</span>
+			<span class="pa-icon"><svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#0087be" d="M12.158 12.786l-2.698 7.84c.806.236 1.657.365 2.54.365 1.047 0 2.05-.18 2.986-.51-.024-.037-.046-.078-.065-.123l-2.762-7.57zM3.008 12c0 3.56 2.07 6.634 5.068 8.092L3.788 8.342c-.5 1.117-.78 2.354-.78 3.658zm15.06-.454c0-1.112-.398-1.88-.74-2.48-.456-.74-.883-1.368-.883-2.11 0-.825.627-1.595 1.51-1.595.04 0 .078.006.116.008-1.598-1.464-3.73-2.36-6.07-2.36-3.14 0-5.904 1.613-7.512 4.053.21.008.41.012.58.012.94 0 2.395-.114 2.395-.114.484-.028.54.684.057.74 0 0-.487.058-1.03.086l3.275 9.74 1.968-5.902-1.4-3.838c-.485-.028-.944-.085-.944-.085-.486-.03-.43-.77.056-.742 0 0 1.484.114 2.368.114.94 0 2.397-.114 2.397-.114.486-.028.543.684.058.74 0 0-.488.058-1.03.086l3.25 9.665.897-2.997c.456-1.17.684-2.137.684-2.907zm1.82-3.86c.04.286.06.593.06.924 0 .912-.17 1.938-.683 3.22l-2.746 7.94c2.672-1.558 4.47-4.454 4.47-7.77 0-1.564-.4-3.033-1.1-4.314zM12 22C6.486 22 2 17.514 2 12S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></g></svg></span>
+		</p>
+					</div>
+	
+		</div>
+	</div>
+
+	<div id="comment-form-googleplus" class="comment-form-service">
+		<div class="comment-form-padder">
+			<div class="comment-form-avatar">
+				<img src="https://1.gravatar.com/avatar/ad516503a11cd5ca435acc9bb6523536?s=25&amp;d=identicon&amp;forcedefault=y&amp;r=G" alt="Google photo" width="25" class="no-grav" />
+			</div>
+
+				<div class="comment-form-fields">
+				<input type="hidden" name="googleplus_avatar" id="googleplus-avatar" class="comment-meta-googleplus" value="" />
+				<input type="hidden" name="googleplus_user_id" id="googleplus-user_id" class="comment-meta-googleplus" value="" />
+				<input type="hidden" name="googleplus_access_token" id="googleplus-access_token" class="comment-meta-googleplus" value="" />
+						<p class="comment-form-posting-as pa-googleplus">
+			<strong></strong>
+			You are commenting using your Google account.			<span class="comment-form-log-out">
+				(&nbsp;<a href="javascript:HighlanderComments.doExternalLogout( 'googleplus' );">Log&nbsp;Out</a>&nbsp;/&nbsp;
+				<a href="#" onclick="javascript:HighlanderComments.switchAccount();return false;">Change</a>&nbsp;)
+			</span>
+			<span class="pa-icon"><svg xmlns="http://www.w3.org/2000/svg" role="presentation" x="0px" y="0px" viewBox="0 0 60 60" ><path fill="#519bf7" d="M56.3,30c0,-1.6 -0.2,-3.4 -0.6,-5h-3.1H42.2H30v10.6h14.8C44,39.3 42,42 39.1,43.9l8.8,6.8C53,46 56.3,39 56.3,30z" /><path fill="#3db366" d="M30,57.5c6.7,0 13.1,-2.4 17.9,-6.8l-8.8,-6.8c-2.5,1.6 -5.6,2.4 -9.1,2.4c-7.2,0 -13.3,-4.7 -15.4,-11.2l-9.3,7.1C9.8,51.3 19.1,57.5 30,57.5z" /><path fill="#fdc600" d="M5.3,42.2l9.3,-7.1c-0.5,-1.6 -0.8,-3.3 -0.8,-5.1s0.3,-3.5 0.8,-5.1l-9.3,-7.1C3.5,21.5 2.5,25.6 2.5,30S3.5,38.5 5.3,42.2z" /><path fill="#f15b44" d="M40.1,17.4l8,-8C43.3,5.1 37,2.5 30,2.5C19.1,2.5 9.8,8.7 5.3,17.8l9.3,7.1c2.1,-6.5 8.2,-11.1 15.4,-11.1C33.9,13.7 37.4,15.1 40.1,17.4z" /></svg></span>
+		</p>
+					</div>
+	
+		</div>
+	</div>
+
+	<div id="comment-form-twitter" class="comment-form-service">
+		<div class="comment-form-padder">
+			<div class="comment-form-avatar">
+				<img src="https://1.gravatar.com/avatar/ad516503a11cd5ca435acc9bb6523536?s=25&amp;d=identicon&amp;forcedefault=y&amp;r=G" alt="Twitter picture" width="25" class="no-grav" />
+			</div>
+
+				<div class="comment-form-fields">
+				<input type="hidden" name="twitter_avatar" id="twitter-avatar" class="comment-meta-twitter" value="" />
+				<input type="hidden" name="twitter_user_id" id="twitter-user_id" class="comment-meta-twitter" value="" />
+				<input type="hidden" name="twitter_access_token" id="twitter-access_token" class="comment-meta-twitter" value="" />
+						<p class="comment-form-posting-as pa-twitter">
+			<strong></strong>
+			You are commenting using your Twitter account.			<span class="comment-form-log-out">
+				(&nbsp;<a href="javascript:HighlanderComments.doExternalLogout( 'twitter' );">Log&nbsp;Out</a>&nbsp;/&nbsp;
+				<a href="#" onclick="javascript:HighlanderComments.switchAccount();return false;">Change</a>&nbsp;)
+			</span>
+			<span class="pa-icon"><svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#1DA1F2" d="M22.23 5.924c-.736.326-1.527.547-2.357.646.847-.508 1.498-1.312 1.804-2.27-.793.47-1.67.812-2.606.996C18.325 4.498 17.258 4 16.078 4c-2.266 0-4.103 1.837-4.103 4.103 0 .322.036.635.106.935-3.41-.17-6.433-1.804-8.457-4.287-.353.607-.556 1.312-.556 2.064 0 1.424.724 2.68 1.825 3.415-.673-.022-1.305-.207-1.86-.514v.052c0 1.988 1.415 3.647 3.293 4.023-.344.095-.707.145-1.08.145-.265 0-.522-.026-.773-.074.522 1.63 2.038 2.817 3.833 2.85-1.404 1.1-3.174 1.757-5.096 1.757-.332 0-.66-.02-.98-.057 1.816 1.164 3.973 1.843 6.29 1.843 7.547 0 11.675-6.252 11.675-11.675 0-.178-.004-.355-.012-.53.802-.578 1.497-1.3 2.047-2.124z"/></g></svg></span>
+		</p>
+					</div>
+	
+		</div>
+	</div>
+
+	<div id="comment-form-facebook" class="comment-form-service">
+		<div class="comment-form-padder">
+			<div class="comment-form-avatar">
+				<img src="https://1.gravatar.com/avatar/ad516503a11cd5ca435acc9bb6523536?s=25&amp;d=identicon&amp;forcedefault=y&amp;r=G" alt="Facebook photo" width="25" class="no-grav" />
+			</div>
+
+				<div class="comment-form-fields">
+				<input type="hidden" name="fb_avatar" id="facebook-avatar" class="comment-meta-facebook" value="" />
+				<input type="hidden" name="fb_user_id" id="facebook-user_id" class="comment-meta-facebook" value="" />
+				<input type="hidden" name="fb_access_token" id="facebook-access_token" class="comment-meta-facebook" value="" />
+						<p class="comment-form-posting-as pa-facebook">
+			<strong></strong>
+			You are commenting using your Facebook account.			<span class="comment-form-log-out">
+				(&nbsp;<a href="javascript:HighlanderComments.doExternalLogout( 'facebook' );">Log&nbsp;Out</a>&nbsp;/&nbsp;
+				<a href="#" onclick="javascript:HighlanderComments.switchAccount();return false;">Change</a>&nbsp;)
+			</span>
+			<span class="pa-icon"><svg xmlns="http://www.w3.org/2000/svg" role="presentation" viewBox="0 0 24 24" ><rect x="0" fill="none" width="24" height="24"/><g><path fill="#3B5998" d="M20.007 3H3.993C3.445 3 3 3.445 3 3.993v16.013c0 .55.445.994.993.994h8.62v-6.97H10.27V11.31h2.346V9.31c0-2.325 1.42-3.59 3.494-3.59.993 0 1.847.073 2.096.106v2.43h-1.438c-1.128 0-1.346.537-1.346 1.324v1.734h2.69l-.35 2.717h-2.34V21h4.587c.548 0 .993-.445.993-.993V3.993c0-.548-.445-.993-.993-.993z"/></g></svg></span>
+		</p>
+					</div>
+	
+		</div>
+	</div>
+
+
+	<div id="comment-form-load-service" class="comment-form-service">
+		<div class="comment-form-posting-as-cancel"><a href="javascript:HighlanderComments.cancelExternalWindow();">Cancel</a></div>
+		<p>Connecting to %s</p>
+	</div>
+
+</div>
+
+<script type="text/javascript">
+var highlander_expando_javascript = function(){
+	var input = document.createElement( 'input' ),
+	    comment = jQuery( '#comment' );
+
+	if ( 'placeholder' in input ) {
+		comment.attr( 'placeholder', jQuery( '.comment-textarea label' ).remove().text() );
+	}
+
+	// Expando Mode: start small, then auto-resize on first click + text length
+	jQuery( '#comment-form-identity' ).hide();
+	jQuery( '#comment-form-subscribe' ).hide();
+	jQuery( '#commentform .form-submit' ).hide();
+
+	comment.css( { 'height':'10px' } ).one( 'focus', function() {
+		var timer = setInterval( HighlanderComments.resizeCallback, 10 )
+		jQuery( this ).animate( { 'height': HighlanderComments.initialHeight } ).delay( 100 ).queue( function(n) { clearInterval( timer ); HighlanderComments.resizeCallback(); n(); } );
+		jQuery( '#comment-form-identity' ).slideDown();
+		jQuery( '#comment-form-subscribe' ).slideDown();
+		jQuery( '#commentform .form-submit' ).slideDown();
+	});
+}
+jQuery(document).ready( highlander_expando_javascript );
+</script>
+
+<div id="comment-form-subscribe">
+	<p class="comment-subscription-form"><input type="checkbox" name="subscribe" id="subscribe" value="subscribe" style="width: auto;"/> <label class="subscribe-label" id="subscribe-label" for="subscribe" style="display: inline;">Notify me of new comments via email.</label></p><p class="post-subscription-form"><input type="checkbox" name="subscribe_blog" id="subscribe_blog" value="subscribe" style="width: auto;"/> <label class="subscribe-label" id="subscribe-blog-label" for="subscribe_blog"  style="display: inline;">Notify me of new posts via email.</label></p></div>
+
+
+
+
+<p class="form-submit"><input name="submit" type="submit" id="comment-submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='1994' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='833' />
+</p><p style="display: none;"><input type="hidden" id="akismet_comment_nonce" name="akismet_comment_nonce" value="6b17b58746" /></p>
+<input type="hidden" name="genseq" value="1563465226" />
+<p style="display: none;"><input type="hidden" id="ak_js" name="ak_js" value="47"/></p>			</form>
+			</div><!-- #respond -->
+	<div style="clear: both"></div>
+</div><!-- #post-extra-content -->
+									</div><!-- #content -->
+			</div><!-- #content-container -->
+
+
+	<div id="sidebar" class="widget-area" role="complementary">
+				<div class="wpcnt">
+			<div class="wpa wpmrec">
+				<span class="wpa-about">Advertisements</span>
+				<div class="u">
+							<div style="padding-bottom:15px;width:300px;height:250px;">
+			<div id="atatags-149482473-5d30960a7a0f4">
+				<script type="text/javascript">
+				__ATA.cmd.push(function() {
+					__ATA.initSlot('atatags-149482473-5d30960a7a0f4',  {
+						collapseEmpty: 'before',
+						sectionId: '149482473',
+						location: 140,
+						width: 300,
+						height: 250
+					});
+				});
+				</script>
+			</div>
+		</div>
+				</div>
+				
+			</div>
+		</div>		<ul class="xoxo">
+
+		<li id="search-4" class="widget widget_search">
+<form method="get" id="searchform" action="https://coolestfamilyontheblock.com/">
+	<div id="searchfield">
+		<label for="s" class="screen-reader-text">Search for:</label>
+		<input type="text" name="s" id="s" class="searchtext" />
+		<input type="submit" value="Go" class="searchbutton" />
+	</div>
+</form></li><li id="text-33" class="widget widget_text">			<div class="textwidget"><a href="mailto:coolfamilyblog@yahoo.com" title="coolfamilyblog@yahoo.com"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/00mail.png"></a><a href="http://feeds.feedburner.com/CoolestFamilyOnTheBlock" /><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/01rss.png" title="Subscribe via RSS!"></a><a href="http://www.facebook.com/coolestfamilyontheblockblog" title="Like me on Facebook!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/02facebook.png"></a><a href="http://pinterest.com/coolfamilyblog/" title="Follow Me on Pinterest!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/03pinterest.png" /></a><a href="http://twitter.com/coolfamilyblog" title="Follow me on Twitter!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/04twitter.png"></a><a href="https://plus.google.com/u/0/109549440334908625710/about"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/05google.png" title="Follow me on Google+!"></a><a href="https://www.youtube.com/user/coolfamilyblog"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/06youtube.png" title="Subscribe on YouTube!" /></a><a href="https://www.bloglovin.com/blog/6218791/coolest-family-on-the-block"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/07bloglovin.png" title="Follow on bloglovin!"></a><a href="http://instagram.com/jennrianblogs"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/08instagram.png" title="Follow on Instagram!" /></a>
+<br><a href="https://coolestfamilyontheblock.com/about-cool-mama/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2014/11/jrcoolfamilyblog01cewb.jpg" alt="JennRian CoolestFamilyOnTheBlock" width="300" height="300" class="alignnone size-full wp-image-10607" /></a></div>
+		</li><li id="blog_subscription-3" class="widget widget_blog_subscription jetpack_subscription_widget">            <form action="https://subscribe.wordpress.com" method="post" accept-charset="utf-8"
+                  id="subscribe-blog">
+									<p>Enter your email address to subscribe to this blog and receive notifications of new posts by email.</p>
+<p>Join 4,506 other followers</p>
+                    <p><input type="text" name="email" style="width: 95%; padding: 1px 2px"
+                              placeholder="Enter your email address" value=""
+                              id="subscribe-field"/></p>
+				
+                <p>
+                    <input type="hidden" name="action" value="subscribe"/>
+                    <input type="hidden" name="blog_id" value="14948247"/>
+                    <input type="hidden" name="source" value="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?replytocom=833"/>
+                    <input type="hidden" name="sub-type" value="widget"/>
+                    <input type="hidden" name="redirect_fragment" value="blog_subscription-3"/>
+					<input type="hidden" id="_wpnonce" name="_wpnonce" value="2cf0a92a2a" />                    <button type="submit"
+	                    		                	                >
+	                    Sign me up!                    </button>
+                </p>
+            </form>
+			
+</li><li id="follow_button_widget-2" class="widget widget_follow_button_widget">
+		<a class="wordpress-follow-button" href="https://coolestfamilyontheblock.com" data-blog="https://coolestfamilyontheblock.com" data-lang="en" data-show-follower-count="true">Follow Coolest Family on the Block on WordPress.com</a>
+		<script type="text/javascript">(function(d){var f = d.getElementsByTagName('SCRIPT')[0], p = d.createElement('SCRIPT');p.type = 'text/javascript';p.async = true;p.src = '//widgets.wp.com/platform.js';f.parentNode.insertBefore(p,f);}(document));</script>
+
+		</li><li id="archives-5" class="widget widget_archive"><h3 class="widget-title"><span>Archives</span></h3>		<label class="screen-reader-text" for="archives-dropdown-5">Archives</label>
+		<select id="archives-dropdown-5" name="archive-dropdown">
+			
+			<option value="">Select Month</option>
+				<option value='https://coolestfamilyontheblock.com/2014/12/'> December 2014 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/11/'> November 2014 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/10/'> October 2014 &nbsp;(3)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/09/'> September 2014 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/07/'> July 2014 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/06/'> June 2014 &nbsp;(3)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/05/'> May 2014 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/04/'> April 2014 &nbsp;(6)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/03/'> March 2014 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/02/'> February 2014 &nbsp;(5)</option>
+	<option value='https://coolestfamilyontheblock.com/2014/01/'> January 2014 &nbsp;(3)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/12/'> December 2013 &nbsp;(8)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/11/'> November 2013 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/10/'> October 2013 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/07/'> July 2013 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/06/'> June 2013 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/04/'> April 2013 &nbsp;(5)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/03/'> March 2013 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2013/02/'> February 2013 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/12/'> December 2012 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/11/'> November 2012 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/09/'> September 2012 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/07/'> July 2012 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/06/'> June 2012 &nbsp;(2)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/05/'> May 2012 &nbsp;(1)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/04/'> April 2012 &nbsp;(9)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/03/'> March 2012 &nbsp;(7)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/02/'> February 2012 &nbsp;(3)</option>
+	<option value='https://coolestfamilyontheblock.com/2012/01/'> January 2012 &nbsp;(3)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/12/'> December 2011 &nbsp;(7)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/11/'> November 2011 &nbsp;(11)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/10/'> October 2011 &nbsp;(4)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/09/'> September 2011 &nbsp;(10)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/08/'> August 2011 &nbsp;(11)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/07/'> July 2011 &nbsp;(20)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/06/'> June 2011 &nbsp;(22)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/05/'> May 2011 &nbsp;(11)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/04/'> April 2011 &nbsp;(24)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/03/'> March 2011 &nbsp;(22)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/02/'> February 2011 &nbsp;(15)</option>
+	<option value='https://coolestfamilyontheblock.com/2011/01/'> January 2011 &nbsp;(20)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/12/'> December 2010 &nbsp;(26)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/11/'> November 2010 &nbsp;(13)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/10/'> October 2010 &nbsp;(22)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/09/'> September 2010 &nbsp;(46)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/08/'> August 2010 &nbsp;(13)</option>
+	<option value='https://coolestfamilyontheblock.com/2010/07/'> July 2010 &nbsp;(2)</option>
+
+		</select>
+
+<script type='text/javascript'>
+/* <![CDATA[ */
+(function() {
+	var dropdown = document.getElementById( "archives-dropdown-5" );
+	function onSelectChange() {
+		if ( dropdown.options[ dropdown.selectedIndex ].value !== '' ) {
+			document.location.href = this.options[ this.selectedIndex ].value;
+		}
+	}
+	dropdown.onchange = onSelectChange;
+})();
+/* ]]> */
+</script>
+
+		</li><li id="text-24" class="widget widget_text">			<div class="textwidget"><br><a href="https://coolestfamilyontheblock.com/category/diy-crafts/tutorials-diy-crafts/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsdiy300.jpg" alt="labelsdiy300" width="300" height="39" class="alignnone size-full wp-image-9032" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/parties/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsparties300.jpg?w=300" alt="labelsparties300" width="300" height="40" class="alignnone size-medium wp-image-9023" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/birthdays/birthday-traditions-birthdays/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsbday300.jpg?w=300" alt="labelsbday300" width="300" height="38" class="alignnone size-medium wp-image-9016" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/fonts-2/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsfonts300.jpg?w=300" alt="labelsfonts300" width="300" height="40" class="alignnone size-medium wp-image-9033" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/dr-seuss/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelseuss3001.jpg?w=300" alt="labelseuss300" width="300" height="39" class="alignnone size-medium wp-image-9019" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/groundhog-day-holidays/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsgroundhog300.jpg?w=300" alt="labelsgroundhog300" width="300" height="39" class="alignnone size-medium wp-image-9021" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/valentines-day/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsvday300.jpg?w=300" alt="labelsvday300" width="300" height="40" class="alignnone size-medium wp-image-9026" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/st-patricks-day/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsstpatday300.jpg?w=300" alt="labelsstpatday300" width="300" height="39" class="alignnone size-medium wp-image-9025" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/easter-holidays/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelseaster300.jpg?w=300" alt="labelseaster300" width="300" height="39" class="alignnone size-medium wp-image-9018" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/april-fools-day/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsaprilfools300.jpg" alt="labelsaprilfools300" width="300" height="40" class="alignnone size-full wp-image-9015" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/seasons/fall/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsfall300.jpg?w=300" alt="labelsfall300" width="300" height="40" class="alignnone size-medium wp-image-9020" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/holidays/christmas/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelschristmas300.jpg?w=300" alt="labelschristmas300" width="300" height="40" class="alignnone size-medium wp-image-9017" /></a>
+<a href="https://coolestfamilyontheblock.com/category/infertility/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsinfertility300.jpg" alt="labelsinfertility300" width="300" height="39" class="alignnone size-full wp-image-9010" /></a>
+<br><a href="https://coolestfamilyontheblock.com/category/miscarriage/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelsmiscarriage300.jpg" alt="labelsmiscarriage300" width="300" height="40" class="alignnone size-full wp-image-9009" /></a>
+<br><a href="https://coolestfamilyontheblock.com/?cat=10234"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/labelspreg300.jpg" alt="labelspreg300" width="300" height="40" class="alignnone size-full wp-image-9011" /></a><br>
+</div>
+		</li><li id="text-22" class="widget widget_text">			<div class="textwidget"><br><br>
+<a href="https://coolestfamilyontheblock.com/2011/02/26/free-dr-seuss-fonts-links/"><img class="aligncenter size-medium wp-image-9084" alt="Free Dr Seuss fonts" src="https://coolestfamilyontheblock.files.wordpress.com/2011/02/cfotbdrseussfonts00.jpg?w=300" width="300" height="297" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2011%2F02%2F26%2Ffree-dr-seuss-fonts-links%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2011%2F02%2Fcfotbdrseussfonts00.jpg&amp;description=Links%20to%20Free%20Dr.%20Seuss%20Fonts%20(www.coolestfamilyontheblock.com)"><img alt="" src="//assets.pinterest.com/images/pidgets/pin_it_button.png" /></a>
+<br><b>FREE Dr. Seuss Fonts</b>(Links)
+<br><br>	
+<a href="https://coolestfamilyontheblock.com/2011/02/28/10-easy-dr-seuss-snacks/"><img class="aligncenter size-medium wp-image-9783" alt="10 Easy Dr. Seuss Snacks" src="https://coolestfamilyontheblock.files.wordpress.com/2011/02/cfotbseusssnacks02cf.jpg?w=300" width="300" height="300" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2011%2F02%2F28%2F10-easy-dr-seuss-snacks%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2011%2F02%2Fcfotbseusssnacks02cf.jpg&amp;description=10%20Easy%20Dr.%20Seuss%20Snacks%20%23readacrossamerica%20%23seuss"><img class="aligncenter" alt="" src="//assets.pinterest.com/images/pidgets/pinit_fg_en_rect_gray_20.png" /></a>
+<br><b>10 Easy Dr. Seuss Snacks</b>
+<br><br>
+<a href="https://coolestfamilyontheblock.com/2012/05/14/police-officer-crafts/"><img class="aligncenter size-medium wp-image-9780" alt="Police Officer Crafts" src="https://coolestfamilyontheblock.files.wordpress.com/2012/05/cfotbcopcrafts01.jpg?w=300" width="300" height="300" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2012%2F05%2F14%2Fpolice-officer-crafts%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2012%2F05%2Fcfotbcopcrafts01.jpg&amp;description=30%2B%20Police%20Officer%20Crafts"><img class="aligncenter" alt="" src="//assets.pinterest.com/images/pidgets/pinit_fg_en_rect_gray_20.png" /></a>
+<br>Police Officer Crafts
+<br>National Police Week: May 12-18, 2013
+<br><br>
+<a href="https://coolestfamilyontheblock.com/2011/06/05/hot-air-balloon-crafts/"><img class="aligncenter size-medium wp-image-9778" alt="50+ Hot Air Balloon Snacks and Crafts" src="https://coolestfamilyontheblock.files.wordpress.com/2011/06/cfotbhotairball03.jpg?w=300" width="300" height="226" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2011%2F06%2F05%2Fhot-air-balloon-crafts%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2011%2F06%2Fcfotbhotairball03.jpg&amp;description=50%2B%20Hot%20Air%20Balloon%20Crafts%20and%20Snacks"><img class="aligncenter" alt="" src="//assets.pinterest.com/images/pidgets/pinit_fg_en_rect_gray_20.png" /></a>
+<br>The <b>first hot air balloon flight</b> 
+<Br>was on June 5th 1783.
+<br><br>
+<a href="https://coolestfamilyontheblock.com/2013/02/05/half-birthday-celebrations/"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/02/halfbirthday02-imgp3517ctxt.jpg?w=235" alt="halfbirthday02 IMGP3517ctxt" width="235" height="300" class="aligncenter size-medium wp-image-8376" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2013%2F02%2F05%2Fhalf-birthday-celebrations%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2013%2F02%2Fhalfbirthday02-imgp3517ctxt-btn.jpg&amp;description=Half%20Birthday%20Celebrations%20(Coolest%20Family%20on%20the%20Block)%20%23birthday%20%23traditions%20"><img src="//assets.pinterest.com/images/pidgets/pinit_fg_en_rect_gray_20.png" /></a> 
+<br><b>Half Birthday Tradition</b> 
+<br><br>
+<a href="https://coolestfamilyontheblock.com/2011/08/01/ribbon-topiary-video-tutorial/"><img class="alignnone size-medium wp-image-9318" alt="topiaryIMG_0214txt" src="https://coolestfamilyontheblock.files.wordpress.com/2011/08/topiaryimg_0214txt.jpg?w=252" width="252" height="300" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2011%2F08%2F01%2Fribbon-topiary-video-tutorial%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2011%2F08%2Ftopiaryimg_0214txt.jpg&amp;description=updated%20DIY%20Ribbon%20Topiary%20Video%20Tutorial%20(Coolest%20Family%20on%20the%20Block)"><img class="aligncenter" alt="" src="//assets.pinterest.com/images/pidgets/pin_it_button.png" /></a>
+<Br><b>Ribbon Topiary Video Tutorial</b> 
+<Br>(Centerpiece)
+<br><br>
+<a href="https://coolestfamilyontheblock.com/2013/07/17/review-blackout-ez-window-cover/"><img class="aligncenter size-medium wp-image-9800" alt="Product Review Blackout EZ Window Covers" src="https://coolestfamilyontheblock.files.wordpress.com/2013/12/boezreview3.jpg?w=300" width="300" height="300" /></a><a href="//www.pinterest.com/pin/create/button/?url=http%3A%2F%2Fcoolestfamilyontheblock.com%2F2013%2F07%2F17%2Freview-blackout-ez-window-cover%2F&amp;media=http%3A%2F%2Fcoolestfamilyontheblock.files.wordpress.com%2F2013%2F12%2Fboezreview3.jpg&amp;description=Product%20Review%3A%20Blackout%20EZ%20Window%20Covers%20room%20darkening%20shades"><img class="aligncenter" alt="" src="//assets.pinterest.com/images/pidgets/pinit_fg_en_rect_gray_20.png" /></a>
+<br><br>
+
+</div>
+		</li><li id="facebook-likebox-3" class="widget widget_facebook_likebox"><h3 class="widget-title"><span><a href="https://www.facebook.com/jennriandotcom/">Like me on Facebook!</a></span></h3>		<div id="fb-root"></div>
+		<div class="fb-page" data-href="https://www.facebook.com/jennriandotcom/" data-width="300"  data-height="130" data-hide-cover="false" data-show-facepile="true" data-show-posts="false">
+		<div class="fb-xfbml-parse-ignore"><blockquote cite="https://www.facebook.com/jennriandotcom/"><a href="https://www.facebook.com/jennriandotcom/">Like me on Facebook!</a></blockquote></div>
+		</div>
+		</li><li id="text-30" class="widget widget_text"><h3 class="widget-title"><span>JennRian.com</span></h3>			<div class="textwidget"><a href="http://jennrian.com">JennRian.com</a><br>
+<a href="http://jennrian.com"><img src="https://coolestfamilyontheblock.files.wordpress.com/2014/06/visitjennriancom01_300.jpg" alt="Visit JennRian.com" width="300" height="476" class="aligncenter size-full wp-image-10633" /></a>
+</div>
+		</li>		<div class="wpcnt">
+			<div class="wpa wpmrec">
+				<span class="wpa-about">Advertisements</span>
+				<div class="u">
+							<div style="padding-bottom:15px;width:300px;height:250px;">
+			<div id="atatags-149482473-5d30960a7b2a8">
+				<script type="text/javascript">
+				__ATA.cmd.push(function() {
+					__ATA.initSlot('atatags-149482473-5d30960a7b2a8',  {
+						collapseEmpty: 'before',
+						sectionId: '149482473',
+						location: 140,
+						width: 300,
+						height: 250
+					});
+				});
+				</script>
+			</div>
+		</div>
+				</div>
+				
+			</div>
+		</div>
+		</ul>
+	</div><!-- #sidebar .widget-area -->
+
+	
+</div><!-- #main -->
+
+		<div id="footer" role="contentinfo">
+			
+
+			<div id="footer-widget-area" role="complementary">
+
+				<div id="first" class="widget-area">
+											<ul class="xoxo">
+							<li id="blog-stats-2" class="widget widget_blog-stats"><h3 class="widget-title">Blog Stats</h3>		<ul>
+			<li>2,498,763 hits</li>
+		</ul>
+		</li><li id="text-35" class="widget widget_text">			<div class="textwidget"><a href="http://feeds.feedburner.com/CoolestFamilyOnTheBlock"><img src="http://feeds.feedburner.com/~fc/CoolestFamilyOnTheBlock?bg=99CCFF&amp;fg=444444&amp;anim=0" height="26" width="88" style="border:0;" alt="" /></a>
+<br><a href="http://www.bloglovin.com/en/blog/6218791" title="Follow Coolest Family on the Block on Bloglovin"><img src="http://www.bloglovin.com/widget/subscribers.php?id=6218791&amp;lang=en" alt="Follow on Bloglovin" border="0"></a>
+<Br><a href="http://www.blogoversary.com"><img src="http://www.blogoversary.com/button.php?born_date=2010-07-30" alt="Get your own free Blogoversary button!" border="0"></a></div>
+		</li><li id="meta-3" class="widget widget_meta"><h3 class="widget-title">Meta</h3>			<ul>
+			<li><a href="https://wordpress.com/start?ref=wplogin">Register</a></li>			<li><a href="https://coolestfamilyontheblock.wordpress.com/wp-login.php">Log in</a></li>
+			<li><a href="https://coolestfamilyontheblock.com/feed/">Entries <abbr title="Really Simple Syndication">RSS</abbr></a></li>
+			<li><a href="https://coolestfamilyontheblock.com/comments/feed/">Comments <abbr title="Really Simple Syndication">RSS</abbr></a></li>
+			<li><a href="https://wordpress.com/" title="Powered by WordPress, state-of-the-art semantic personal publishing platform.">WordPress.com</a></li>			</ul>
+			</li>						</ul>
+									</div><!-- #first .widget-area -->
+
+				<div id="second" class="widget-area">
+											<ul class="xoxo">
+							<li id="text-5" class="widget widget_text"><h3 class="widget-title">This blog is Copyright Protected</h3>			<div class="textwidget"><br><a href='http://www.myfreecopyright.com/registered_mcn/B4FG3_1LQJB_9N9YC' title='MyFreeCopyright.com Registered &amp; Protected'><img src='https://i1.wp.com/storage.myfreecopyright.com/mfc_protected.png' alt='MyFreeCopyright.com Registered &amp; Protected' title='MyFreeCopyright.com Registered &amp; Protected' width='145px' height='38px' border='0' /></a>
+<br>&copy; Copyright www.coolestfamilyontheblock.com 2010 - 2014
+<br><i>This blog is copyright protected.  You may use images and an excerpt from my blog only if you <b>link back</b> to the original post here at <a href="http://www.coolestfamilyontheblock.com">Coolest Family on the Block</a>.  Do not alter the photos or remove the url or watermark.  Please do not use any pictures of my children without my permission.  Thank you.</i></div>
+		</li>						</ul>
+									</div><!-- #second .widget-area -->
+
+				<div id="third" class="widget-area">
+											<ul class="xoxo">
+							<li id="search-2" class="widget widget_search">
+<form method="get" id="searchform" action="https://coolestfamilyontheblock.com/">
+	<div id="searchfield">
+		<label for="s" class="screen-reader-text">Search for:</label>
+		<input type="text" name="s" id="s" class="searchtext" />
+		<input type="submit" value="Go" class="searchbutton" />
+	</div>
+</form></li><li id="archives-4" class="widget widget_archive"><h3 class="widget-title">Archives</h3>		<label class="screen-reader-text" for="archives-dropdown-4">Archives</label>
+		<select id="archives-dropdown-4" name="archive-dropdown">
+			
+			<option value="">Select Month</option>
+				<option value='https://coolestfamilyontheblock.com/2014/12/'> December 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/11/'> November 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/10/'> October 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/09/'> September 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/07/'> July 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/06/'> June 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/05/'> May 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/04/'> April 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/03/'> March 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/02/'> February 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2014/01/'> January 2014 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/12/'> December 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/11/'> November 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/10/'> October 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/07/'> July 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/06/'> June 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/04/'> April 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/03/'> March 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2013/02/'> February 2013 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/12/'> December 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/11/'> November 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/09/'> September 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/07/'> July 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/06/'> June 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/05/'> May 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/04/'> April 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/03/'> March 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/02/'> February 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2012/01/'> January 2012 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/12/'> December 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/11/'> November 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/10/'> October 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/09/'> September 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/08/'> August 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/07/'> July 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/06/'> June 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/05/'> May 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/04/'> April 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/03/'> March 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/02/'> February 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2011/01/'> January 2011 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/12/'> December 2010 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/11/'> November 2010 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/10/'> October 2010 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/09/'> September 2010 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/08/'> August 2010 </option>
+	<option value='https://coolestfamilyontheblock.com/2010/07/'> July 2010 </option>
+
+		</select>
+
+<script type='text/javascript'>
+/* <![CDATA[ */
+(function() {
+	var dropdown = document.getElementById( "archives-dropdown-4" );
+	function onSelectChange() {
+		if ( dropdown.options[ dropdown.selectedIndex ].value !== '' ) {
+			document.location.href = this.options[ this.selectedIndex ].value;
+		}
+	}
+	dropdown.onchange = onSelectChange;
+})();
+/* ]]> */
+</script>
+
+		</li><li id="categories-3" class="widget widget_categories"><h3 class="widget-title">Categories</h3><form action="https://coolestfamilyontheblock.com" method="get"><label class="screen-reader-text" for="cat">Categories</label><select  name='cat' id='cat' class='postform' >
+	<option value='-1'>Select Category</option>
+	<option class="level-0" value="215158198">About the Cool Family</option>
+	<option class="level-1" value="14966757">&nbsp;&nbsp;&nbsp;Adaline</option>
+	<option class="level-1" value="12494292">&nbsp;&nbsp;&nbsp;Cool Daddy</option>
+	<option class="level-1" value="304929">&nbsp;&nbsp;&nbsp;Jenn</option>
+	<option class="level-1" value="41675">&nbsp;&nbsp;&nbsp;Jonathan</option>
+	<option class="level-1" value="4948">&nbsp;&nbsp;&nbsp;Jordan</option>
+	<option class="level-1" value="321191">&nbsp;&nbsp;&nbsp;Muppet</option>
+	<option class="level-1" value="44659">&nbsp;&nbsp;&nbsp;Names</option>
+	<option class="level-1" value="260411">&nbsp;&nbsp;&nbsp;Open House</option>
+	<option class="level-0" value="10292">Birthdays</option>
+	<option class="level-1" value="215156163">&nbsp;&nbsp;&nbsp;Birthday Traditions</option>
+	<option class="level-0" value="3633">Blog Stuff</option>
+	<option class="level-1" value="18595246">&nbsp;&nbsp;&nbsp;31 Days to Build a Better Blog</option>
+	<option class="level-1" value="197827">&nbsp;&nbsp;&nbsp;Blog Hops</option>
+	<option class="level-2" value="21047942">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mama Kat&#8217;s Writer&#8217;s Workshop</option>
+	<option class="level-2" value="54505902">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;No Housework Party</option>
+	<option class="level-2" value="58758418">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Show Us Your Town</option>
+	<option class="level-2" value="306369">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Tackle it Tuesday</option>
+	<option class="level-2" value="781020">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Ultimate Blog Party</option>
+	<option class="level-1" value="28509914">&nbsp;&nbsp;&nbsp;SITS Girls</option>
+	<option class="level-1" value="49818">&nbsp;&nbsp;&nbsp;Social Media</option>
+	<option class="level-0" value="666995">DIY Crafts</option>
+	<option class="level-1" value="215153411">&nbsp;&nbsp;&nbsp;Fonts</option>
+	<option class="level-1" value="215156190">&nbsp;&nbsp;&nbsp;Tutorials</option>
+	<option class="level-0" value="7827680">Domestically Challenged</option>
+	<option class="level-0" value="20150">Dr. Seuss</option>
+	<option class="level-0" value="64050">Flashbacks</option>
+	<option class="level-1" value="39832997">&nbsp;&nbsp;&nbsp;Mommy&#8217;s Piggy Tales</option>
+	<option class="level-2" value="44055779">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Young Adult Years</option>
+	<option class="level-0" value="150060">Guest Posts</option>
+	<option class="level-0" value="4325">Holidays</option>
+	<option class="level-1" value="91682">&nbsp;&nbsp;&nbsp;April Fools Day</option>
+	<option class="level-1" value="9445">&nbsp;&nbsp;&nbsp;Celebrations</option>
+	<option class="level-1" value="15607">&nbsp;&nbsp;&nbsp;Christmas</option>
+	<option class="level-2" value="13723238">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Believing in Santa</option>
+	<option class="level-2" value="13131104">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Christmas PJs</option>
+	<option class="level-2" value="529189">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dear Santa</option>
+	<option class="level-2" value="3254975">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Elf on a Shelf</option>
+	<option class="level-2" value="3265821">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Santa Photos</option>
+	<option class="level-2" value="3192611">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ugly Sweaters</option>
+	<option class="level-1" value="941218">&nbsp;&nbsp;&nbsp;Easter</option>
+	<option class="level-2" value="5527410">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Easter Traditions</option>
+	<option class="level-3" value="219728366">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Easter Bunny</option>
+	<option class="level-3" value="219729087">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Easter Egg Hunts</option>
+	<option class="level-3" value="55163">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Easter Eggs</option>
+	<option class="level-1" value="133723">&nbsp;&nbsp;&nbsp;Father&#8217;s Day</option>
+	<option class="level-1" value="76203981">&nbsp;&nbsp;&nbsp;Groundhog Day</option>
+	<option class="level-1" value="6168">&nbsp;&nbsp;&nbsp;Halloween</option>
+	<option class="level-2" value="12036839">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Costumes</option>
+	<option class="level-2" value="357514">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pumpkin Carving</option>
+	<option class="level-1" value="5119064">&nbsp;&nbsp;&nbsp;Leap Day / Leap Year</option>
+	<option class="level-1" value="128713">&nbsp;&nbsp;&nbsp;Mother&#8217;s Day</option>
+	<option class="level-1" value="5674099">&nbsp;&nbsp;&nbsp;Patriotic</option>
+	<option class="level-2" value="296670">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flag Day</option>
+	<option class="level-2" value="224463">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Independence Day</option>
+	<option class="level-2" value="175459">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memorial Day</option>
+	<option class="level-2" value="368038">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Veterans Day</option>
+	<option class="level-1" value="89944">&nbsp;&nbsp;&nbsp;St. Patrick&#8217;s Day</option>
+	<option class="level-2" value="857595">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Leprechauns</option>
+	<option class="level-1" value="15318">&nbsp;&nbsp;&nbsp;Thanksgiving</option>
+	<option class="level-1" value="36700">&nbsp;&nbsp;&nbsp;Traditions</option>
+	<option class="level-2" value="14634767">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Legendary Figures</option>
+	<option class="level-3" value="219728985">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Footprints</option>
+	<option class="level-2" value="1085324">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;School Traditions</option>
+	<option class="level-1" value="13766">&nbsp;&nbsp;&nbsp;Valentine&#8217;s Day</option>
+	<option class="level-0" value="376">Humor</option>
+	<option class="level-0" value="115194">Infertility</option>
+	<option class="level-0" value="79032314">Kinda Crunchy</option>
+	<option class="level-0" value="2200">Links</option>
+	<option class="level-1" value="946357">&nbsp;&nbsp;&nbsp;Round ups</option>
+	<option class="level-0" value="769159">List Posts</option>
+	<option class="level-1" value="399148">&nbsp;&nbsp;&nbsp;101 Things in 1001 Days</option>
+	<option class="level-1" value="36887">&nbsp;&nbsp;&nbsp;Top 10</option>
+	<option class="level-0" value="16290818">Local</option>
+	<option class="level-0" value="310790192">On JennRian.com</option>
+	<option class="level-0" value="1381">Parties</option>
+	<option class="level-1" value="17022661">&nbsp;&nbsp;&nbsp;Ladybug Party</option>
+	<option class="level-0" value="10234">Pregnancy</option>
+	<option class="level-1" value="128229">&nbsp;&nbsp;&nbsp;Birth Stories</option>
+	<option class="level-1" value="31407">&nbsp;&nbsp;&nbsp;Miscarriage</option>
+	<option class="level-1" value="795865">&nbsp;&nbsp;&nbsp;Ultrasounds</option>
+	<option class="level-0" value="30">Random</option>
+	<option class="level-1" value="14480">&nbsp;&nbsp;&nbsp;Coming soon&#8230;</option>
+	<option class="level-1" value="9548">&nbsp;&nbsp;&nbsp;Features</option>
+	<option class="level-1" value="5621">&nbsp;&nbsp;&nbsp;Introductions</option>
+	<option class="level-0" value="309">Reviews</option>
+	<option class="level-0" value="20333">Seasons</option>
+	<option class="level-1" value="46710">&nbsp;&nbsp;&nbsp;Fall</option>
+	<option class="level-1" value="9486">&nbsp;&nbsp;&nbsp;Spring</option>
+	<option class="level-1" value="22302">&nbsp;&nbsp;&nbsp;Summer</option>
+	<option class="level-1" value="9484">&nbsp;&nbsp;&nbsp;Winter</option>
+	<option class="level-0" value="1">Uncategorized</option>
+	<option class="level-0" value="1149">Videos</option>
+	<option class="level-0" value="215155807">Wordless-ful Wednesday</option>
+	<option class="level-1" value="873072">&nbsp;&nbsp;&nbsp;Wordful Wednesday</option>
+</select>
+</form>
+<script type='text/javascript'>
+/* <![CDATA[ */
+(function() {
+	var dropdown = document.getElementById( "cat" );
+	function onCatChange() {
+		if ( dropdown.options[ dropdown.selectedIndex ].value > 0 ) {
+			dropdown.parentNode.submit();
+		}
+	}
+	dropdown.onchange = onCatChange;
+})();
+/* ]]> */
+</script>
+
+			</li>						</ul>
+									</div><!-- #third .widget-area -->
+
+				<div id="fourth" class="widget-area">
+											<ul class="xoxo">
+							<li id="text-16" class="widget widget_text">			<div class="textwidget"><a href="http://www.facebook.com/coolestfamilyontheblockblog" title="Like me on Facebook!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/02facebook.png"></a><a href="http://pinterest.com/coolfamilyblog/" title="Follow Me on Pinterest!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/03pinterest.png" /></a><a href="http://twitter.com/coolfamilyblog" title="Follow me on Twitter!"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/04twitter.png"></a><a href="https://plus.google.com/u/0/109549440334908625710/about"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/05google.png" title="”Follow"></a><a href="https://www.youtube.com/user/coolfamilyblog"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/06youtube.png" title="”Subscribe" /></a><a href="http://instagram.com/jennrianblogs"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/08instagram.png" title="”Follow" /></a>
+<br><a href="http://feedburner.google.com/fb/a/mailverify?uri=CoolestFamilyOnTheBlock&amp;loc=en_US"><img src="https://coolestfamilyontheblock.files.wordpress.com/2013/09/cfotbemailsubbtn200.jpg" alt="subscribebtn2_200" width="200" height="200" class="aligncenter size-full wp-image-9035" /></a></div>
+		</li><li id="blog_subscription-4" class="widget widget_blog_subscription jetpack_subscription_widget"><h3 class="widget-title"><label for="subscribe-field-2">Email Subscription</label></h3>
+            <form action="https://subscribe.wordpress.com" method="post" accept-charset="utf-8"
+                  id="subscribe-blog-2">
+									<p>Enter your email address to subscribe to "Coolest Family on the Block" blog and receive notifications of new posts by email.</p>
+<p>Join 4,506 other followers</p>
+                    <p><input type="text" name="email" style="width: 95%; padding: 1px 2px"
+                              placeholder="Enter your email address" value=""
+                              id="subscribe-field-2"/></p>
+				
+                <p>
+                    <input type="hidden" name="action" value="subscribe"/>
+                    <input type="hidden" name="blog_id" value="14948247"/>
+                    <input type="hidden" name="source" value="https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?replytocom=833"/>
+                    <input type="hidden" name="sub-type" value="widget"/>
+                    <input type="hidden" name="redirect_fragment" value="blog_subscription-4"/>
+					<input type="hidden" id="_wpnonce" name="_wpnonce" value="2cf0a92a2a" />                    <button type="submit"
+	                    		                	                >
+	                    Sign me up!                    </button>
+                </p>
+            </form>
+			
+</li>						</ul>
+									</div><!-- #fourth .widget-area -->
+
+			</div><!-- #footer-widget-area -->				<div id="copyright">
+					<p>
+	 					<a href="https://wordpress.com/?ref=footer_blog">Blog at WordPress.com.</a>
+											</p>
+				</div><!-- #copyright -->
+			</div><!-- #footer -->
+	</div><!-- #container -->
+</div><!-- #page -->
+
+<!--  -->
+	<div style="display:none">
+	<div class="grofile-hash-map-439098ef7ceffa48f2ddb3f5a2bae889">
+	</div>
+	<div class="grofile-hash-map-a36a702c862655cc40dab1a1a6038330">
+	</div>
+	<div class="grofile-hash-map-439098ef7ceffa48f2ddb3f5a2bae889">
+	</div>
+	<div class="grofile-hash-map-578d63cf31a560e8574d0ae2480e0baf">
+	</div>
+	<div class="grofile-hash-map-f1f82898a6f097ec64b9aad084e15ed5">
+	</div>
+	<div class="grofile-hash-map-903d2e9323b570f9af6a84e9da39b2d8">
+	</div>
+	<div class="grofile-hash-map-534970ebb6fd5d5937acf7883ecabf7a">
+	</div>
+	<div class="grofile-hash-map-b3e5e3a9614ef09427e3ee898117792b">
+	</div>
+	<div class="grofile-hash-map-31c9022cece7d2f848fe139363912948">
+	</div>
+	<div class="grofile-hash-map-1f904548aa777cecf0db49e1c81a977c">
+	</div>
+	<div class="grofile-hash-map-a2c72ba825925f2450f0a1a9f2bbe3bc">
+	</div>
+	<div class="grofile-hash-map-81460b3dbf12aed7c03a7fb3588a313f">
+	</div>
+	<div class="grofile-hash-map-839b8aed4d3dd7791745fc79a4bd479b">
+	</div>
+	</div>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var HighlanderComments = {"loggingInText":"Logging In\u2026","submittingText":"Posting Comment\u2026","postCommentText":"Post Comment","connectingToText":"Connecting to %s","commentingAsText":"%1$s: You are commenting using your %2$s account.","logoutText":"Log Out","loginText":"Log In","connectURL":"https:\/\/coolestfamilyontheblock.wordpress.com\/public.api\/connect\/?action=request&domain=coolestfamilyontheblock.com","logoutURL":"https:\/\/coolestfamilyontheblock.wordpress.com\/wp-login.php?action=logout&_wpnonce=a493c8b943","homeURL":"https:\/\/coolestfamilyontheblock.com\/","postID":"1994","gravDefault":"identicon","enterACommentError":"Please enter a comment","enterEmailError":"Please enter your email address here","invalidEmailError":"Invalid email address","enterAuthorError":"Please enter your name here","gravatarFromEmail":"This picture will show whenever you leave a comment. Click to customize it.","logInToExternalAccount":"Log in to use details from one of these accounts.","change":"Change","changeAccount":"Change Account","comment_registration":"","userIsLoggedIn":"","isJetpack":"","text_direction":"ltr"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='https://s2.wp.com/_static/??/wp-content/js/jquery/jquery.autoresize.js,/wp-content/mu-plugins/highlander-comments/script.js?m=1551752381j'></script>
+
+	<div id="carousel-reblog-box">
+		<form action="#" name="carousel-reblog">
+			<textarea id="carousel-reblog-content" name="carousel-reblog-content" placeholder="Add your thoughts here... (optional)"></textarea>
+			<label for="carousel-reblog-to-blog-id" id="carousel-reblog-lblogid">Post to</label>
+			<select name="carousel-reblog-to-blog-id" id="carousel-reblog-to-blog-id">
+						</select>
+
+			<div class="submit">
+				<span class="canceltext"><a href="#" class="cancel">Cancel</a></span>
+				<input type="submit" name="carousel-reblog-submit" class="button" id="carousel-reblog-submit" value="Reblog Post" />
+				<input type="hidden" id="carousel-reblog-blog-id" value="14948247" />
+				<input type="hidden" id="carousel-reblog-blog-url" value="https://coolestfamilyontheblock.com" />
+				<input type="hidden" id="carousel-reblog-blog-title" value="Coolest Family on the Block" />
+				<input type="hidden" id="carousel-reblog-post-url" value="" />
+				<input type="hidden" id="carousel-reblog-post-title" value="" />
+			</div>
+
+			<input type="hidden" id="_wpnonce" name="_wpnonce" value="9e168fadc6" /><input type="hidden" name="_wp_http_referer" value="/2010/12/01/my-letter-to-santa-1984/?replytocom=833" />		</form>
+
+		<div class="arrow"></div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/":1994};
+	</script>
+							<div id="sharing_email" style="display: none;">
+		<form action="/2010/12/01/my-letter-to-santa-1984/?replytocom=833" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="" />
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="" />
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="" />
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed" />
+			
+			<div
+				class="g-recaptcha"
+				data-sitekey="6LcmyE0UAAAAALID28yVNg7pFCodGaArJzHitez_"
+				data-theme="light"
+				data-type="image"
+				data-tabindex="0"></div>
+			<script type="text/javascript" src="https://www.google.com/recaptcha/api.js?hl=en" async></script>
+			
+			<img style="float: right; display: none" class="loading" src="https://s2.wp.com/wp-content/mu-plugins/post-flair/sharing/images/loading.gif" alt="loading" width="16" height="16" />
+			<input type="submit" value="Send Email" class="sharing_send" />
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<link rel='stylesheet' id='all-css-0-3' href='https://s0.wp.com/wp-content/mu-plugins/carousel/jetpack-carousel.css?m=1563361695h&cssminify=yes' type='text/css' media='all' />
+<script type='text/javascript'>
+/* <![CDATA[ */
+var comment_like_text = {"loading":"Loading..."};
+/* ]]> */
+</script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var jpfbembed = {"appid":"249643311490","locale":"en_US"};
+/* ]]> */
+</script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var actionbardata = {"siteID":"14948247","siteName":"Coolest Family on the Block","siteURL":"https:\/\/coolestfamilyontheblock.com","icon":"<img alt='' src='https:\/\/secure.gravatar.com\/blavatar\/92b1c9bf8e54ce538759f5b500cb5ea8?s=50&d=https%3A%2F%2Fs2.wp.com%2Fi%2Flogo%2Fwpcom-gray-white.png' class='avatar avatar-50' height='50' width='50' \/>","canManageOptions":"","canCustomizeSite":"","isFollowing":"","themeSlug":"pub\/mystique","signupURL":"https:\/\/wordpress.com\/start\/","loginURL":"https:\/\/wordpress.com\/log-in?redirect_to=https%3A%2F%2Fcoolestfamilyontheblock.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F&signup_flow=account&domain=coolestfamilyontheblock.com","themeURL":"","xhrURL":"https:\/\/coolestfamilyontheblock.com\/wp-admin\/admin-ajax.php","nonce":"a3afb3140e","isSingular":"1","isFolded":"","isLoggedIn":"","isMobile":"","subscribeNonce":"<input type=\"hidden\" id=\"_wpnonce\" name=\"_wpnonce\" value=\"2cf0a92a2a\" \/>","referer":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/?replytocom=833","canFollow":"1","feedID":"63967","statusMessage":"","customizeLink":"https:\/\/coolestfamilyontheblock.wordpress.com\/wp-admin\/customize.php?url=https%3A%2F%2Fcoolestfamilyontheblock.wordpress.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F%3Freplytocom%3D833","postID":"1994","shortlink":"https:\/\/wp.me\/p10IIL-wa","canEditPost":"","editLink":"https:\/\/wordpress.com\/post\/coolestfamilyontheblock.com\/1994","statsLink":"https:\/\/wordpress.com\/stats\/post\/1994\/coolestfamilyontheblock.com","i18n":{"view":"View site","follow":"Follow","following":"Following","edit":"Edit","login":"Log in","signup":"Sign up","customize":"Customize","report":"Report this content","themeInfo":"Get theme: Mystique","shortlink":"Copy shortlink","copied":"Copied","followedText":"New posts from this site will now appear in your <a href=\"https:\/\/wordpress.com\/\">Reader<\/a>","foldBar":"Collapse this bar","unfoldBar":"Expand this bar","editSubs":"Manage subscriptions","viewReader":"View site in Reader","viewReadPost":"View post in Reader","subscribe":"Sign me up","enterEmail":"Enter your email address","followers":"Join 4,506 other followers","alreadyUser":"Already have a WordPress.com account? <a href=\"https:\/\/wordpress.com\/log-in?redirect_to=https%3A%2F%2Fcoolestfamilyontheblock.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F&signup_flow=account&domain=coolestfamilyontheblock.com\">Log in now.<\/a>","stats":"Stats"}};
+/* ]]> */
+</script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var jetpackCarouselStrings = {"widths":[370,700,1000,1200,1400,2000],"is_logged_in":"","lang":"en","ajaxurl":"https:\/\/coolestfamilyontheblock.com\/wp-admin\/admin-ajax.php","nonce":"f7975e547f","display_exif":"1","display_geo":"1","single_image_gallery":"1","single_image_gallery_media_file":"","background_color":"black","comment":"Comment","post_comment":"Post Comment","write_comment":"Write a Comment...","loading_comments":"Loading Comments...","download_original":"View full size <span class=\"photo-size\">{0}<span class=\"photo-size-times\">\u00d7<\/span>{1}<\/span>","no_comment_text":"Please be sure to submit some text with your comment.","no_comment_email":"Please provide an email address to comment.","no_comment_author":"Please provide your name to comment.","comment_post_error":"Sorry, but there was an error posting your comment. Please try again later.","comment_approved":"Your comment was approved.","comment_unapproved":"Your comment is in moderation.","camera":"Camera","aperture":"Aperture","shutter_speed":"Shutter Speed","focal_length":"Focal Length","copyright":"Copyright","comment_registration":"0","require_name_email":"1","login_url":"https:\/\/coolestfamilyontheblock.wordpress.com\/wp-login.php?redirect_to=https%3A%2F%2Fcoolestfamilyontheblock.com%2F2010%2F12%2F01%2Fmy-letter-to-santa-1984%2F","blog_id":"14948247","meta_data":["camera","aperture","shutter_speed","focal_length","copyright"],"local_comments_commenting_as":"<fieldset><label for=\"email\">Email (Required)<\/label> <input type=\"text\" name=\"email\" class=\"jp-carousel-comment-form-field jp-carousel-comment-form-text-field\" id=\"jp-carousel-comment-form-email-field\" \/><\/fieldset><fieldset><label for=\"author\">Name (Required)<\/label> <input type=\"text\" name=\"author\" class=\"jp-carousel-comment-form-field jp-carousel-comment-form-text-field\" id=\"jp-carousel-comment-form-author-field\" \/><\/fieldset><fieldset><label for=\"url\">Website<\/label> <input type=\"text\" name=\"url\" class=\"jp-carousel-comment-form-field jp-carousel-comment-form-text-field\" id=\"jp-carousel-comment-form-url-field\" \/><\/fieldset>","reblog":"Reblog","reblogged":"Reblogged","reblog_add_thoughts":"Add your thoughts here... (optional)","reblogging":"Reblogging...","post_reblog":"Post Reblog","stats_query_args":"blog=14948247&v=wpcom&tz=-5&user_id=0&subd=coolestfamilyontheblock","is_public":"1","reblog_enabled":""};
+/* ]]> */
+</script>
+<script type='text/javascript' src='https://s0.wp.com/_static/??-eJyVkV1OwzAQhC+Esy1Q0RfEUZBjD8WJ//DaDb09jmhKiipLffJqdr7VepamKFTwGT7TwKRxNArxuxv4gVYtV0S05WA8kzUjmL4KCj6l1xapYVbBuSqJX2iY6Z54MhH3QFfCAhqvbNHXhoRoT50zvjF9MvqAzIRSu2E0EFZOlOGilRn/9MacATlKNdJ7XYQ+pEJfKQHXQzcoqet2opeJnOSMVCsRjkjJzF+5aHdOyKluwi1IZRP8DF2qWzly/IturQ/13Ol0frq169b5ZAqFYZeExCK09hsNO2Tx1G3OgYbkqv/NvW53u5fn7X6/eRx+ANmR/78='></script>
+<script type='text/javascript'>
+<!--//--><![CDATA[//><!--
+PDRTJS_settings_2974363_post_1994={"id":2974363,"unique_id":"wp-post-1994","title":"My%20letter%20to%20Santa%26nbsp%3B1984","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/","item_id":"_post_1994"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974363_post_1994 == 'undefined' ){PDRTJS_2974363_post_1994 = new PDRTJS_RATING( PDRTJS_settings_2974363_post_1994 );}}PDRTJS_settings_2974366_comm_792={"id":2974366,"unique_id":"wp-comment-792","title":"Writing%20to%20Santa%20is%20so%20magical%20and%20it%26%23039%3Bs%20easy%20to%20think%20that%20anything%20is%20possible%20when%20you%20believe%2C%20truly%20believe.%20What%20a%20dynamic%20Grandma%20who%20was%20courageous%20in%20sharing%20her%20wishes%20and%20hopes%20for%20a%20so...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-792","item_id":"_comm_792"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_792 == 'undefined' ){PDRTJS_2974366_comm_792 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_792 );}}PDRTJS_settings_2974366_comm_1130={"id":2974366,"unique_id":"wp-comment-1130","title":"Santa%21%20%20I%26%23039%3Bm%20sooo%20excited%20that%20Santa%20replied%20on%20my%20blog%21%20%20I%20love%20you%2C%20Santa%21%20%20I%20DO%20have%20an%20awesome%20Grandma....","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1130","item_id":"_comm_1130"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1130 == 'undefined' ){PDRTJS_2974366_comm_1130 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1130 );}}PDRTJS_settings_2974366_comm_793={"id":2974366,"unique_id":"wp-comment-793","title":"I%20still%20use%20my%20Cabbage%20Patch%20Kids%20for%20Touch%20of%20Home%20Learning%2C%20In-School%20Events.%20%20I%20was%20getting%20ready%20for%20our%20Crime%20Scene%20class%20%28the%20dolls%20are%20the%20suspects%20of%20a%20crime%29%20and%20my%20dad%20was%20here.%20%20He%20tol...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-793","item_id":"_comm_793"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_793 == 'undefined' ){PDRTJS_2974366_comm_793 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_793 );}}PDRTJS_settings_2974366_comm_1131={"id":2974366,"unique_id":"wp-comment-1131","title":"Sara%2C%20I%20LOVE%20your%20story%21%20%20Wouldn%26%23039%3Bt%20it%20be%20awesome%20if%20you%20could%20find%20out%20whatever%20happened%20with%20that%20doll%3F%21%20%20I%20bet%20that%20little%20girl%20was%20truly%20blessed%20%3A%29%20%20I%26%23039%3Bll%20stop%20by%20your%20blog%20soon%20and%20I%20appreciat...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1131","item_id":"_comm_1131"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1131 == 'undefined' ){PDRTJS_2974366_comm_1131 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1131 );}}PDRTJS_settings_2974366_comm_794={"id":2974366,"unique_id":"wp-comment-794","title":"I%20love%20it%21%20This%20is%20so%20sweet%21%20I%20had%20cabbage%20patch%20twins%20one%20year.%20%3A-%29...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-794","item_id":"_comm_794"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_794 == 'undefined' ){PDRTJS_2974366_comm_794 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_794 );}}PDRTJS_settings_2974366_comm_1132={"id":2974366,"unique_id":"wp-comment-1132","title":"Wow%2C%20twins%21%20%20You%20lucky%20duck%20%3B%29...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1132","item_id":"_comm_1132"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1132 == 'undefined' ){PDRTJS_2974366_comm_1132 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1132 );}}PDRTJS_settings_2974366_comm_795={"id":2974366,"unique_id":"wp-comment-795","title":"Cabbage%20Patch%20Kids%20were%20so%20fun%21%20%20I%20had%202%20%26%23039%3Breal%26%23039%3B%20ones%20from%20the%20store%20and%20several%20hand%20made%20ones%20by%20my%20grandma.%20%20I%20think%20I%20got%20a%20corn%20silk%20doll%20%28with%20the%20hair%20you%20could%20brush%20vs.%20yarn%29%20for%20Christma...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-795","item_id":"_comm_795"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_795 == 'undefined' ){PDRTJS_2974366_comm_795 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_795 );}}PDRTJS_settings_2974366_comm_1133={"id":2974366,"unique_id":"wp-comment-1133","title":"Yeah%2C%20we%20had%20the%20yarn-haired%20dolls.%20%20The%20corn%20silk%20hair%20definitely%20looked%20fun%20to%20brush%21%20%20Aren%26%23039%3Bt%20they%20just%20the%20ugliest%20dolls...why%20were%20they%20so%20popular%3F%21%20%20We%20sure%20loved%20them%21...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1133","item_id":"_comm_1133"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1133 == 'undefined' ){PDRTJS_2974366_comm_1133 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1133 );}}PDRTJS_settings_2974366_comm_797={"id":2974366,"unique_id":"wp-comment-797","title":"Hey%20there%21%20%20I%20just%20wanted%20to%20stop%20by%20to%20thank%20you%20for%20your%20awesome%20comment%20on%20Sofia%26%23039%3Bs%20Ideas%21%20%20I%20replied%20to%20you%20so%20I%20hope%20that%20when%20you%20get%20a%20moment%2C%20you%26%23039%3Bll%20come%20on%20back......","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-797","item_id":"_comm_797"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_797 == 'undefined' ){PDRTJS_2974366_comm_797 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_797 );}}PDRTJS_settings_2974366_comm_1134={"id":2974366,"unique_id":"wp-comment-1134","title":"Thanks%2C%20Sofia%21%20%20I%26%23039%3Bll%20have%20to%20stop%20back%20soon...this%20has%20been%20a%20crazy%20month%21%20%20I%20sure%20appreciate%20you%20following%20up%20with%20me%20%3A%29%20%20You%26%23039%3Bve%20got%20an%20awesome%20blog%21...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1134","item_id":"_comm_1134"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1134 == 'undefined' ){PDRTJS_2974366_comm_1134 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1134 );}}PDRTJS_settings_2974366_comm_798={"id":2974366,"unique_id":"wp-comment-798","title":"Does%20Grandma%20still%20have%20her%20preemie%3F%20You%20looked%20so%20happy%20on%20Christmas%20day%21%20You%20must%20have%20totally%20wound%20down%20later%20when%20you%20were%20dangling%20your%20doll%20in%20the%20air%20by%20her%20ponytail.%20A%20Christmas%20morning%20...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-798","item_id":"_comm_798"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_798 == 'undefined' ){PDRTJS_2974366_comm_798 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_798 );}}PDRTJS_settings_2974366_comm_1135={"id":2974366,"unique_id":"wp-comment-1135","title":"Grandma%20does%20indeed%20still%20have%20her%20preemie%20and%20I%20believe%20it%26%23039%3Bs%20still%20in%20the%20box%20too%21%20%20We%20actually%20received%20the%20dolls%20on%20Christmas%20Eve%20at%20my%20Grandma%26%23039%3Bs%20house%20and%20the%20other%20photo%20is%20on%20Christmas%20morn...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1135","item_id":"_comm_1135"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1135 == 'undefined' ){PDRTJS_2974366_comm_1135 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1135 );}}PDRTJS_settings_2974366_comm_804={"id":2974366,"unique_id":"wp-comment-804","title":"Hi%20Jenn%21%20I%20gave%20you%20a%20blog%20award.%20%3DD%20Check%20it%20out%20and%20pass%20it%20on%20%3D%29...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-804","item_id":"_comm_804"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_804 == 'undefined' ){PDRTJS_2974366_comm_804 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_804 );}}PDRTJS_settings_2974366_comm_1136={"id":2974366,"unique_id":"wp-comment-1136","title":"Viviene%2C%20THANK%20YOU%20SO%20MUCH%21%20%20I%20truly%20appreciate%20it.%20%20As%20you%20can%20probably%20see%20I%26%23039%3Bve%20been%20totally%20out%20of%20it%20lately%20and%20really%20busy%20this%20month...when%20things%20calm%20down%20around%20here%20I%26%23039%3Bll%20officially%20acce...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1136","item_id":"_comm_1136"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1136 == 'undefined' ){PDRTJS_2974366_comm_1136 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1136 );}}PDRTJS_settings_2974366_comm_833={"id":2974366,"unique_id":"wp-comment-833","title":"I%20love%20this%20story%21%21%21...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-833","item_id":"_comm_833"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_833 == 'undefined' ){PDRTJS_2974366_comm_833 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_833 );}}PDRTJS_settings_2974366_comm_1137={"id":2974366,"unique_id":"wp-comment-1137","title":"Thanks%2C%20Retha%20%3A%29It%26%23039%3Bs%20funny%20I%26%23039%3Bd%20almost%20forgotten%20about%20this%20until%20I%20came%20across%20my%20grandma%26%23039%3Bs%20typed%20story%20and%20then%20it%20all%20came%20back%20to%20me%21%20%20I%20can%20still%20see%20that%20preemie%20in%20the%20box%20inside%20her%20closet...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1137","item_id":"_comm_1137"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1137 == 'undefined' ){PDRTJS_2974366_comm_1137 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1137 );}}PDRTJS_settings_2974366_comm_1124={"id":2974366,"unique_id":"wp-comment-1124","title":"AWw%20I%20love%20this%20story%20and%20the%20photos%20too%21%20I%26%23039%3Bd%20have%20loved%20to%20see%20a%20photo%20of%20your%20grandma%20with%20the%20preemie%21%20%20%20I%20have%20to%20say%20I%20never%20got%20one.%20%20I%20was%2012%20when%20the%20big%20craze%20hit%20and%20I%20don%26%23039%3Bt%20know%20if%20I%20j...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1124","item_id":"_comm_1124"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1124 == 'undefined' ){PDRTJS_2974366_comm_1124 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1124 );}}PDRTJS_settings_2974366_comm_1138={"id":2974366,"unique_id":"wp-comment-1138","title":"Thanks%2C%20zeemaid%21%20%20I%20sooo%20wish%20that%20I%20had%20a%20picture%20of%20Grandma%20with%20her%20preemie%21%20%20She%20still%20has%20it%2C%20I%20think%2C%20so%20if%20I%20ever%20go%20and%20visit%20her%20in%20Florida%20again%20I%26%23039%3Bll%20have%20to%20ask%20her%20to%20pose%20for%20a%20photo...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-1138","item_id":"_comm_1138"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_1138 == 'undefined' ){PDRTJS_2974366_comm_1138 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_1138 );}}PDRTJS_settings_2974366_comm_2430={"id":2974366,"unique_id":"wp-comment-2430","title":"What%20a%20cute%20story%21%20Your%20Grandma%20was%20a%20good%20writer%20like%20you.%20I%20have%20no%20idea%20what%20a%20Preemie%20is%20but%20that%20didn%26%23039%3Bt%20matter.%20I%20understood%20and%20enjoyed%20the%20sentiment....","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-2430","item_id":"_comm_2430"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_2430 == 'undefined' ){PDRTJS_2974366_comm_2430 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_2430 );}}PDRTJS_settings_2974366_comm_9569={"id":2974366,"unique_id":"wp-comment-9569","title":"That%20is%20so%20so%20sweet.%20%20I%20remember%20Cabbage%20Patch%20kids%20being%20all%20the%20rage%2C%20but%20I%20was%20in%20Middle%2FHigh%20School%20by%20that%20time.%20%20So%20I%20was%20surely%20too%20cool%20for%20that%21%3A%29...","permalink":"https:\/\/coolestfamilyontheblock.com\/2010\/12\/01\/my-letter-to-santa-1984\/#comment-9569","item_id":"_comm_9569"}; if ( typeof PDRTJS_RATING !== 'undefined' ){if ( typeof PDRTJS_2974366_comm_9569 == 'undefined' ){PDRTJS_2974366_comm_9569 = new PDRTJS_RATING( PDRTJS_settings_2974366_comm_9569 );}}
+//--><!]]>
+</script>
+<script type='text/javascript' src='https://polldaddy.com/js/rating/rating.js?ver=wpcom'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='https://s1.wp.com/wp-content/mu-plugins/post-flair/sharing/sharing.js?m=1554999852h'></script>
+<script type='text/javascript'>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-tumblr', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtumblr', 'menubar=1,resizable=1,width=450,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-pocket', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcompocket', 'menubar=1,resizable=1,width=450,height=450' );
+				return false;
+			});
+</script>
+<script type="text/javascript">
+// <![CDATA[
+(function() {
+try{
+  if ( window.external &&'msIsSiteMode' in window.external) {
+    if (window.external.msIsSiteMode()) {
+      var jl = document.createElement('script');
+      jl.type='text/javascript';
+      jl.async=true;
+      jl.src='/wp-content/plugins/ie-sitemode/custom-jumplist.php';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(jl, s);
+    }
+  }
+}catch(e){}
+})();
+// ]]>
+</script>		<iframe src='https://widgets.wp.com/likes/master.html?ver=20190321#ver=20190321' scrolling='no' id='likes-master' name='likes-master' style='display:none;'></iframe>
+		<div id='likes-other-gravatars'><div class="likes-text"><span>%d</span> bloggers like this:</div><ul class="wpl-avatars sd-like-gravatars"></ul></div>
+<script src="//stats.wp.com/w.js?60" type="text/javascript" async defer></script>
+<script type="text/javascript">
+_tkq = window._tkq || [];
+_stq = window._stq || [];
+_tkq.push(['storeContext', {'blog_id':'14948247','blog_tz':'-5','user_lang':'en','blog_lang':'en','user_id':'0'}]);
+_stq.push(['view', {'blog':'14948247','v':'wpcom','tz':'-5','user_id':'0','post':'1994','subd':'coolestfamilyontheblock'}]);
+_stq.push(['extra', {'crypt':'UE5tW3cvZGRRV3BGVDJreldLUDRmREhGYy55aEViS2lqNm9odS9MMmwrP3ZlUkE5cng0R2krXWx1ZSZlTzRVP1E9c2JoVkxpQnV5RmlGNCU3cGJ0RzBlbmk3d3BdREpoZDRvQVA3X3BvRV8tbXE2Ti9kM0J2ZD98bDhUT1Y/aEFEdEJZVy0udj15cGtPdmp+Nz1IfHU2MDRVRURIWHw4MHJ2MldyQls1TEs1XVhiUGd4TXNqa2NZZDljRkYsZEpMSiwvelo4KzBvVGMvaTQyMT9ZS3hUUld4RmNNPXd1PTczL3diMFJybD9MSzkwTGksaG9jUWE4Qi1abGF1ZUJYUlNBcTl0KzB+RWlb'}]);
+_stq.push([ 'clickTrackerInit', '14948247', '1994' ]);
+	</script>
+<noscript><img src="https://pixel.wp.com/b.gif?v=noscript" style="height:0px;width:0px;overflow:hidden" alt="" /></noscript>
+<script>
+if ( 'object' === typeof wpcom_mobile_user_agent_info ) {
+
+	wpcom_mobile_user_agent_info.init();
+	var mobileStatsQueryString = "";
+	
+	if( false !== wpcom_mobile_user_agent_info.matchedPlatformName )
+		mobileStatsQueryString += "&x_" + 'mobile_platforms' + '=' + wpcom_mobile_user_agent_info.matchedPlatformName;
+	
+	if( false !== wpcom_mobile_user_agent_info.matchedUserAgentName )
+		mobileStatsQueryString += "&x_" + 'mobile_devices' + '=' + wpcom_mobile_user_agent_info.matchedUserAgentName;
+	
+	if( wpcom_mobile_user_agent_info.isIPad() )
+		mobileStatsQueryString += "&x_" + 'ipad_views' + '=' + 'views';
+
+	if( "" != mobileStatsQueryString ) {
+		new Image().src = document.location.protocol + '//pixel.wp.com/g.gif?v=wpcom-no-pv' + mobileStatsQueryString + '&baba=' + Math.random();
+	}
+	
+}
+</script>
+</body>
+</html>

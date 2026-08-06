@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha256-916EbMg70RQy9LHiGkXzG8hSg9EdNy97GazNG/aiY1w=" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha256-ZT4HPpdCOt2lvDkXokHuhJfdOKSPFLzeAJik5U/Q+l4=" crossorigin="anonymous" />
+<link rel="stylesheet" href="/static/font/style.css">
+<link href="/static/base.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mhayes-twentytwenty/1.0.0/css/twentytwenty.min.css" integrity="sha256-2Wze5epdlzF8qLSkEqbpZ54nJACNd5Vk87ymLv9vcqw=" crossorigin="anonymous" />
+<title>ObsPy - Test Reports - Report #94715</title>
+</head>
+<body>
+<div id="wrapper">
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+<div class="container-fluid">
+<div class="navbar-header">
+<button data-target=".navbar-collapse" data-toggle="collapse" class="navbar-toggle" type="button">
+<span class="sr-only">Toggle navigation</span>
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+</button>
+<a href="/" class="navbar-brand" title="Home"><span class="icon-obspy"></span>&nbsp;ObsPy</a>
+</div>
+<div class="navbar-collapse collapse">
+<form class="navbar-form navbar-right" role="search" method="get" action="https://docs.obspy.org/search.html">
+<div class="form-group">
+<input type="text" class="form-control" placeholder="Search Docs" name="q">
+</div>
+</form>
+<ul class="nav navbar-nav navbar-right">
+<li><a href="https://github.com/obspy/obspy/" title="GitHub"><span class="icon-github iconx2"></span><span class="hidden-sm">&nbsp;GitHub</span></a></li>
+<li class="dropdown">
+<a href="#" class="dropdown-toggle" data-toggle="dropdown" title="Documentation"><span class="glyphicon glyphicon-book iconx2"></span><span class="hidden-sm">&nbsp;Documentation</span>&nbsp;<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li class="dropdown-header">Getting&nbsp;Started</li>
+<li><a href="https://github.com/obspy/obspy/wiki#installation">Installation</a></li>
+<li><a href="https://tutorial.obspy.org/">Tutorial</a></li>
+<li><a href="http://gallery.obspy.org/">Gallery</a></li>
+<li><a href="https://docs.obspy.org/">API&nbsp;Documentation&nbsp;(latest&nbsp;release)</a></li>
+<li><a href="https://docs.obspy.org/master/">API&nbsp;Documentation&nbsp;(current&nbsp;master)</a></li>
+</ul>
+</li>
+<li class="dropdown">
+<a href="#" class="dropdown-toggle" data-toggle="dropdown" title="Mailing&nbsp;Lists"><span class="glyphicon glyphicon-envelope iconx2"></span><span class="hidden-sm">&nbsp;Mailing&nbsp;Lists</span>&nbsp;<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li class="dropdown-header">Announcements&nbsp;Mailing&nbsp;List&nbsp;(public)</li>
+<li><a href="http://lists.swapbytes.de/mailman/listinfo/obspy-announcements"><span class="glyphicon glyphicon-user"></span>&nbsp;Subscribe</a></li>
+<li><a href="http://lists.swapbytes.de/archives/obspy-announcements/"><span class="glyphicon glyphicon-inbox"></span>&nbsp;Archive</a></li>
+<li class="divider"></li>
+<li class="dropdown-header">Users&nbsp;Mailing&nbsp;List&nbsp;(public)</li>
+<li><a href="http://lists.swapbytes.de/mailman/listinfo/obspy-users"><span class="glyphicon glyphicon-user"></span>&nbsp;Subscribe</a></li>
+<li><a href="http://lists.swapbytes.de/archives/obspy-users"><span class="glyphicon glyphicon-inbox"></span>&nbsp;Archives</a></li>
+<li><a href="mailto:users@obspy.org"><span class="glyphicon glyphicon-envelope"></span>&nbsp;Post&nbsp;a&nbsp;message</a></li>
+</ul>
+</li>
+<li class="dropdown">
+<a href="#" class="dropdown-toggle" data-toggle="dropdown" title="Developer&nbsp;Resources"><span class="glyphicon glyphicon-cog iconx2"></span><span class="hidden-sm">&nbsp;Developer&nbsp;Resources</span>&nbsp;<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li><a href="https://gitter.im/obspy/obspy">Gitter</a></li>
+<li><a href="https://github.com/obspy/obspy/blob/master/CONTRIBUTING.md">How&nbsp;to&nbsp;contribute</a></li>
+<li><a href="http://docs.obspy.org/coding_style.html">Coding&nbsp;Style&nbsp;Guide</a></li>
+<li><a href="https://github.com/obspy/obspy/releases/">All&nbsp;Releases</a></li>
+<li class="divider"></li>
+<li class="dropdown-header">Code&nbsp;Analysis</li>
+<li><a href="http://docs.obspy.org/master/c_coverage/index.html">C&nbsp;Coverage</a></li>
+<li><a href="https://coveralls.io/r/obspy/obspy?branch=master">Coveralls</a></li>
+<li class="divider"></li>
+<li class="dropdown-header">Continuous&nbsp;Integration</li>
+<li><a href="http://tests.obspy.org/">Test&nbsp;Reports</a></li>
+<li><a href="https://travis-ci.org/obspy/obspy/"><span class="icon-travis"></span>&nbsp;Travis&nbsp;CI</a></li>
+<li><a href="https://ci.appveyor.com/project/obspy/obspy"><span class="icon-appveyor"></span>&nbsp;AppVeyor</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<div id="content" class="container">
+<h1>
+#94715
+<small>
+Report by node <b>docker-deb-debian_8_jessie_32bit</b> covering
+<b>1973</b> tests from
+<b>54</b> modules resulted into
+<b>5</b> errors
+</small>
+</h1>
+<section id="report">
+<ul class="pager">
+<li class="previous"><a href="/94716/">&laquo; Next</a></li>
+<li><a href="/">Return to Overview</a></li>
+<li class="next"><a href="/94714/">Previous &raquo;</a></li>
+</ul>
+<div class="row">
+<div class="col-md-4">
+<h3>Report</h3>
+<dl class="dl-horizontal">
+<dt>ObsPy Version</dt>
+<dd title="1.1.0.post0+186.g718cc14c7e.dirty">
+<a href="https://github.com/obspy/obspy/tree/718cc14c7e">1.1.0.post0+186.g718cc14c7e...</a>
+</dd>
+</dl>
+<dl class="dl-horizontal">
+<dt>Continuous Integration</dt>
+<dd>
+<span class="muted">-</span>
+</dd>
+</dl>
+<dl class="dl-horizontal">
+<dt>GitHub Pull Request</dt>
+<dd>
+<span class="muted">-</span>
+</dd>
+</dl>
+<dl class="dl-horizontal">
+<dt>Report File</dt>
+<dd><a href="/94715/xml/">XML Document</a></dd>
+</dl>
+<dl class="dl-horizontal">
+<dt>Total Runtime</dt>
+<dd>548.0 sec</dd>
+<dt>Report Date/Time</dt>
+<dd>2018-05-05 05:17:45</dd>
+</dl>
+</div>
+<div class="col-md-4">
+<h3>System / Python</h3>
+<dl class="dl-horizontal">
+<dt>Architecture</dt>
+<dd>32bit</dd>
+<dt>Machine</dt>
+<dd>x86_64</dd>
+<dt>Node</dt>
+<dd>docker-deb-debian_8_jessie_32bit</dd>
+<dt>Processor</dt>
+<dd>None</dd>
+<dt>Python Compiler</dt>
+<dd>GCC 4.9.1</dd>
+<dt>Python Implementation</dt>
+<dd>CPython</dd>
+<dt>Python Version</dt>
+<dd>3.4.2</dd>
+<dt>Release</dt>
+<dd>4.4.0-119-generic</dd>
+<dt>System</dt>
+<dd>Linux</dd>
+<dt>Version</dt>
+<dd>#143-Ubuntu SMP Mon Apr 2 16:08:24 UTC 2018</dd>
+</dl>
+</div>
+<div class="col-md-4">
+<h3>Dependencies</h3>
+<dl class="dl-horizontal">
+<dt>cartopy</dt>
+<dd>---</dd>
+<dt>decorator</dt>
+<dd>3.4.0</dd>
+<dt>flake8</dt>
+<dd>2.2.2</dd>
+<dt>future</dt>
+<dd>0.16.0</dd>
+<dt>geographiclib</dt>
+<dd>---</dd>
+<dt>lxml.etree</dt>
+<dd>3.4.0</dd>
+<dt>m2crypto</dt>
+<dd>---</dd>
+<dt>matplotlib</dt>
+<dd>1.4.2</dd>
+<dt>mock</dt>
+<dd>1.0.1</dd>
+<dt>mpl_toolkits.basemap</dt>
+<dd>---</dd>
+<dt>numpy</dt>
+<dd>1.8.2</dd>
+<dt>pep8-naming</dt>
+<dd>---</dd>
+<dt>pyflakes</dt>
+<dd>0.8.1</dd>
+<dt>pyimgur</dt>
+<dd>0.5.3</dd>
+<dt>pyproj</dt>
+<dd>1.8.9</dd>
+<dt>requests</dt>
+<dd>2.4.3</dd>
+<dt>scipy</dt>
+<dd>0.14.0</dd>
+<dt>setuptools</dt>
+<dd>5.5.1</dd>
+<dt>shapefile</dt>
+<dd>1.2.1</dd>
+<dt>sqlalchemy</dt>
+<dd>0.9.8</dd>
+</dl>
+</div>
+</div>
+<div class="status-icon pull-right text-warning glyphicon glyphicon-remove"></div>
+<h3>Modules <small>(54)</small></h3>
+<table id="modules" class="table table-hover table-condensed tablesorter">
+<thead>
+<tr>
+<th>Module</th>
+<th>Errors /<br />Failures</th>
+<th class="col-md-1 hidden-xs">Tests</th>
+<th class="col-md-1 hidden-xs">Executed<br/>Tests</th>
+<th class="col-md-1 hidden-xs">Skipped<br/>Tests</th>
+<th class="col-md-1 hidden-xs">Runtime</th>
+<th class="col-md-4">Tracebacks</th>
+</tr>
+</thead>
+<tbody>
+<tr class="warning">
+<td>obspy.clients.arclink</td>
+<td>1</td>
+<td class="hidden-xs">41</td>
+<td class="hidden-xs">39</td>
+<td class="hidden-xs">
+<a href="#skippedtests">2</a>
+</td>
+<td class="hidden-xs">212.5s</td>
+<td>
+<a href="#1"><span class="badge badge-warning">1</span></a>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.earthworm</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">11.8s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="warning">
+<td>obspy.clients.fdsn</td>
+<td>1</td>
+<td class="hidden-xs">129</td>
+<td class="hidden-xs">129</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">85.0s</td>
+<td>
+<a href="#2"><span class="badge badge-warning">2</span></a>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.filesystem</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">6</td>
+<td class="hidden-xs">6</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">1.2s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="warning">
+<td>obspy.clients.iris</td>
+<td>2</td>
+<td class="hidden-xs">15</td>
+<td class="hidden-xs">15</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">23.7s</td>
+<td>
+<a href="#3"><span class="badge badge-warning">3</span></a>
+<a href="#4"><span class="badge badge-warning">4</span></a>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.neic</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">8.9s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.nrl</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">4.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.seedlink</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">10</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<a href="#skippedtests">3</a>
+</td>
+<td class="hidden-xs">1.6s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.clients.seishub</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">17</td>
+<td class="hidden-xs">4</td>
+<td class="hidden-xs">
+<a href="#skippedtests">13</a>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="warning">
+<td>obspy.clients.syngine</td>
+<td>1</td>
+<td class="hidden-xs">18</td>
+<td class="hidden-xs">18</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">18.0s</td>
+<td>
+<a href="#5"><span class="badge badge-warning">5</span></a>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.core</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">584</td>
+<td class="hidden-xs">561</td>
+<td class="hidden-xs">
+<a href="#skippedtests">23</a>
+</td>
+<td class="hidden-xs">23.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.db</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">9</td>
+<td class="hidden-xs">9</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.geodetics</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">18</td>
+<td class="hidden-xs">16</td>
+<td class="hidden-xs">
+<a href="#skippedtests">2</a>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.imaging</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">76</td>
+<td class="hidden-xs">75</td>
+<td class="hidden-xs">
+<a href="#skippedtests">1</a>
+</td>
+<td class="hidden-xs">47.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.ah</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.arclink</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">4</td>
+<td class="hidden-xs">4</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">1.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.ascii</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">27</td>
+<td class="hidden-xs">27</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.cmtsolution</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">10</td>
+<td class="hidden-xs">10</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.cnv</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">1</td>
+<td class="hidden-xs">1</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.css</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.5s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.gcf</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">9</td>
+<td class="hidden-xs">9</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.gse2</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">55</td>
+<td class="hidden-xs">55</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.iaspei</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.6s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.json</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">4</td>
+<td class="hidden-xs">4</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.kinemetrics</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">7</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.kml</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">3</td>
+<td class="hidden-xs">3</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.2s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.mseed</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">118</td>
+<td class="hidden-xs">118</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">1.6s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.ndk</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">20</td>
+<td class="hidden-xs">20</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.nied</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.nlloc</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.nordic</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">31</td>
+<td class="hidden-xs">31</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.7s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.pdas</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">3</td>
+<td class="hidden-xs">3</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.pde</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">13</td>
+<td class="hidden-xs">13</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.quakeml</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">34</td>
+<td class="hidden-xs">34</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.reftek</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">19</td>
+<td class="hidden-xs">19</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.sac</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">94</td>
+<td class="hidden-xs">94</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.scardec</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.seg2</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">1</td>
+<td class="hidden-xs">1</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.segy</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">54</td>
+<td class="hidden-xs">54</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.5s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.seisan</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">8</td>
+<td class="hidden-xs">8</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.seiscomp</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">42</td>
+<td class="hidden-xs">42</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.7s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.sh</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">19</td>
+<td class="hidden-xs">19</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.shapefile</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.stationtxt</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">11</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.stationxml</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">20</td>
+<td class="hidden-xs">20</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.3s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.wav</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">8</td>
+<td class="hidden-xs">8</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.win</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">2</td>
+<td class="hidden-xs">2</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.1s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.xseed</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">80</td>
+<td class="hidden-xs">80</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">8.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.y</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">5</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.io.zmap</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">14</td>
+<td class="hidden-xs">14</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.2s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.realtime</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">22</td>
+<td class="hidden-xs">22</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.9s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.scripts</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">2</td>
+<td class="hidden-xs">2</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">0.0s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.signal</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">176</td>
+<td class="hidden-xs">176</td>
+<td class="hidden-xs">
+<span class="muted">-</span>
+</td>
+<td class="hidden-xs">44.4s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+<tr class="success">
+<td>obspy.taup</td>
+<td><span class="muted">-</span></td>
+<td class="hidden-xs">64</td>
+<td class="hidden-xs">58</td>
+<td class="hidden-xs">
+<a href="#skippedtests">6</a>
+</td>
+<td class="hidden-xs">46.5s</td>
+<td>
+<span class="muted">-</span>
+</td>
+</tr>
+</tbody>
+<tfoot>
+<tr>
+<th>Summary</th>
+<th>5</th>
+<th class="hidden-xs">1973</th>
+<th class="hidden-xs">1923</th>
+<th class="hidden-xs">
+<a href="#skippedtests">50</a>
+</th>
+<th class="hidden-xs">548.0s</th>
+<th>5</th>
+</tr>
+</tfoot>
+</table>
+<h3>Tracebacks <small>(5)</small></h3>
+<div class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<h3 class="panel-title">
+<a data-toggle="collapse" href="#1"><span class="badge badge-warning">1</span></a>
+<a data-toggle="collapse" href="#1">obspy.clients.arclink</a>
+</h3>
+</div>
+<div id="1" class="panel-body collapse in">
+<pre>Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/arclink/tests/test_client.py#L527">/usr/lib/python3/dist-packages/obspy/clients/arclink/tests/test_client.py</a>&quot;, line 527, in test_save_waveform_no_compression
+end, compressed=False)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/arclink/client.py#L565">/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py</a>&quot;, line 565, in save_waveforms
+data = self._fetch(rtype, rdata, route=route)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/arclink/client.py#L260">/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py</a>&quot;, line 260, in _fetch
+return self._request(request_type, request_data)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/arclink/client.py#L324">/usr/lib/python3/dist-packages/obspy/clients/arclink/client.py</a>&quot;, line 324, in _request
+raise ArcLinkException(&quot;%s %s&quot; % (err_code, msg))
+obspy.clients.arclink.client.ArcLinkException: b&#39;UNSET&#39;
+</pre>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<h3 class="panel-title">
+<a data-toggle="collapse" href="#2"><span class="badge badge-warning">2</span></a>
+<a data-toggle="collapse" href="#2">obspy.clients.fdsn</a>
+</h3>
+</div>
+<div id="2" class="panel-body collapse in">
+<pre>Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/tests/test_federator_routing_client.py#L342">/usr/lib/python3/dist-packages/obspy/clients/fdsn/tests/test_federator_routing_client.py</a>&quot;, line 342, in test_get_stations_integration_test
+channel=&quot;LHZ&quot;, level=&quot;network&quot;)
+File &quot;&lt;string&gt;&quot;, line 2, in get_stations
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/routing_client.py#L79">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py</a>&quot;, line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/federator_routing_client.py#L110">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/federator_routing_client.py</a>&quot;, line 110, in get_stations
+return super(FederatorRoutingClient, self).get_stations(**kwargs)
+File &quot;&lt;string&gt;&quot;, line 2, in get_stations
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/routing_client.py#L79">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py</a>&quot;, line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/routing_client.py#L344">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py</a>&quot;, line 344, in get_stations
+return self.get_stations_bulk([bulk], **kwargs)
+File &quot;&lt;string&gt;&quot;, line 2, in get_stations_bulk
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/routing_client.py#L79">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py</a>&quot;, line 79, in _assert_filename_not_in_kwargs
+return f(*args, **kwargs)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/federator_routing_client.py#L143">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/federator_routing_client.py</a>&quot;, line 143, in get_stations_bulk
+r = self._download(self._url + &quot;/query&quot;, data=bulk_str)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/base.py#L245">/usr/lib/python3/dist-packages/obspy/clients/base.py</a>&quot;, line 245, in _download
+self._handle_requests_http_error(r)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/routing/routing_client.py#L280">/usr/lib/python3/dist-packages/obspy/clients/fdsn/routing/routing_client.py</a>&quot;, line 280, in _handle_requests_http_error
+raise_on_error(r.status_code, get_reason_from_response(r))
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/fdsn/client.py#L1710">/usr/lib/python3/dist-packages/obspy/clients/fdsn/client.py</a>&quot;, line 1710, in raise_on_error
+raise FDSNException(msg, server_info)
+obspy.clients.fdsn.header.FDSNException: Bad request. If you think your request was valid please contact the developers.
+</pre>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<h3 class="panel-title">
+<a data-toggle="collapse" href="#3"><span class="badge badge-warning">3</span></a>
+<a data-toggle="collapse" href="#3">obspy.clients.iris</a>
+</h3>
+</div>
+<div id="3" class="panel-body collapse in">
+<pre>Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L340">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 340, in timeseries
+data = self._fetch(&quot;timeseries&quot;, param_list=filter, **kwargs)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L133">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 133, in _fetch
+response = urllib_request.urlopen(req, timeout=self.timeout)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 153, in urlopen
+return opener.open(url, data, timeout)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 461, in open
+response = meth(req, response)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 571, in http_response
+&#39;http&#39;, request, response, code, msg, hdrs)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 499, in error
+return self._call_chain(*args)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 433, in _call_chain
+result = func(*args)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 579, in http_error_default
+raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/tests/test_client.py#L256">/usr/lib/python3/dist-packages/obspy/clients/iris/tests/test_client.py</a>&quot;, line 256, in test_timeseries
+filter=[&quot;correct&quot;])
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L344">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 344, in timeseries
+raise Exception(msg)
+Exception: No waveform data available (HTTPError: HTTP Error 400: Bad Request)
+</pre>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<h3 class="panel-title">
+<a data-toggle="collapse" href="#4"><span class="badge badge-warning">4</span></a>
+<a data-toggle="collapse" href="#4">obspy.clients.iris</a>
+</h3>
+</div>
+<div id="4" class="panel-body collapse in">
+<pre>Traceback (most recent call last):
+File &quot;/usr/lib/python3.4/doctest.py&quot;, line 2193, in runTest
+raise self.failureException(self.format_failure(new.getvalue()))
+AssertionError: Failed doctest test for obspy.clients.iris.client.Client.timeseries
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L177">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 177, in timeseries
+----------------------------------------------------------------------
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L318">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 318, in obspy.clients.iris.client.Client.timeseries
+Failed example:
+st = client.timeseries(&quot;IU&quot;, &quot;ANMO&quot;, &quot;00&quot;, &quot;BHZ&quot;, dt, dt+10,
+filter=[&quot;correct&quot;, &quot;demean&quot;, &quot;lp=2.0&quot;])
+Exception raised:
+Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L340">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 340, in timeseries
+data = self._fetch(&quot;timeseries&quot;, param_list=filter, **kwargs)
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L133">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 133, in _fetch
+response = urllib_request.urlopen(req, timeout=self.timeout)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 153, in urlopen
+return opener.open(url, data, timeout)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 461, in open
+response = meth(req, response)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 571, in http_response
+&#39;http&#39;, request, response, code, msg, hdrs)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 499, in error
+return self._call_chain(*args)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 433, in _call_chain
+result = func(*args)
+File &quot;/usr/lib/python3.4/urllib/request.py&quot;, line 579, in http_error_default
+raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+File &quot;/usr/lib/python3.4/doctest.py&quot;, line 1324, in __run
+compileflags, 1), test.globs)
+File &quot;&lt;doctest obspy.clients.iris.client.Client.timeseries[6]&gt;&quot;, line 2, in &lt;module&gt;
+filter=[&quot;correct&quot;, &quot;demean&quot;, &quot;lp=2.0&quot;])
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L344">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 344, in timeseries
+raise Exception(msg)
+Exception: No waveform data available (HTTPError: HTTP Error 400: Bad Request)
+----------------------------------------------------------------------
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/iris/client.py#L320">/usr/lib/python3/dist-packages/obspy/clients/iris/client.py</a>&quot;, line 320, in obspy.clients.iris.client.Client.timeseries
+Failed example:
+print(st[0].data) # doctest: +ELLIPSIS
+Expected:
+[ -1.57488682e-06 -1.26318002e-06 -7.84807128e-07 ...
+Got:
+[ 24 20 19 19 19 15 10 4 -4 -11 -19 -26 -35 -48 -60
+-72 -83 -95 -109 -121 -133 -147 -162 -179 -195 -208 -221 -238 -256 -272
+-285 -301 -314 -324 -333 -341 -350 -358 -365 -370 -376 -378 -378 -380 -381
+-381 -378 -376 -374 -370 -364 -359 -356 -352 -345 -337 -331 -328 -323 -316
+-310 -305 -301 -295 -290 -289 -283 -275 -271 -269 -267 -263 -258 -257 -253
+-248 -243 -240 -239 -237 -233 -229 -224 -218 -211 -208 -205 -202 -200 -195
+-191 -185 -181 -180 -179 -177 -177 -177 -176 -176 -179 -183 -185 -187 -189
+-192 -198 -204 -210 -216 -220 -227 -235 -241 -247 -253 -262 -270 -277 -284
+-294 -304 -313 -323 -332 -340 -345 -350 -355 -358 -361 -364 -369 -372 -371
+-372 -374 -373 -368 -364 -362 -357 -349 -344 -338 -331 -320 -311 -302 -291
+-280 -268 -255 -243 -231 -218 -203 -187 -173 -160 -147 -132 -119 -108 -97
+-86 -73 -62 -54 -48 -42 -37 -33 -29 -27 -27 -25 -26 -27 -29
+-31 -30 -31 -36 -40 -44 -52 -59 -68 -77 -83 -89 -95 -101 -108
+-116 -123 -130 -141 -150]
+</pre>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<h3 class="panel-title">
+<a data-toggle="collapse" href="#5"><span class="badge badge-warning">5</span></a>
+<a data-toggle="collapse" href="#5">obspy.clients.syngine</a>
+</h3>
+</div>
+<div id="5" class="panel-body collapse in">
+<pre>Traceback (most recent call last):
+File &quot;<a href="https://github.com/obspy/obspy/blob/718cc14c7e/obspy/clients/syngine/tests/test_client.py#L456">/usr/lib/python3/dist-packages/obspy/clients/syngine/tests/test_client.py</a>&quot;, line 456, in test_reading_saczip_files
+self.assertEqual(st, st_bulk)
+AssertionError: &lt;obspy.core.stream.Stream object at 0xf29210ac&gt; != &lt;obspy.core.stream.Stream object at 0xf2a4e1ac&gt;
+</pre>
+</div>
+</div>
+</div>
+<h3 id="skippedtests">Skipped Tests <small>(50)</small></h3>
+<table class="table table-hover">
+<tr>
+<th class="col-xs-1">Submodule</th>
+<th>Test</th>
+<th>Skip Message</th>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_compute_ray_paths (obspy.taup.tests.test_ray_paths.RayPathCalculationsTestCase)</td>
+<td>test needs geographiclib &gt;= 1.34</td>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_path_geo (obspy.taup.tests.test_taup_geo.TaupGeoTestCase)</td>
+<td>Module geographiclib is not installed or too old.</td>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_path_resampling (obspy.taup.tests.test_taup_geo.TaupGeoTestCase)</td>
+<td>Module geographiclib is not installed or too old.</td>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_p_iasp91_geo_manual (obspy.taup.tests.test_tau.TauPyModelTestCase)</td>
+<td>Module geographiclib is not installed</td>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_pierce_p_iasp91_geo (obspy.taup.tests.test_tau.TauPyModelTestCase)</td>
+<td>test needs geographiclib &gt;= 1.34</td>
+</tr>
+<tr>
+<td>taup</td>
+<td>test_single_path_geo_iasp91 (obspy.taup.tests.test_tau.TauPyModelTestCase)</td>
+<td>test needs geographiclib &gt;= 1.34</td>
+</tr>
+<tr>
+<td>clients.seedlink</td>
+<td>test_info (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase)</td>
+<td>test must be started manually</td>
+</tr>
+<tr>
+<td>clients.seedlink</td>
+<td>test_issue708 (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase)</td>
+<td>test must be started manually</td>
+</tr>
+<tr>
+<td>clients.seedlink</td>
+<td>test_time_window (obspy.clients.seedlink.tests.test_slclient.SLClientTestCase)</td>
+<td>test must be started manually</td>
+</tr>
+<tr>
+<td>clients.arclink</td>
+<td>test_m2crypto (obspy.clients.arclink.tests.test_decrypt.ClientTestCase)</td>
+<td>M2Crypto is not installed</td>
+</tr>
+<tr>
+<td>clients.arclink</td>
+<td>test_pycrypto (obspy.clients.arclink.tests.test_decrypt.ClientTestCase)</td>
+<td>PyCrypto is not installed</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_channel_ids (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_coordinates (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_event_list (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_location_ids (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_network_ids (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_paz (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_preview (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_preview_by_ids (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_station_ids (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_waveform_with_metadata (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_get_waveforms (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_localcache (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>clients.seishub</td>
+<td>test_ping (obspy.clients.seishub.tests.test_client.ClientTestCase)</td>
+<td>Seishub test server not reachable.</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_combined_station_event_plot (obspy.core.tests.test_inventory.InventoryBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_global (obspy.core.tests.test_inventory.InventoryBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_local (obspy.core.tests.test_inventory.InventoryBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_ortho (obspy.core.tests.test_inventory.InventoryBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_global (obspy.core.tests.test_inventory.InventoryCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_local (obspy.core.tests.test_inventory.InventoryCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_ortho (obspy.core.tests.test_inventory.InventoryCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_global (obspy.core.tests.test_event.CatalogBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_local (obspy.core.tests.test_event.CatalogBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_ortho (obspy.core.tests.test_event.CatalogBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_ortho_longitude_wrap (obspy.core.tests.test_event.CatalogBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_global (obspy.core.tests.test_event.CatalogCartopyTestCase)</td>
+<td>Cartopy not installed or too old</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_local (obspy.core.tests.test_event.CatalogCartopyTestCase)</td>
+<td>Cartopy not installed or too old</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_ortho (obspy.core.tests.test_event.CatalogCartopyTestCase)</td>
+<td>Cartopy not installed or too old</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_catalog_plot_ortho_longitude_wrap (obspy.core.tests.test_event.CatalogCartopyTestCase)</td>
+<td>Cartopy not installed or too old</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_plot_farfield_without_quiver_with_maps (obspy.core.tests.test_event.EventTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_flake8 (obspy.core.tests.test_code_formatting.CodeFormattingTestCase)</td>
+<td>Formatting tests require at least flake8 3.0.</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_global (obspy.core.tests.test_network.NetworkBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_local (obspy.core.tests.test_network.NetworkBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_ortho (obspy.core.tests.test_network.NetworkBasemapTestCase)</td>
+<td>basemap not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_global (obspy.core.tests.test_network.NetworkCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_local (obspy.core.tests.test_network.NetworkCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>core</td>
+<td>test_location_plot_ortho (obspy.core.tests.test_network.NetworkCartopyTestCase)</td>
+<td>cartopy not installed</td>
+</tr>
+<tr>
+<td>geodetics</td>
+<td>test_gps_2_dist_azimuth_with_geographiclib (obspy.geodetics.tests.test_util_geodetics.UtilGeodeticsTestCase)</td>
+<td>Module geographiclib is not installed</td>
+</tr>
+<tr>
+<td>geodetics</td>
+<td>test_issue_375 (obspy.geodetics.tests.test_util_geodetics.UtilGeodeticsTestCase)</td>
+<td>Module geographiclib is not installed</td>
+</tr>
+<tr>
+<td>imaging</td>
+<td>test_script_plot (obspy.imaging.tests.test_mopad_script.MopadTestCase)</td>
+<td>Currently broken until further review.</td>
+</tr>
+</table>
+<h3>Slowest Tests <small>(20)</small></h3>
+<table class="table table-hover">
+<tr>
+<th class="col-xs-1">Runtime</th>
+<th>Test</th>
+</tr>
+<tr>
+<td>30.049s</td>
+<td>test_save_waveform_no_compression (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>28.691s</td>
+<td>test_issue_372 (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>22.775s</td>
+<td>test_get_networks (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>13.287s</td>
+<td>test_get_waveform_instrument_change (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>10.036s</td>
+<td>test_redirection (obspy.clients.fdsn.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>9.900s</td>
+<td>test_redirection_auth (obspy.clients.fdsn.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>9.504s</td>
+<td>test_get_inventory (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>9.439s</td>
+<td>test_ppsd_restricted_stacks (obspy.signal.tests.test_spectral_estimation.PsdTestCase)</td>
+</tr>
+<tr>
+<td>9.035s</td>
+<td>test_dataselect_bulk (obspy.clients.fdsn.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>8.478s</td>
+<td>test_get_waveform_with_metadata (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>8.288s</td>
+<td>test_get_routing (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>7.793s</td>
+<td>test_evalresp (obspy.clients.iris.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>6.889s</td>
+<td>test_get_waveforms_integration_test (obspy.clients.fdsn.tests.test_federator_routing_client.FederatorRoutingClientTestCase)</td>
+</tr>
+<tr>
+<td>6.366s</td>
+<td>__init__ (obspy.taup)</td>
+</tr>
+<tr>
+<td>6.190s</td>
+<td>test_delayed_request (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>6.062s</td>
+<td>test_iris_example_queries_dataselect (obspy.clients.fdsn.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>6.050s</td>
+<td>test_get_stations (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>6.009s</td>
+<td>test_response_calculation_from_seed_and_xseed (obspy.io.xseed.tests.test_core.CoreTestCase)</td>
+</tr>
+<tr>
+<td>5.907s</td>
+<td>test_issue_311 (obspy.clients.arclink.tests.test_client.ClientTestCase)</td>
+</tr>
+<tr>
+<td>5.733s</td>
+<td>__init__ (obspy.clients.fdsn.client.Client)</td>
+</tr>
+</table>
+</section>
+<h3>Chuck Norris Fact</h3>
+<p>Chuck Norris can access private methods.</p>
+</div>
+<footer>
+<p class="text-muted small">
+By the <a href="https://github.com/orgs/obspy/people">ObsPy
+Development Team</a> and many <a href="#contributors" role="button"
+data-toggle="modal" data-target="#contributors">Awesome Contributors</a>™ &nbsp;|&nbsp; Built with
+<a href="http://getbootstrap.com/">Bootstrap</a> and
+<a href="http://glyphicons.com//">Glyphicons</a> &nbsp;|&nbsp; Copyright 2008-2019
+</p>
+</footer>
+<div id="contributors" class="modal fade" tabindex="-1"
+role="dialog" aria-labelledby="contributorsLabel" aria-hidden="true">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<div class="modal-header">
+<button type="button" class="close" data-dismiss="modal"
+aria-hidden="true">&times;</button>
+<h3 class="modal-title" id="contributorsLabel">Thank you!</h3>
+</div>
+<div class="modal-body">
+<p>We would like to thank our contributors, whose efforts make
+this software what it is. These people have helped by writing code
+and documentation, and by testing. They have created and
+maintained this product, its associated libraries and
+applications, our build tools and our web sites.</p>
+<h4>Contributors</h4>
+<div class="container-fluid">
+<div class="row">
+<div class="col-md-3">
+<ul>
+<li>Ackerley, Nick</li>
+<li>Allgeyer, Sebastien</li>
+<li>Ammon, Charles J.</li>
+<li>Antunes, Emanuel</li>
+<li>Arnarsson, Ólafur St.</li>
+<li>Bagagli, Matteo</li>
+<li>Bank, Markus</li>
+<li>Barsch, Robert</li>
+<li>Behr, Yannik</li>
+<li>Bernardi, Fabrizio</li>
+<li>Bernauer, Felix</li>
+<li>Bes de Berc, Maxime</li>
+<li>Beyreuther, Moritz</li>
+<li>Boltz, Shawn</li>
+<li>Bonaimé, Sébastien</li>
+<li>Carothers, Lloyd</li>
+<li>Chamberlain, Calum</li>
+<li>Chambers, Derrick</li>
+<li>Chen, Zhao</li>
+<li>Clark, Adam</li>
+<li>Danecek, Peter</li>
+<li>Egdorf, Sven</li>
+<li>Engels, Fabian</li>
+<li>Ermert, Laura</li>
+<li>Eulenfeld, Tom</li>
+</ul>
+</div>
+<div class="col-md-3">
+<ul>
+<li>Fabbri, Tommaso</li>
+<li>Falco, Nicholas</li>
+<li>Fee, Jeremy</li>
+<li>Grellier, Clément</li>
+<li>Grunberg, Marc</li>
+<li>Hammer, Conny</li>
+<li>Heimann, Sebastian</li>
+<li>Heiniger, Lukas</li>
+<li>Hope, Gaute</li>
+<li>Igel, Heiner</li>
+<li>Inza, Adolfo</li>
+<li>Isken, Marius</li>
+<li>Ketchum, David</li>
+<li>Koymans, Mathijs</li>
+<li>Kremers, Simon</li>
+<li>Kress, Victor</li>
+<li>Krieger, Lars</li>
+<li>Krischer, Lion</li>
+<li>Kula, Damian</li>
+<li>Käufl, Paul</li>
+<li>Köhler, Andreas</li>
+<li>Lecocq, Thomas</li>
+<li>Leeman, John</li>
+<li>Legovini, Paride</li>
+</ul>
+</div>
+<div class="col-md-3">
+<ul>
+<li>Lesage, Philippe</li>
+<li>Li, Yulin</li>
+<li>Lomax, Anthony</li>
+<li>Lopes, Rui L.</li>
+<li>MacCarthy, Jonathan</li>
+<li>Maggi, Alessia</li>
+<li>Martin, Henri</li>
+<li>Medlin, Andrew</li>
+<li>Megies, Tobias</li>
+<li>Meschede, Matthias</li>
+<li>Michelini, Alberto</li>
+<li>Miller, Nathaniel C.</li>
+<li>Morgenstern, Bernhard</li>
+<li>Murray-Bergquist, Louisa</li>
+<li>Nof, Ran Novitsky</li>
+<li>Panning, Mark P.</li>
+<li>Parker, Tom</li>
+<li>Pestourie, Romain</li>
+<li>Rapagnani, Giovanni</li>
+<li>Reyes, Celso</li>
+<li>Ringler, Adam</li>
+<li>Rothenhäusler, Nicolas</li>
+<li>Russo, Emiliano</li>
+<li>Sales de Andrade, Elliott</li>
+</ul>
+</div>
+<div class="col-md-3">
+<ul>
+<li>Satriano, Claudio</li>
+<li>Saul, Joachim</li>
+<li>Scheingraber, Chris</li>
+<li>Schneider, Simon</li>
+<li>Sippl, Christian</li>
+<li>Snoke, Arthur</li>
+<li>Stange, Stefan</li>
+<li>Strutz, Dominik</li>
+<li>Stähler, Simon C.</li>
+<li>Sullivan, Benjamin</li>
+<li>Tian, Dongdong</li>
+<li>Trabant, Chad</li>
+<li>Trani, Luca</li>
+<li>Uieda, Leonardo</li>
+<li>Walker, Andrew</li>
+<li>Walther, Marcus</li>
+<li>Wassermann, Joachim</li>
+<li>Williams, Mark C.</li>
+<li>Winkelman, Andrew</li>
+<li>Zaccarelli, Riccardo</li>
+<li>Zad, Seyed Kasra Hosseini</li>
+<li>Zhu, Lijun</li>
+<li>van Driel, Martin</li>
+<li>van Wijk, Kasper</li>
+</ul>
+</div>
+</div>
+</div>
+<h4>Funds</h4>
+<p>ObsPy was partially funded by the</p>
+<ul>
+<li>German Science Foundation (DFG) via grant DFG IG 16/9-1</li>
+<li>German Ministry for Education and Research (BMBF), GEOTECHNOLOGIEN grant 03G0646H.</li>
+<li>NERA project (Network of European Research Infrastructures for Earthquake Risk Assessment and Mitigation) under the European Community&#39;s Seventh Framework Programme (FP7/2007-2013) grant agreement n° 262330</li>
+<li>Leibniz Institute for Applied Geophysics (LIAG)</li>
+<li>VERCE EU-FP7 project (no. 283543)</li>
+</ul>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+<script defer async src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha256-U5ZEeKfGNOja007MMD3YBI0A3OSZOQbeG6z2f2Y0hu8=" crossorigin="anonymous"></script>
+<script src="/static/base.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mhayes-twentytwenty/1.0.0/js/jquery.event.move.min.js" integrity="sha256-fqXzZX48vO+Q2Uz6Wkh3veStRw4i24PfRgW7twugCxo=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mhayes-twentytwenty/1.0.0/js/jquery.twentytwenty.min.js" integrity="sha256-D2l9+EHv9C1Jk7FXmUNFnbtmFHowHewFTkbZTnzqdsg=" crossorigin="anonymous"></script>
+<script src="/static/report.js"></script>
+</body>
+</html>

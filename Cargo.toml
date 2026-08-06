@@ -5,6 +5,7 @@ members = [
     "fastwarc-py/fastwarc",
     "resiliparse-rs",
     "resiliparse-py/resiliparse/parse/_html_rs",
+    "resiliparse-py/resiliparse/extract/_extract_rs",
 ]
 default-members = [
     "fastwarc-rs",

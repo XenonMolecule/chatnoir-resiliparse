@@ -72,6 +72,8 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML): F1 **0.7619** / Lev **0.6540** · 1.64 ms/doc (0001 baseline).
+lpv11/dev (raw HTML): F1 **0.7619** / Lev **0.6540** · Rust 1.28 ms/doc (0002; Cython ref 1.64).
+**Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
+- [0002 — Rust port spike](0002-rust-port-spike.md) — **both gates passed**: 10,999/10,999 docs byte-identical, 1.27× faster (p95 1.31×); Rust adopted

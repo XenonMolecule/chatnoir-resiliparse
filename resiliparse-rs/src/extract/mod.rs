@@ -1,4 +1,4 @@
-// Copyright 2023 Janek Bevendorff
+// Copyright 2026 Janek Bevendorff
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod third_party;
+//! Content extraction tools.
 
-pub mod extract;
-pub mod parse;
+pub mod html2text;
