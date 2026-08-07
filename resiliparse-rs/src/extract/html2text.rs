@@ -1904,6 +1904,10 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 lxb_html_document_destroy(doc);
                 return out;
             }
+            if let Some(out) = extract_xenforo(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
+            }
             if generator.starts_with(b"ubb.threads") {
                 if let Some(out) = extract_ubb(doc, opts) {
                     lxb_html_document_destroy(doc);
@@ -3445,6 +3449,88 @@ unsafe fn extract_plain_text_from_node_opts(
     opts: &ExtractOpts,
 ) -> String {
     unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None, None).0 }
+}
+
+/// XenForo thread handler (cycle 0043; jusText-0058 map): XF1 posts are
+/// `li[data-author]` with body `blockquote.messageText` and the post time
+/// in `span.DateTime[title="... at ..."]`; XF2 uses `article[data-author]`
+/// with `div.bbWrapper` and a `<time>` element. Gold joins with an
+/// en-dash and renders the title-attr time with " at " collapsed to a
+/// space. Bodies keep nested quotes (stripping them cratered in jusText).
+unsafe fn extract_xenforo(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let containers = query_selector_all_raw(doc, body, b"li[data-author], article[data-author]");
+        if containers.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        let mut posts = 0usize;
+        let mut total = 0usize;
+        let page_text_len = get_collapsed_string(&get_node_text(body)).len();
+        for c in containers {
+            let author = String::from_utf8_lossy(&get_node_attr(c, b"data-author")).trim().to_string();
+            let Some(&bn) = query_selector_all_raw(doc, c, b"blockquote.messageText, div.bbWrapper")
+                .first()
+            else {
+                continue;
+            };
+            let mut date = String::new();
+            for &dn in query_selector_all_raw(doc, c, b".messageMeta .DateTime, time, .DateTime")
+                .iter()
+                .take(3)
+            {
+                let title = String::from_utf8_lossy(&get_node_attr(dn, b"title")).trim().to_string();
+                let text = collapsed_text(dn);
+                let has4 = |t: &str| t.bytes().filter(|b| b.is_ascii_digit()).count() >= 4;
+                // XF2 <time>: gold renders the visible date only; XF1
+                // span.DateTime: gold uses the full title-attr timestamp
+                let cand = if (*dn).local_name == LXB_TAG_TIME {
+                    let ds = String::from_utf8_lossy(&get_node_attr(dn, b"data-date-string")).trim().to_string();
+                    if has4(&ds) { ds } else if has4(&text) { text } else { title }
+                } else if has4(&title) {
+                    title
+                } else {
+                    text
+                };
+                if cand.len() <= 40 && cand.bytes().filter(|b| b.is_ascii_digit()).count() >= 4 {
+                    date = cand.replace(" at ", " ");
+                    break;
+                }
+            }
+            // Gold strips XF quote blocks in ~3/4 of docs — the dominant
+            // convention (unlike jusText's gold, which kept them). A
+            // duplicate-only-strip variant measured WORSE (whitespace/emoji
+            // normalization made real reply-quotes look novel).
+            let mut sub = ExtractOpts { main_content: false, ..opts.clone() };
+            sub.skip_elements.push(".bbCodeQuote".to_string());
+            sub.skip_elements.push("blockquote.bbCodeBlock--quote".to_string());
+            let text = extract_plain_text_from_node_opts(doc, bn, &sub);
+            if text.trim().is_empty() || author.is_empty() {
+                continue;
+            }
+            total += text.len();
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2013} {date}**"));
+            }
+            out.push_str("\n\n");
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts >= 2 && total * 4 >= page_text_len {
+            Some(out)
+        } else {
+            None
+        }
+    }
 }
 
 /// phpBB3 subSilver2 skin handler (cycle 0041): table layout with
