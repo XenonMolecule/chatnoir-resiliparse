@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8058** / Lev **0.7071** (0036) · train 0.7962/0.6931. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8061** / Lev **0.7072** (0037) · train 0.7965/0.6933. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -110,3 +110,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8058** / Lev **0.7071**
 - [0034 — Heading promotion](0034-heading-promotion.md) — gold re-levels to #-min (98%): +0.0002 Lev; ungated hard-breaks re-measured negative (gate twice-confirmed)
 - [0035 — UI-line strip extension](0035-ui-line-strip-extension.md) — census-driven chrome lines + heading/bold normalization fix: +0.0009 F1 / +0.0012 Lev; bold-coverage & Tags-lines walls confirmed
 - [0036 — Table separator convention](0036-table-separator-convention.md) — tight `|---|` + cell-space collapse + rescue gate hardening (dash exclusion, content-table veto): +0.0002 Lev both splits, two crater classes closed
+- [0037 — Byline microdata recovery](0037-byline-microdata-recovery.md) — "Posted by at" was a degenerate byline, not chrome: itemprop author/date exemption + dual keep-test: +0.0003 F1 both splits

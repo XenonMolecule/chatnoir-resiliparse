@@ -245,6 +245,7 @@ tag_consts!(
     LXB_TAG_IMG,
     LXB_TAG_INPUT,
     LXB_TAG_LI,
+    LXB_TAG_LINK,
     LXB_TAG_MAIN,
     LXB_TAG_META,
     LXB_TAG_NAV,
@@ -1466,7 +1467,7 @@ unsafe fn is_small_chrome_sized(node: *mut lxb_dom_node_t) -> bool {
 }
 
 static BYLINE_CLS: LazyLock<Regex> = LazyLock::new(|| {
-    RegexBuilder::new(r"(?:^|[\s_-])(?:author|byline|by-?line|posted|vcard|entry-meta|post-?meta)(?:$|[\s_-])")
+    RegexBuilder::new(r"(?:^|[\s_-])(?:author|byline|by-?line|posted|vcard|entry-meta|post-?meta|timestamp|published|post-?footer|entry-date|post-?date)(?:$|[\s_-])")
         .case_insensitive(true)
         .unicode(false)
         .build()
@@ -1616,7 +1617,23 @@ unsafe fn is_main_content_node(
         if !itemprop_attr.is_empty()
             && [b"datePublished".as_slice(), b"author", b"url"].contains(&itemprop_attr)
         {
-            return false;
+            // markdown config: visible byline microdata (span[itemprop=author],
+            // abbr[itemprop=datePublished]) carries the author name and post
+            // time the gold keeps ("Posted by NAME at TIME" — the degenerate
+            // "Posted by at" family, cycle 0037). Invisible meta/link carriers
+            // and itemprop=url permalinks stay dropped, as does everything in
+            // plain config (Cython reference behavior).
+            let visible_byline = md_chrome
+                && itemprop_attr != b"url"
+                && local_name != LXB_TAG_META
+                && local_name != LXB_TAG_LINK
+                && has_byline_ancestry(node)
+                // a byline fragment is short (name / time); anything larger
+                // is an author bio, which stays chrome (0033 veto family)
+                && get_node_text(node).len() <= 80;
+            if !visible_byline {
+                return false;
+            }
         }
 
         // ARIA hidden
@@ -2034,7 +2051,14 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     ..opts.clone()
                 };
                 let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), tpl_ref, wl_ref);
-                if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
+                // Dual keep test (0037): either raw-length or content-length
+                // clearing the factor accepts the rescue. Each test alone
+                // flips docs at the 20x margin when a few formatting/byline
+                // bytes land in a tiny base output (0012/0036 instability
+                // class); the OR-frontier is strictly more stable.
+                if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1)
+                    || content_len(&fallback) > RESCUE_KEEP_FACTOR * result_content_len.max(1)
+                {
                     result = fallback;
                     rescued = true;
                 }
