@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7811** / Lev **0.6705** (0010). Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7819** / Lev **0.6712** (0012). Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -86,3 +86,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7811** / Lev **0.6705**
 - [0009 — Markdown mode v1](0009-markdown-mode-v1.md) — headings/bold/bullets/hard-breaks: Lev +0.0024, F1 flat, +0.4% cost; markdown is now the lpv11 config; label-bold + md-links queued
 - [0010 — Blogger chrome handler](0010-blogger-chrome.md) — meta-generator-gated skip of share/labels/pager chrome: 110 docs improved across dev sets, 0 meaningful reg; gold-consistency check kept "Posted by" untouched (28/62 wall)
 - [0011 — Markdown images (NEGATIVE)](0011-markdown-images-negative.md) — `![alt](src)` reverted: gold keeps 3.4% of images, no DOM rule reaches viable precision (−0.022 ungated → −0.001 best gate); needs learned selection
+- [0012 — Pipe tables](0012-pipe-tables.md) — per-cell nodes + data-table gate + pipe serializer; renders 105/109; F1 +0.0007 dev, +0.0008 train; rescue gates hardened to content-length

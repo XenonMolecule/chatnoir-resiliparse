@@ -402,6 +402,9 @@ struct ExtractNode {
     make_big_block: bool,
     is_end_tag: bool,
     escape_text_contents: bool,
+    /// Set by the markdown table pre-pass: this node belongs to an eligible
+    /// data table and gets pipe-row serialization (cycle 0012).
+    md_table: bool,
     text_contents: Option<Vec<u8>>,
 }
 
@@ -417,6 +420,7 @@ impl Default for ExtractNode {
             make_big_block: false,
             is_end_tag: false,
             escape_text_contents: false,
+            md_table: false,
             text_contents: None,
         }
     }
@@ -465,6 +469,8 @@ unsafe fn extract_cb(extract_nodes: &mut Vec<ExtractNode>, ctx: &mut ExtractCont
             || ctx.depth < last_depth
             || (ctx.opts.links && local_name == LXB_TAG_A)
             || local_name == LXB_TAG_TEXTAREA
+            || (ctx.opts.preserve_formatting == FormattingOpts::Markdown
+                && matches!(local_name, LXB_TAG_TD | LXB_TAG_TH))
         {
             let mut new_node = ExtractNode {
                 reference_node: node,
@@ -651,6 +657,83 @@ fn make_margin(
     *margin_is_br = false;
 }
 
+/// Markdown data-table pre-pass (cycle 0012): find TABLE spans in the node
+/// stream, check eligibility (>=2 rows, >=2 cells in some row, no nested
+/// table, no oversized cells — layout tables must stay plain), and mark the
+/// span's TABLE/TR/TD/TH nodes for pipe-row serialization.
+fn mark_markdown_tables(extract_nodes: &mut [ExtractNode]) {
+    const MAX_CELL_TEXT: usize = 300;
+    let mut i = 0;
+    while i < extract_nodes.len() {
+        if extract_nodes[i].tag_id == LXB_TAG_TABLE && !extract_nodes[i].is_end_tag {
+            // find matching end at same nesting level
+            let start = i;
+            let mut depth = 1;
+            let mut end = None;
+            let mut nested = false;
+            let mut rows = 0usize;
+            let mut max_cells = 0usize;
+            let mut cur_cells = 0usize;
+            let mut cell_text = 0usize;
+            let mut oversized = false;
+            let mut j = i + 1;
+            while j < extract_nodes.len() {
+                let n = &extract_nodes[j];
+                if n.tag_id == LXB_TAG_TABLE {
+                    if n.is_end_tag {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = Some(j);
+                            break;
+                        }
+                    } else {
+                        depth += 1;
+                        nested = true;
+                    }
+                } else if depth == 1 {
+                    if n.tag_id == LXB_TAG_TR && !n.is_end_tag {
+                        rows += 1;
+                        max_cells = max_cells.max(cur_cells);
+                        cur_cells = 0;
+                        cell_text = 0;
+                    } else if matches!(n.tag_id, LXB_TAG_TD | LXB_TAG_TH) && !n.is_end_tag {
+                        cur_cells += 1;
+                        cell_text = 0;
+                    }
+                    // Any node's text between here and the next cell/row
+                    // boundary belongs to the current cell (nested <p> etc.
+                    // carry their text on their own nodes).
+                    cell_text += n.text_contents.as_ref().map(|t| t.len()).unwrap_or(0);
+                    if cell_text > MAX_CELL_TEXT {
+                        oversized = true;
+                    }
+                }
+                j += 1;
+            }
+            max_cells = max_cells.max(cur_cells);
+            if let Some(end) = end {
+                if !nested && !oversized && rows >= 2 && max_cells >= 2 {
+                    for n in &mut extract_nodes[start..=end] {
+                        if matches!(n.tag_id, LXB_TAG_TABLE | LXB_TAG_TR | LXB_TAG_TD | LXB_TAG_TH) {
+                            n.md_table = true;
+                            if n.tag_id == LXB_TAG_TABLE {
+                                // blank line around the table
+                                n.make_big_block = true;
+                            } else {
+                                // rows/cells manage their own line breaks
+                                n.make_block = false;
+                            }
+                        }
+                    }
+                }
+                i = if nested { i + 1 } else { end + 1 };
+                continue;
+            }
+        }
+        i += 1;
+    }
+}
+
 unsafe fn serialize_extract_nodes(
     extract_nodes: &mut [ExtractNode],
     opts: &ExtractOptsC,
@@ -658,12 +741,20 @@ unsafe fn serialize_extract_nodes(
 ) -> Vec<u8> {
     unsafe {
         let mut output: Vec<u8> = Vec::with_capacity(reserve_size);
+        if opts.preserve_formatting == FormattingOpts::Markdown {
+            mark_markdown_tables(extract_nodes);
+        }
         let mut element_text_prefix: Vec<u8> = Vec::new();
         let mut bullet_inserted = false;
         let mut list_depth: usize = 0;
         let mut margin_size: usize = 0;
         let mut margin_is_br = false;
         let mut uncollapsed_margin_count: usize = 0;
+        // markdown pipe-table state (only one eligible table active at a time)
+        let mut md_row_index: usize = 0;
+        let mut md_cell_index: usize = 0;
+        let mut md_row0_cells: usize = 0;
+        let mut md_in_table = false;
         let mut list_numbering: Vec<usize> = Vec::new();
 
         for i in 0..extract_nodes.len() {
@@ -747,6 +838,64 @@ unsafe fn serialize_extract_nodes(
                     } else if element_text_prefix.first() == Some(&b'#') {
                         element_text_prefix.clear();
                     }
+                }
+            }
+
+            // Markdown pipe tables (cycle 0012)
+            if opts.preserve_formatting == FormattingOpts::Markdown && current_node.md_table {
+                match current_node.tag_id {
+                    t if t == LXB_TAG_TABLE => {
+                        if !current_node.is_end_tag {
+                            md_row_index = 0;
+                            md_cell_index = 0;
+                            md_row0_cells = 0;
+                            md_in_table = true;
+                        } else {
+                            md_in_table = false;
+                        }
+                        // margins handled by normal block mechanics below
+                    }
+                    t if t == LXB_TAG_TR => {
+                        if !current_node.is_end_tag {
+                            make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
+                            while matches!(output.last(), Some(b' ') | Some(b'\t')) {
+                                output.pop();
+                            }
+                            if !output.is_empty() && *output.last().unwrap() != b'\n' {
+                                output.push(b'\n');
+                            }
+                            output.extend_from_slice(b"| ");
+                            md_cell_index = 0;
+                        } else {
+                            rstrip_in_place(&mut output);
+                            if output.last() == Some(&b'|') {
+                                // empty row: drop the dangling "|"
+                                output.pop();
+                                rstrip_in_place(&mut output);
+                            } else {
+                                output.extend_from_slice(b" |");
+                                if md_row_index == 0 {
+                                    md_row0_cells = md_cell_index.max(1);
+                                    output.push(b'\n');
+                                    output.push(b'|');
+                                    for _ in 0..md_row0_cells {
+                                        output.extend_from_slice(b" --- |");
+                                    }
+                                }
+                            }
+                            md_row_index += 1;
+                        }
+                    }
+                    t if matches!(t, LXB_TAG_TD | LXB_TAG_TH) => {
+                        if !current_node.is_end_tag {
+                            if md_cell_index > 0 {
+                                rstrip_in_place(&mut output);
+                                output.extend_from_slice(b" | ");
+                            }
+                            md_cell_index += 1;
+                        }
+                    }
+                    _ => {}
                 }
             }
 
@@ -860,8 +1009,17 @@ unsafe fn serialize_extract_nodes(
                 element_text = escape_html(&element_text);
             }
 
-            // Make margins and indents
-            make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
+            // Make margins and indents (inside a pipe-table row, a margin
+            // must not break the line — flush it as a single space)
+            if md_in_table && opts.preserve_formatting == FormattingOpts::Markdown {
+                if margin_size > 0 && !output.is_empty() && !c_isspace(*output.last().unwrap()) {
+                    output.push(b' ');
+                }
+                margin_size = 0;
+                margin_is_br = false;
+            } else {
+                make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
+            }
             uncollapsed_margin_count = 0;
 
             // Indent list items if basic formatting is used (follow-up lines without bullets are indented more)
@@ -881,6 +1039,7 @@ unsafe fn serialize_extract_nodes(
 
             if opts.preserve_formatting >= FormattingOpts::Basic
                 && matches!(current_node.tag_id, LXB_TAG_TD | LXB_TAG_TH)
+                && !current_node.md_table
                 && !output.is_empty()
                 && *output.last().unwrap() != b'\n'
             {
@@ -1443,12 +1602,24 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 })
             };
 
+            // Rescue gates measure CONTENT length, not output length —
+            // markdown formatting bytes (pipes, dashes, #, *) must not move
+            // a page across a gate boundary (cycle 0012 regression: table
+            // syntax pushed a 100-byte calendar page past the near-empty
+            // gate).
+            fn content_len(t: &str) -> usize {
+                // exclude markdown structure punctuation only — whitespace
+                // stays counted so plain-mode gate behavior is unchanged
+                t.bytes().filter(|b| !matches!(b, b'|' | b'#' | b'*')).count()
+            }
+            let result_content_len = content_len(&result);
+
             // Error/stub pages ("We're sorry", "page not found", "out of
             // stock") legitimately extract to a tiny message inside a huge
             // site shell — rescuing them swaps the correct answer for the
             // shell. Their tiny output names the condition, so a keyword
             // veto is cheap and can't fire on wiped-article scraps.
-            let is_error_stub = result.len() < RESCUE_NEAR_EMPTY_ABS + 100
+            let is_error_stub = result_content_len < RESCUE_NEAR_EMPTY_ABS + 100
                 && regex_search_not_empty(result.as_bytes(), &ERROR_STUB_TEXT);
 
             // Tier 1 (0004): near-empty output → unfiltered fallback, kept
@@ -1456,8 +1627,8 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // wiped the whole page).
             let mut rescued = false;
             if !is_error_stub
-                && result.len() < RESCUE_NEAR_EMPTY_ABS
-                && body_text_len(doc) > RESCUE_BODY_FACTOR * result.len().max(1)
+                && result_content_len < RESCUE_NEAR_EMPTY_ABS
+                && body_text_len(doc) > RESCUE_BODY_FACTOR * result_content_len.max(1)
             {
                 let fallback_opts = ExtractOpts {
                     main_content: false,
@@ -1514,7 +1685,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 }
 
                 if relax != RelaxFlags::default()
-                    && (result.len() as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
+                    && (result_content_len as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
                 {
                     let retry = extract_plain_text_from_doc(doc, opts, relax);
                     if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
@@ -1578,12 +1749,17 @@ fn duplicates_existing_content(base: &str, retry: &str) -> bool {
         return false;
     }
     let mid = base.len() / 2;
-    // Find a char-boundary-aligned probe window around the middle.
+    // Char-boundary-aligned probe window around the middle.
     let start = (mid - PROBE_LEN / 2..mid).rev().find(|&i| base.is_char_boundary(i));
     let Some(start) = start else { return false };
     let end = (start + PROBE_LEN..base.len()).find(|&i| base.is_char_boundary(i));
     let Some(end) = end else { return false };
     let probe = &base[start..end];
+    // Formatted table rows legitimately repeat (calendars); a probe that is
+    // table content would false-positive — abstain (cycle 0012).
+    if probe.contains(" | ") || probe.contains("---") {
+        return false;
+    }
     let mut count = 0;
     let mut hay = retry;
     while let Some(pos) = hay.find(probe) {
