@@ -3405,6 +3405,57 @@ unsafe fn extract_plain_text_from_doc_impl2(
             (chars_extracted as f64 * 1.2) as usize,
         );
         rstrip_in_place(&mut output);
-        (decode_utf8_ignore(output), dropped_nodes)
+        let mut text = decode_utf8_ignore(output);
+        if opts.preserve_formatting == FormattingOpts::Markdown {
+            text = strip_ui_label_lines(text);
+        }
+        (text, dropped_nodes)
     }
+}
+
+/// Dangling UI-label lines (jusText-0084 family, cycle 0026): a line that is
+/// exactly a comment-widget verb is never content. Curated, exact-match after
+/// stripping list markers. "Author", "Comments", "Quote" excluded (real
+/// content in some gold).
+fn strip_ui_label_lines(text: String) -> String {
+    const LABELS: &[&str] = &[
+        "reply", "like", "report", "share", "permalink", "profile",
+        "post a comment", "log in to reply", "login to reply",
+        "reply to this comment", "view profile", "send pm", "back to top",
+        "read more", "continue reading",
+        "leave a reply", "leave a comment", "post comment", "submit comment",
+        "notify me of new posts by email.", "notify me of follow-up comments by email.",
+    ];
+    let mut out = String::with_capacity(text.len());
+    let mut removed_any = false;
+    for line in text.split('\n') {
+        let t = line.trim().trim_start_matches(['-', '\u{2022}', ' ']).trim();
+        let t = t.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.').trim();
+        let tl = t.to_lowercase();
+        if !tl.is_empty() && LABELS.contains(&tl.as_str()) {
+            removed_any = true;
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    if !removed_any {
+        return text;
+    }
+    let mut cleaned = String::with_capacity(out.len());
+    let mut blanks = 0;
+    for line in out.lines() {
+        if line.trim().is_empty() {
+            blanks += 1;
+            if blanks > 1 {
+                continue;
+            }
+        } else {
+            blanks = 0;
+        }
+        cleaned.push_str(line);
+        cleaned.push('\n');
+    }
+    cleaned.truncate(cleaned.trim_end().len());
+    cleaned
 }
