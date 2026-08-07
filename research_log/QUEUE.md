@@ -54,3 +54,12 @@ else; sweep tau in {0.3..0.6}.
 Also queued: learned per-image selection (0059 verdict); v7 features
 gated on live-dev only (0056 lesson); 27 fleet flags for owner review;
 empty-section list drops (3 docs); Yahoo message-board handler.
+
+## Empty-section family diagnosis (0062 window, 3 docs)
+Drupal year-sectioned lists (dartmouth pattern): each section is an
+<article class="text-chunk"> whose item titles are links -> the teaser-
+article rule vetoes them; tier-2 short_articles rescue is blocked by
+ARTICLE_RESCUE_MAX_COUNT=3 (the page has ~15). Correct fix requires
+distinguishing "many small content articles" from "teaser stream" —
+page-type wall instance #13. Not chased at 3-doc scale; unlocks with
+any future page-type capability.
