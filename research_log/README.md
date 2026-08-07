@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7878** / Lev **0.6820** (0017) · train 0.7842. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7895** / Lev **0.6843** (0018) · train 0.7854. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -91,3 +91,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7878** / Lev **0.6820**
 - [0014 — vBulletin handler](0014-vbulletin-handler.md) — engine-gated thread rebuild (**user – date** + body walk): dev +0.0031 (18↑/0↓), train +0.0059 (258↑/13↓); handler pattern established
 - [0015 — phpBB3 handler](0015-phpbb-handler.md) — body#phpbb gate + author-parse variants + authored-posts fallback: dev +0.0006, train +0.0006 (47↑/8↓); forum arc cumulative +0.0037 dev
 - [0017 — IPB/UBB/SMF handlers](0017-forum-handlers-ipb-ubb-smf.md) — agent-built, battery-verified: dev +0.0023 (14↑/0↓), Lev +0.0035, train +0.0013; forum arc cumulative +0.0058 F1
+- [0018 — Chrome drops](0018-chrome-drops.md) — audit-backed veto, 7 hardening variants (negations, size cap, content markers): dev +0.0017/+0.0023, train +0.0015 (30:1), guardrails clean

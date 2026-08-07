@@ -1322,6 +1322,71 @@ const BLACKLIST_ARIA_ROLES: &[&[u8]] = &[
     b"tooltip",
 ];
 
+/// Chrome classes the lpv11 gold consistently drops (audit 2026-08-07:
+/// cookie 0%, share 2%, breadcrumb 5%, footer 5%, login/search 6%,
+/// pagination 7% keep-rates). Active in markdown mode only; wall categories
+/// (nav, related-posts) deliberately absent. Single-hyphen boundaries
+/// included (the classic `post-share-buttons` escape).
+static MD_CHROME_CLS: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(
+        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links))(?:$|[\s_-])",
+    )
+    .case_insensitive(true)
+    .unicode(false)
+    .build()
+    .unwrap()
+});
+
+/// Classes that mark a container as content regardless of other matches
+/// (WordPress/microformats post containers).
+static CONTENT_MARKER_CLS: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"(?:^|\s)(?:hentry|h-entry|type-post|instapaper_body|entry-content|post-body)(?:$|\s)|(?:^|[\s_-])signature(?:$|[\s_-])")
+        .case_insensitive(true)
+        .unicode(false)
+        .build()
+        .unwrap()
+});
+
+static MD_COPYRIGHT_CLS: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"(?:^|[\s_-])copyright(?:$|[\s_-])")
+        .case_insensitive(true)
+        .unicode(false)
+        .build()
+        .unwrap()
+});
+
+/// Remove the hyphen after "no"/"not" so negated widget names ("no-share")
+/// stop being boundary-delimited for the chrome veto.
+fn glue_negations(hay: &mut Vec<u8>) {
+    let mut i = 0;
+    while i + 3 <= hay.len() {
+        let neg2 = i + 3 <= hay.len() && hay[i..].starts_with(b"no-");
+        let neg3 = i + 4 <= hay.len() && hay[i..].starts_with(b"not-");
+        let at_boundary = i == 0 || matches!(hay[i - 1], b' ' | b'_' | b'-');
+        if at_boundary && (neg2 || neg3) {
+            let dash = if neg3 { i + 3 } else { i + 2 };
+            hay.remove(dash);
+        }
+        i += 1;
+    }
+}
+
+/// Chrome widgets are small; wrapper divs named after a widget they merely
+/// contain (`place-login-pop` wrapping 45KB of page) must never be vetoed.
+unsafe fn is_small_chrome_sized(node: *mut lxb_dom_node_t) -> bool {
+    unsafe { get_collapsed_string(&get_node_text(node)).len() <= 1500 }
+}
+
+unsafe fn has_anchor_descendant(node: *mut lxb_dom_node_t) -> bool {
+    unsafe {
+        let coll = lxb_dom_collection_make_noi((*node).owner_document, 4);
+        lxb_dom_elements_by_tag_name(node.cast(), coll, b"a".as_ptr(), 1);
+        let n = lxb_dom_collection_length_noi(coll);
+        lxb_dom_collection_destroy(coll, true);
+        n > 0
+    }
+}
+
 /// Rule relaxations active only during the tier-2 rescue retry (never on the
 /// primary extraction pass).
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -1340,6 +1405,7 @@ unsafe fn is_main_content_node(
     keep_post_meta: bool,
     keep_hidden: bool,
     relax: RelaxFlags,
+    md_chrome: bool,
 ) -> bool {
     unsafe {
         if (*node).type_ == LXB_DOM_NODE_TYPE_TEXT {
@@ -1472,6 +1538,34 @@ unsafe fn is_main_content_node(
         }
 
         if body_depth > 2 {
+            // lpv11-gold chrome (markdown config only; audit-backed).
+            // Content-marker exemption: WordPress post containers carry
+            // tag-SLUG classes whose hyphen-internal words false-match
+            // (`tag-...-sharing-them` → "sharing", train −0.96).
+            if md_chrome {
+                // Negated tokens ("no-share" = content that does NOT get
+                // share buttons) must not match; the regex crate has no
+                // lookbehind, so glue "no-"/"not-" prefixes shut.
+                let mut veto_hay = cls_and_id_attr.clone();
+                glue_negations(&mut veto_hay);
+                if regex_search_not_empty(&veto_hay, &MD_CHROME_CLS)
+                    && !regex_search_not_empty(&cls_and_id_attr, &CONTENT_MARKER_CLS)
+                    && is_small_chrome_sized(node)
+                {
+                    return false;
+                }
+            }
+            // copyright-classed FOOTERS (with links: Privacy/Terms rows) are
+            // chrome; linkless copyright paragraphs are source-attribution
+            // credits the gold keeps (audit gold-policy).
+            if md_chrome
+                && regex_search_not_empty(&cls_and_id_attr, &MD_COPYRIGHT_CLS)
+                && has_anchor_descendant(node)
+                && is_small_chrome_sized(node)
+            {
+                return false;
+            }
+
             // Sign-in links
             if regex_search_not_empty(cls_attr, &SIGNIN_CLS) {
                 return false;
@@ -1749,6 +1843,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                             opts.post_meta,
                             opts.hidden_elements,
                             RelaxFlags { text_heavy_lists: true, ..Default::default() },
+                            opts.preserve_formatting == FormattingOpts::Markdown,
                         )
                 }) {
                     relax.text_heavy_lists = true;
@@ -1767,6 +1862,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                                 opts.post_meta,
                                 opts.hidden_elements,
                                 RelaxFlags { short_articles: true, ..Default::default() },
+                                opts.preserve_formatting == FormattingOpts::Markdown,
                             )
                     })
                 {
@@ -2492,6 +2588,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
                         opts.post_meta,
                         opts.hidden_elements,
                         relax,
+                        opts.preserve_formatting == FormattingOpts::Markdown,
                     ))
             {
                 if relax == RelaxFlags::default()
