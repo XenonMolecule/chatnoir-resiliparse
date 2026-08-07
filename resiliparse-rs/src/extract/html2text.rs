@@ -2339,6 +2339,13 @@ pub fn collect_block_features(html: &str) -> String {
         let nav_share = totals.nav_text as f64 / page_text as f64;
         let gen_kind = generator_kind(doc);
         let n_substantial = blocks.iter().filter(|b| b.text_len >= 150).count();
+        let mass: usize = blocks.iter().map(|b| b.text_len).sum();
+        let center: f64 = if mass > 0 {
+            blocks.iter().enumerate().map(|(i, b)| i as f64 * b.text_len as f64).sum::<f64>() / mass as f64
+        } else {
+            0.0
+        };
+        let nb = blocks.len().max(1) as f64;
         let mut out = String::new();
         for (idx, b) in blocks.iter().enumerate() {
             let f = build_block_features(
@@ -2363,10 +2370,11 @@ pub fn collect_block_features(html: &str) -> String {
                 .replace('\t', " ")
                 .replace('\n', " ");
             out.push_str(&format!(
-                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"page_forms\":{},\"page_articles\":{},\"page_comment_cls\":{},\"page_nav_share\":{:.4},\"page_generator\":{},\"page_n_blocks\":{},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
+                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"page_forms\":{},\"page_articles\":{},\"page_comment_cls\":{},\"page_nav_share\":{:.4},\"page_generator\":{},\"page_n_blocks\":{},\"block_pos\":{:.4},\"dist_center\":{:.4},\"card_grid\":{},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
                 idx, b.tag, b.depth, b.text_len, b.link_len, b.n_a, page_text, page_ld,
                 totals.n_forms, totals.n_articles, totals.n_comment_cls,
                 nav_share, gen_kind, n_substantial,
+                idx as f64 / nb, (idx as f64 - center).abs() / nb, 0u8,
                 f.punct, f.digit, f.upper, f.avgw,
                 f.nav as u8, f.footer as u8, f.header as u8, f.sidebar as u8, f.social as u8,
                 f.article as u8, f.chrome as u8, f.byline as u8, f.widget as u8,
