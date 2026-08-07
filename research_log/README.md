@@ -82,3 +82,4 @@ lpv11/dev (raw HTML): F1 **0.7805** (0007) · train 0.7753 (+0.0162 vs baseline)
 - [0005 — ul-rule repair](0005-ul-rule-repair.md) — tier-2 rescue for text-heavy lists: +1 doc/set, 0 reg, ~1% speed cost; bigger variant queued (needs widget signal)
 - [0006 — Widget signal + error-stub guard](0006-widget-signal.md) — widget/meta/hide veto unlocks stronger list exemption: +9 docs/0 reg on dev sets; train 312↑/50↓ (+0.0156) with logged trade-off; 2 robustness fixes
 - [0007 — Article-teaser repair](0007-article-teaser.md) — RelaxFlags generalization + short-article retry: dev +1/0 reg, train +12/−1(noise); rescue buckets overlap tier-1
+- [0008 — Selection ceiling](0008-selection-ceiling.md) — block-oracle 0.77 (< current!), line-oracle 0.86; transformation is load-bearing for the 0.90 goal; GOALS.md set
