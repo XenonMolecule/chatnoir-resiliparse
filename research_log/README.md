@@ -132,3 +132,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8223** / Lev **0.7260**
 - [0056 — NEGATIVE: positional features](0056-NEGATIVE-positional-features.md) — AUC +0.0036 but live −0.001: position anti-correlates on comments; first AUC/live divergence
 - [0057 — Golden devset v1](0057-golden-devset.md) — 34-agent fleet, 365 docs cleaned per charter: pipeline scores 0.8330/0.7450 on golden vs 0.8223/0.7260 original
 - [0058 — Golden recalibration](0058-golden-recalibration.md) — thresholds robust across targets; empty-base fallback negative; 46-doc deficiency ledger opened
+- [0059 — NEGATIVE: md images v2](0059-NEGATIVE-md-images.md) — golden keeps 9% of walk-visible images, best gate 49% precision: family is learned-selection-only
