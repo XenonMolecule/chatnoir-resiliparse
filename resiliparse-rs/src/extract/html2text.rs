@@ -1329,7 +1329,7 @@ const BLACKLIST_ARIA_ROLES: &[&[u8]] = &[
 /// included (the classic `post-share-buttons` escape).
 static MD_CHROME_CLS: LazyLock<Regex> = LazyLock::new(|| {
     RegexBuilder::new(
-        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links))(?:$|[\s_-])",
+        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links)|read-?next|around-?the-?web|you-?may-?(?:also-?)?like|outbrain|taboola|sponsored-?(?:links|content))(?:$|[\s_-])",
     )
     .case_insensitive(true)
     .unicode(false)
@@ -1375,6 +1375,31 @@ fn glue_negations(hay: &mut Vec<u8>) {
 /// contain (`place-login-pop` wrapping 45KB of page) must never be vetoed.
 unsafe fn is_small_chrome_sized(node: *mut lxb_dom_node_t) -> bool {
     unsafe { get_collapsed_string(&get_node_text(node)).len() <= 1500 }
+}
+
+static BYLINE_CLS: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"(?:^|[\s_-])(?:author|byline|by-?line|posted|vcard|entry-meta|post-?meta)(?:$|[\s_-])")
+        .case_insensitive(true)
+        .unicode(false)
+        .build()
+        .unwrap()
+});
+
+/// Whether the node or a near ancestor sits in a byline container.
+unsafe fn has_byline_ancestry(node: *mut lxb_dom_node_t) -> bool {
+    unsafe {
+        let mut n = node;
+        for _ in 0..3 {
+            if n.is_null() || (*n).type_ != LXB_DOM_NODE_TYPE_ELEMENT {
+                return false;
+            }
+            if regex_search_not_empty(get_node_attr(n, b"class"), &BYLINE_CLS) {
+                return true;
+            }
+            n = (*n).parent;
+        }
+        false
+    }
 }
 
 unsafe fn has_anchor_descendant(node: *mut lxb_dom_node_t) -> bool {
@@ -1477,12 +1502,20 @@ unsafe fn is_main_content_node(
             return false;
         }
 
-        // rel attributes
+        // rel attributes (markdown config keeps author anchors — the gold
+        // wants byline names; "Posted by at" bugs, cycle 0022)
         let rel_attr = strip(get_node_attr(node, b"rel"));
-        if !rel_attr.is_empty()
-            && [b"author".as_slice(), b"icon", b"search", b"prev", b"next", b"tag"].contains(&rel_attr)
-        {
-            return false;
+        if !rel_attr.is_empty() {
+            if rel_attr == b"author" {
+                // markdown config: keep byline author anchors (gold wants the
+                // name) but only in byline context — bare rel=author on forum
+                // member links is still chrome (cycle 0022).
+                if !(md_chrome && has_byline_ancestry(node)) {
+                    return false;
+                }
+            } else if [b"icon".as_slice(), b"search", b"prev", b"next", b"tag"].contains(&rel_attr) {
+                return false;
+            }
         }
 
         // itemprop attributes
