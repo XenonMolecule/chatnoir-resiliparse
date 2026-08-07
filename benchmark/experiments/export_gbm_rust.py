@@ -7,8 +7,11 @@ base = ["tag","depth","log_text_len","link_density","n_links","page_ld","frac_pa
         "article","chrome","byline","widget","recommended","comments",
         "headings","page_headings","prev_ld","next_ld","prev_len","next_len"]
 v4 = ["page_forms","page_articles","page_comment_cls"]
+v5 = v4 + ["page_nav_share","page_generator","page_n_blocks"]
 nf = m.n_features_in_
-if nf == 63:
+if nf == 66:
+    names = base + v5 + [f"wb[{i}]" for i in range(32)]
+elif nf == 63:
     names = base + v4 + [f"wb[{i}]" for i in range(32)]
 elif nf == 60:
     names = base + [f"wb[{i}]" for i in range(32)]

@@ -2336,6 +2336,9 @@ pub fn collect_block_features(html: &str) -> String {
         let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut coll);
         let page_text = totals.text_len.max(1);
         let page_ld = totals.link_len as f64 / page_text as f64;
+        let nav_share = totals.nav_text as f64 / page_text as f64;
+        let gen_kind = generator_kind(doc);
+        let n_substantial = blocks.iter().filter(|b| b.text_len >= 150).count();
         let mut out = String::new();
         for (idx, b) in blocks.iter().enumerate() {
             let f = build_block_features(
@@ -2357,9 +2360,10 @@ pub fn collect_block_features(html: &str) -> String {
                 .replace('\t', " ")
                 .replace('\n', " ");
             out.push_str(&format!(
-                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"page_forms\":{},\"page_articles\":{},\"page_comment_cls\":{},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
+                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"page_forms\":{},\"page_articles\":{},\"page_comment_cls\":{},\"page_nav_share\":{:.4},\"page_generator\":{},\"page_n_blocks\":{},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
                 idx, b.tag, b.depth, b.text_len, b.link_len, b.n_a, page_text, page_ld,
                 totals.n_forms, totals.n_articles, totals.n_comment_cls,
+                nav_share, gen_kind, n_substantial,
                 f.punct, f.digit, f.upper, f.avgw,
                 f.nav as u8, f.footer as u8, f.header as u8, f.sidebar as u8, f.social as u8,
                 f.article as u8, f.chrome as u8, f.byline as u8, f.widget as u8,
@@ -2514,6 +2518,7 @@ struct TplNode {
     n_forms: usize,
     n_articles: usize,
     n_comment_cls: usize,
+    nav_text: usize,
     punct: usize,
     digits: usize,
     upper: usize,
@@ -2592,6 +2597,7 @@ unsafe fn tpl_scan(
         } else {
             0
         };
+        let mut nav_text = 0usize;
         let mut punct = 0usize;
         let mut digits = 0usize;
         let mut upper = 0usize;
@@ -2653,6 +2659,7 @@ unsafe fn tpl_scan(
                         n_forms += c.n_forms;
                         n_articles += c.n_articles;
                         n_comment_cls += c.n_comment_cls;
+                        nav_text += c.nav_text;
                         punct += c.punct;
                         digits += c.digits;
                         upper += c.upper;
@@ -2714,6 +2721,10 @@ unsafe fn tpl_scan(
                 candidates.push((node, text_len));
             }
         }
+        // chrome containers claim their whole subtree's text as nav text
+        if matches!(tag, LXB_TAG_NAV | LXB_TAG_ASIDE | LXB_TAG_FOOTER | LXB_TAG_HEADER) {
+            nav_text = text_len;
+        }
         TplNode {
             ptr: node,
             text_len,
@@ -2723,6 +2734,7 @@ unsafe fn tpl_scan(
             n_forms,
             n_articles,
             n_comment_cls,
+            nav_text,
             punct,
             digits,
             upper,
@@ -2852,6 +2864,28 @@ unsafe fn tpl_vetoes(
         }
         let pld = totals.link_len as f64 / totals.text_len.max(1) as f64;
         (vetoes, large_repeated, whitelist, model_veto, model_veto_mass, pld)
+    }
+}
+
+/// Coarse generator class for the model (v5): 0 none/other, 1 blogger,
+/// 2 wordpress, 3 forum engine.
+unsafe fn generator_kind(doc: *mut lxb_html_document_t) -> u8 {
+    unsafe {
+        let g = generator_meta(doc);
+        if g.starts_with(b"blogger") {
+            1
+        } else if g.starts_with(b"wordpress") {
+            2
+        } else if g.starts_with(b"vbulletin")
+            || g.starts_with(b"phpbb")
+            || g.starts_with(b"xenforo")
+            || g.starts_with(b"mybb")
+            || g.starts_with(b"smf")
+        {
+            3
+        } else {
+            0
+        }
     }
 }
 
