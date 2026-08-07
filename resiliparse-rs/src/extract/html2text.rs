@@ -113,6 +113,28 @@ fn rstrip_in_place(s: &mut Vec<u8>) {
     }
 }
 
+/// Collapse like `get_collapsed_string`, additionally treating U+00A0 (NBSP,
+/// bytes C2 A0) as collapsible whitespace — the lpv11 gold normalizes NBSP to
+/// plain space almost everywhere (632 pred docs vs 43 gold docs carried it;
+/// cycle 0016). Markdown mode only; `<pre>` content never passes through here.
+fn get_collapsed_string_nbsp(input: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(input.len());
+    let mut i = 0;
+    while i < input.len() {
+        let is_nbsp = input[i] == 0xC2 && i + 1 < input.len() && input[i + 1] == 0xA0;
+        if is_nbsp || c_isspace(input[i]) {
+            if out.is_empty() || !c_isspace(*out.last().unwrap()) {
+                out.push(b' ');
+            }
+            i += if is_nbsp { 2 } else { 1 };
+        } else {
+            out.push(input[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
 /// Collapse newlines and consecutive white space in a string to single spaces.
 fn get_collapsed_string(input: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len());
@@ -1021,7 +1043,11 @@ unsafe fn serialize_extract_nodes(
 
             let mut element_text = current_node.text_contents.as_ref().unwrap().clone();
             if current_node.pre_depth == 0 || opts.preserve_formatting == FormattingOpts::Off {
-                element_text = get_collapsed_string(&element_text);
+                element_text = if opts.preserve_formatting == FormattingOpts::Markdown {
+                    get_collapsed_string_nbsp(&element_text)
+                } else {
+                    get_collapsed_string(&element_text)
+                };
                 if current_node.make_block || (!output.is_empty() && c_isspace(*output.last().unwrap())) {
                     // Strip inline elements only if previous text ended with space
                     element_text = lstrip(&element_text).to_vec();
