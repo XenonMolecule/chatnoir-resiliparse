@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8174** / Lev **0.7211** (0051) · train 0.8083/0.7078 — **M1 crossed; test 0.8218/0.7225**. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8185** / Lev **0.7232** (0052) · train 0.8101/0.7107 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -125,3 +125,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8174** / Lev **0.7211**
 - [0049 — UI-line strip batch 3](0049-ui-line-strip-batch3.md) — vB footer band + WP likes: 109 docs up, 7 down
 - [0050 — NEGATIVE: phpBB2 pairing](0050-NEGATIVE-phpbb2-pairing.md) — doc-order pairing mispairs column-layout skins; anti-pattern confirmed twice
 - [0051 — Big-data model + size-tiered veto](0051-bigdata-model.md) — 3M-block retrain, veto 0.30/keep 0.70, >1500B blocks need <0.10: **+0.0054 F1 / +0.0058 Lev; M1 crossed**
+- [0052 — Model block-floor sweep](0052-model-block-floor.md) — 150→40B floor, speed-free: +0.0011 F1 / +0.0021 Lev dev

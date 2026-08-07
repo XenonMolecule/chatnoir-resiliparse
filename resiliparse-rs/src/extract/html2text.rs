@@ -2755,7 +2755,11 @@ unsafe fn tpl_vetoes(
             let page_text = totals.text_len.max(1);
             let pld = totals.link_len as f64 / page_text as f64;
             for (i, b) in blocks.iter().enumerate() {
-                if b.text_len < 150 {
+                // 40-byte floor (0052): swept 150->10; quality rises
+                // monotonically as the floor drops but below 40B the extra
+                // per-block scoring costs +26% markdown time for +0.0009 F1
+                // — 40 is the free point (2.60 vs 2.67 ms/doc baseline).
+                if b.text_len < 40 {
                     continue;
                 }
                 let f = build_block_features(
