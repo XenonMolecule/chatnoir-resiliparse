@@ -83,3 +83,24 @@ fn basic_formatting() {
     };
     assert_eq!(extract_plain_text(html, &opts), "t\n\nhi");
 }
+
+#[test]
+fn model_not_placeholder() {
+    // Guard against a stub/placeholder block_model.rs shipping silently
+    // (cycle 0028 incident: a constant-score model disabled both tiers).
+    use resiliparse::extract::block_model::{score_block, BlockFeatures};
+    let mut lo = BlockFeatures::default();
+    lo.log_text_len = 3.0;
+    lo.link_density = 0.95;
+    lo.page_ld = 0.9;
+    lo.nav = 1.0;
+    lo.chrome = 1.0;
+    let mut hi = BlockFeatures::default();
+    hi.log_text_len = 7.0;
+    hi.punct = 0.05;
+    hi.avgw = 5.0;
+    hi.frac_page = 0.5;
+    let (a, b) = (score_block(&lo), score_block(&hi));
+    assert!((a - b).abs() > 0.05, "model looks constant: {a} vs {b}");
+    assert!(a < b, "nav/link-dense block should score below content block: {a} vs {b}");
+}
