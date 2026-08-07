@@ -221,6 +221,7 @@ tag_consts!(
     LXB_TAG_BR,
     LXB_TAG_BUTTON,
     LXB_TAG_CENTER,
+    LXB_TAG_CODE,
     LXB_TAG_DD,
     LXB_TAG_DETAILS,
     LXB_TAG_DIV,
@@ -268,6 +269,7 @@ const BLOCK_ELEMENTS: &[lxb_tag_id_t] = &[
     LXB_TAG_BLOCKQUOTE,
     LXB_TAG_BR,
     LXB_TAG_CENTER,
+    LXB_TAG_CODE,
     LXB_TAG_DETAILS,
     LXB_TAG_DD,
     LXB_TAG_DT,
@@ -778,6 +780,7 @@ unsafe fn serialize_extract_nodes(
         let mut md_cell_index: usize = 0;
         let mut md_row0_cells: usize = 0;
         let mut md_in_table = false;
+        let mut fence_just_opened = false;
         let mut list_numbering: Vec<usize> = Vec::new();
 
         for i in 0..extract_nodes.len() {
@@ -965,6 +968,12 @@ unsafe fn serialize_extract_nodes(
                         output.push(b'\n');
                     }
                     output.extend_from_slice(b"```");
+                    // language tag from class hints on the <pre> (or its
+                    // first <code> child): language-x / lang-x / brush: x
+                    if let Some(lang) = fence_language(current_node.reference_node) {
+                        output.extend_from_slice(lang.as_bytes());
+                    }
+                    fence_just_opened = true;
                     margin_size = 0;
                     current_node.make_block = false;
                 } else {
@@ -1132,11 +1141,11 @@ unsafe fn serialize_extract_nodes(
 
             output.extend_from_slice(&element_text_prefix);
             element_text_prefix.clear();
-            if opts.preserve_formatting == FormattingOpts::Markdown
-                && output.ends_with(b"```")
-                && !element_text.starts_with(b"\n")
-            {
-                output.push(b'\n');
+            if opts.preserve_formatting == FormattingOpts::Markdown && fence_just_opened {
+                if !element_text.starts_with(b"\n") {
+                    output.push(b'\n');
+                }
+                fence_just_opened = false;
             }
             output.extend_from_slice(&element_text);
         }
@@ -3118,6 +3127,41 @@ unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> O
             return None;
         }
         Some(out)
+    }
+}
+
+/// Fence language from `language-x`/`lang-x`/`brush: x` class hints on a
+/// `<pre>` or its first `<code>` child (cycle 0026; hint-only, no sniffing).
+unsafe fn fence_language(pre: *mut lxb_dom_node_t) -> Option<String> {
+    unsafe {
+        fn from_cls(cls: &[u8]) -> Option<String> {
+            let text = String::from_utf8_lossy(cls).to_lowercase();
+            for tok in text.split([' ', ';']) {
+                for pref in ["language-", "lang-", "brush:"] {
+                    if let Some(l) = tok.trim().strip_prefix(pref) {
+                        let l = l.trim();
+                        if !l.is_empty()
+                            && l.len() <= 12
+                            && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '#')
+                        {
+                            return Some(l.to_string());
+                        }
+                    }
+                }
+            }
+            None
+        }
+        if let Some(l) = from_cls(get_node_attr(pre, b"class")) {
+            return Some(l);
+        }
+        let mut child = (*pre).first_child;
+        while !child.is_null() {
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT && (*child).local_name == LXB_TAG_CODE {
+                return from_cls(get_node_attr(child, b"class"));
+            }
+            child = (*child).next;
+        }
+        None
     }
 }
 
