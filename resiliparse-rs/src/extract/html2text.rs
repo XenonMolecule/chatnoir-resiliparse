@@ -3206,7 +3206,7 @@ unsafe fn wp_comment_rebuild(
         let mut attributed = 0;
         for c in &items {
             let c = *c;
-            let author = query_selector_all_raw(
+            let mut author = query_selector_all_raw(
                 doc,
                 c,
                 b".comment-author .fn, cite.fn, .comment-author cite, .c-head a.url, .comment-author b, .comment-author a",
@@ -3214,13 +3214,28 @@ unsafe fn wp_comment_rebuild(
             .first()
             .map(|&n| collapsed_text(n))
             .unwrap_or_default();
+            if author.is_empty() {
+                // Highlander (wordpress.com) puts the author as bare text in
+                // div.c-head with only the permalink linked (0040)
+                if let Some(&h) = query_selector_all_raw(doc, c, b".c-head").first() {
+                    let t = collapsed_text(h);
+                    let t = t.trim_end_matches("permalink").trim();
+                    if !t.is_empty() && t.len() <= 48 {
+                        author = t.to_string();
+                    }
+                }
+            }
+            // first candidate containing a digit — c-head's permalink span
+            // otherwise wins in document order and "permalink" becomes the
+            // date (0040)
             let mut date = query_selector_all_raw(
                 doc,
                 c,
-                b".comment-metadata, .comment-meta, .commentmetadata, .c-head span, time",
+                b".comment-metadata, .comment-meta, .commentmetadata, .c-date, .c-head span, time",
             )
-            .first()
+            .iter()
             .map(|&n| collapsed_text(n))
+            .find(|t| t.bytes().any(|b| b.is_ascii_digit()))
             .unwrap_or_default();
             date = date
                 .trim_start_matches(|ch: char| ch == '/' || ch.is_whitespace())
