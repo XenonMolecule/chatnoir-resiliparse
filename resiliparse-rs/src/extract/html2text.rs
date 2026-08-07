@@ -1899,6 +1899,10 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 lxb_html_document_destroy(doc);
                 return out;
             }
+            if let Some(out) = extract_phpbb_subsilver2(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
+            }
             if generator.starts_with(b"ubb.threads") {
                 if let Some(out) = extract_ubb(doc, opts) {
                     lxb_html_document_destroy(doc);
@@ -3431,6 +3435,90 @@ unsafe fn extract_plain_text_from_node_opts(
     opts: &ExtractOpts,
 ) -> String {
     unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None, None).0 }
+}
+
+/// phpBB3 subSilver2 skin handler (cycle 0041): table layout with
+/// `b.postauthor` per post, body in `div.postbody`, date after "Posted:"
+/// in a `td.gensmall` cell. Pairing is document-order within one engine's
+/// strict table structure (unlike the 0040 mixed-template failure).
+unsafe fn extract_phpbb_subsilver2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let merged = query_selector_all_raw(doc, body, b"b.postauthor, div.postbody, td.gensmall");
+        let n_auth = merged
+            .iter()
+            .filter(|&&n| (*n).local_name == LXB_TAG_B)
+            .count();
+        if n_auth < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        let mut posts = 0usize;
+        let mut i = 0usize;
+        let page_text_len = get_collapsed_string(&get_node_text(body)).len();
+        let mut total = 0usize;
+        while i < merged.len() {
+            let n = merged[i];
+            if (*n).local_name != LXB_TAG_B {
+                i += 1;
+                continue;
+            }
+            let author = collapsed_text(n);
+            let mut date = String::new();
+            let mut bodyn: Option<*mut lxb_dom_node_t> = None;
+            let mut j = i + 1;
+            while j < merged.len() && (*merged[j]).local_name != LXB_TAG_B {
+                let m = merged[j];
+                if (*m).local_name == LXB_TAG_TD && date.is_empty() {
+                    let t = collapsed_text(m);
+                    if let Some(pos) = t.find("Posted:") {
+                        let tail = t[pos + 7..].trim();
+                        // date runs until the next label ("Post subject:")
+                        let tail = tail.split("Post subject:").next().unwrap_or(tail).trim();
+                        if !tail.is_empty()
+                            && tail.len() <= 48
+                            && tail.bytes().any(|b| b.is_ascii_digit())
+                        {
+                            date = tail.to_string();
+                        }
+                    }
+                } else if (*m).local_name == LXB_TAG_DIV && bodyn.is_none() {
+                    bodyn = Some(m);
+                }
+                j += 1;
+            }
+            i = j;
+            let (Some(bn), false) = (bodyn, author.is_empty()) else {
+                continue;
+            };
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            total += text.len();
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("\n\n");
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        // coverage guard (0021 pattern): the rebuilt thread must be a
+        // substantial share of the page or the generic walk knows better
+        if posts >= 2 && total * 4 >= page_text_len {
+            Some(out)
+        } else {
+            None
+        }
+    }
 }
 
 /// phpBB 2.x thread handler (cycle 0021): classic table skins — author in
