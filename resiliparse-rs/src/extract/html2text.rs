@@ -1737,11 +1737,20 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         // markdown; plain/guardrail behavior untouched).
         if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
             let generator = generator_meta(doc);
-            if generator.starts_with(b"vbulletin") {
+            let body_ptr: *mut lxb_dom_node_t = (*doc).body.cast();
+            // vBulletin: generator meta, or (0021) markup fallback — many vB
+            // installs strip the meta; the postbit ids are unmistakable.
+            let vb_markup = !body_ptr.is_null()
+                && query_selector_all_raw(doc, body_ptr, b"div[id^=\"post_message_\"]").len() >= 2;
+            if generator.starts_with(b"vbulletin") || vb_markup {
                 if let Some(out) = extract_vbulletin(doc, opts) {
                     lxb_html_document_destroy(doc);
                     return out;
                 }
+            }
+            if let Some(out) = extract_phpbb2(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
             }
             if let Some(out) = extract_phpbb(doc, opts) {
                 lxb_html_document_destroy(doc);
@@ -2700,6 +2709,71 @@ unsafe fn extract_plain_text_from_node_opts(
     opts: &ExtractOpts,
 ) -> String {
     unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None).0 }
+}
+
+/// phpBB 2.x thread handler (cycle 0021): classic table skins — author in
+/// `span.name` (usually `<b>`), body `span.postbody`, date in
+/// `span.postdetails` ("Posted: DATE    Post subject: ..."). Gate: >=2 of
+/// both name and postbody spans (a markup combo unique to phpBB2), paired by
+/// document order when counts match.
+unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let names = query_selector_all_raw(doc, body, b"span.name");
+        let bodies = query_selector_all_raw(doc, body, b"span.postbody");
+        if names.len() < 2 || bodies.len() < 2 || names.len() != bodies.len() {
+            return None;
+        }
+        let details = query_selector_all_raw(doc, body, b"span.postdetails");
+        let mut out = String::new();
+        let mut posts = 0;
+        for (i, (&n, &b)) in names.iter().zip(bodies.iter()).enumerate() {
+            let author = collapsed_text(n);
+            let text = extract_plain_text_from_node(doc, b, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            let mut date = String::new();
+            if let Some(&d) = details.get(i * details.len() / names.len().max(1)) {
+                let t = collapsed_text(d);
+                if let Some(pos) = t.find("Posted:") {
+                    let rest = &t[pos + 7..];
+                    let end = rest.find("Post subject").unwrap_or(rest.len());
+                    let cand = rest[..end].trim();
+                    if cand.len() <= 40 && cand.bytes().filter(|c| c.is_ascii_digit()).count() >= 4 {
+                        date = cand.to_string();
+                    }
+                }
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2013} {date}**"));
+                }
+                out.push_str("\n\n");
+            }
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts < 2 {
+            return None;
+        }
+        // Coverage guard: on odd skins (PNphpBB2) span.postbody matches
+        // signatures, not bodies — the rebuild must carry a meaningful share
+        // of the page text or the generic walk is better.
+        let body_total = get_collapsed_string(&get_node_text(body)).len();
+        if out.len() * 4 < body_total {
+            return None;
+        }
+        Some(out)
+    }
 }
 
 /// Whether the document declares `<meta name="generator" content="blogger">`
