@@ -1848,6 +1848,17 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 lxb_html_document_destroy(doc);
                 return out;
             }
+            // Generic post-stream rebuilder measured NEGATIVE twice
+            // (cycle 0029): repeated-blocks + head-anchored author/date
+            // cannot separate threads from slideshows/datelined grids.
+            // Disabled; one-off engines get per-engine gates instead.
+            #[allow(clippy::never_loop)]
+            if false {
+                if let Some(out) = extract_generic_posts(doc, opts) {
+                    lxb_html_document_destroy(doc);
+                    return out;
+                }
+            }
         }
 
         let mut page_has_card_grid = false;
@@ -3241,6 +3252,153 @@ unsafe fn fence_language(pre: *mut lxb_dom_node_t) -> Option<String> {
             child = (*child).next;
         }
         None
+    }
+}
+
+static DATE_LIKE: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"(?:\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(?:st|nd|rd|th)?,? \d{2,4}|\d{1,2}:\d{2}\s?(?:am|pm)?|\d+ (?:hours?|days?|weeks?|months?|years?) ago)")
+        .case_insensitive(true)
+        .unicode(false)
+        .build()
+        .unwrap()
+});
+
+/// Generic forum post-stream rebuilder (cycle 0029): one-off engines share a
+/// shape — >=3 repeated same-class sibling containers, each with a short
+/// user link, a date-like string, and a substantial body. Rebuild as
+/// `**user — date**` + body. Runs only after every specific handler
+/// declined; authored/coverage/native-first gates as elsewhere.
+unsafe fn extract_generic_posts(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let page_text = get_collapsed_string(&get_node_text(body)).len();
+        if page_text < 1500 {
+            return None;
+        }
+        // find the best repeated-sibling stream container
+        let mut best: Option<(Vec<*mut lxb_dom_node_t>, usize)> = None;
+        let mut node = body;
+        let mut depth = 0usize;
+        let mut end_tag = false;
+        while !node.is_null() {
+            if !end_tag && (*node).type_ == LXB_DOM_NODE_TYPE_ELEMENT {
+                // group element children by (tag, class)
+                let mut groups: std::collections::HashMap<(lxb_tag_id_t, Vec<u8>), Vec<*mut lxb_dom_node_t>> =
+                    std::collections::HashMap::new();
+                let mut child = (*node).first_child;
+                while !child.is_null() {
+                    if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                        && is_block_element((*child).local_name)
+                    {
+                        let cls = get_node_attr(child, b"class").to_vec();
+                        groups.entry(((*child).local_name, cls)).or_default().push(child);
+                    }
+                    child = (*child).next;
+                }
+                for (_k, members) in groups {
+                    if members.len() < 3 {
+                        continue;
+                    }
+                    let total: usize = members
+                        .iter()
+                        .map(|&m| get_collapsed_string(&get_node_text(m)).len())
+                        .sum();
+                    if total * 4 < page_text || total / members.len() < 200 {
+                        continue;
+                    }
+                    if best.as_ref().map(|(_, t)| total > *t).unwrap_or(true) {
+                        best = Some((members, total));
+                    }
+                }
+            }
+            node = next_node(body, node, &mut depth, &mut end_tag);
+        }
+        let (posts_nodes, _) = best?;
+
+        let mut out = String::new();
+        let mut authored = 0;
+        let mut authors: Vec<String> = Vec::new();
+        for c in &posts_nodes {
+            let c = *c;
+            let text_all = get_collapsed_string(&get_node_text(c));
+            let head = &text_all[..text_all.len().min(200)];
+            // author: first short link whose text appears in the post HEAD
+            // (forum post headers lead with the username)
+            let mut author = String::new();
+            let coll = lxb_dom_collection_make_noi((*c).owner_document, 8);
+            lxb_dom_elements_by_tag_name(c.cast(), coll, b"a".as_ptr(), 1);
+            for i in 0..lxb_dom_collection_length_noi(coll) {
+                let t = collapsed_text(lxb_dom_collection_node_noi(coll, i));
+                let wc = t.split_whitespace().count();
+                if (2..=25).contains(&t.len())
+                    && wc <= 3
+                    && !t.chars().all(|ch| ch.is_ascii_digit())
+                    && String::from_utf8_lossy(head).contains(t.as_str())
+                {
+                    author = t;
+                    break;
+                }
+            }
+            // date: date-like substring in the post head only
+            let date = DATE_LIKE
+                .find(head)
+                .map(|m| String::from_utf8_lossy(&head[m.start()..m.end()]).to_string())
+                .unwrap_or_default();
+            lxb_dom_collection_destroy(coll, true);
+            if date.is_empty() {
+                continue; // post streams carry dates; listings usually don't
+            }
+            let text = extract_plain_text_from_node(doc, c, opts);
+            if text.trim().is_empty() || author.is_empty() {
+                continue;
+            }
+            // strip the standalone author/date lines the subtree walk kept
+            let cleaned: String = text
+                .lines()
+                .filter(|l| {
+                    let t = l.trim().trim_start_matches(['-', '\u{2022}', ' ']).trim();
+                    !t.is_empty() && t != author && t != date
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            if cleaned.trim().is_empty() {
+                continue;
+            }
+            authored += 1;
+            authors.push(author.clone());
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("\n\n");
+            out.push_str(cleaned.trim_end());
+        }
+        if authored < 3 {
+            return None;
+        }
+        // listings repeat one link target; threads have diverse authors
+        let unique: std::collections::HashSet<&String> = authors.iter().collect();
+        if unique.len() < 2 {
+            return None;
+        }
+        let body_total = page_text.max(1);
+        if out.len() * 4 < body_total {
+            return None;
+        }
+        // native-first: only rebuild if the generic walk loses attribution
+        let generic = extract_plain_text_from_doc(doc, opts, RelaxFlags::default(), None, None);
+        let missing = authors.iter().filter(|a| !generic.contains(a.as_str())).count();
+        if missing * 2 < authors.len() {
+            return None;
+        }
+        Some(out)
     }
 }
 

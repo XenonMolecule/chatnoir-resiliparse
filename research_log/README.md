@@ -102,3 +102,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7977** / Lev **0.6960**
 - [0026 — Fence langs + UI labels](0026-fence-lang-ui-labels.md) — residual audit → curated chrome-line filter: 109↑/15↓ dev; fence ```lang hints
 - [0027 — Model v2 scaling (NEGATIVE)](0027-model-v2-scaling-negative.md) — 10× data → AUC +0.001, live wash; features are the frontier, not rows
 - [0028 — Model v3 features (in progress)](0028-model-v3-features.md) — wordbag+context features: AUC 0.8551 (+0.005); calibration pending, exact next steps logged
+- [0029 — Generic post-stream (NEGATIVE)](0029-generic-poststream-negative.md) — 2 gate rounds, −0.020/−0.002; fifth discriminator-wall confirmation; per-engine gates only
