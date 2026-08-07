@@ -4455,6 +4455,15 @@ fn strip_ui_label_lines(text: String) -> String {
         "you cannot edit your posts in this forum",
         "you cannot delete your posts in this forum",
         "you cannot post attachments in this forum",
+        "view single post", "blog comments powered by disqus",
+        "comments powered by disqus",
+        "related posts plugin for wordpress, blogger...",
+        "share this page", "events calendar",
+        "current community", "your communities",
+        "more stack exchange communities",
+        "you may not post new threads", "you may not post replies",
+        "subscribe to: post comments (atom)",
+        "get every new post delivered to your inbox.",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
