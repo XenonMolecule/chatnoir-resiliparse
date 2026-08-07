@@ -1889,38 +1889,38 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             if generator.starts_with(b"vbulletin") || vb_markup {
                 if let Some(out) = extract_vbulletin(doc, opts) {
                     lxb_html_document_destroy(doc);
-                    return out;
+                    return md_post_passes(out);
                 }
             }
             if let Some(out) = extract_phpbb2(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             if let Some(out) = extract_phpbb(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             if let Some(out) = extract_phpbb_subsilver2(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             if let Some(out) = extract_xenforo(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             if generator.starts_with(b"ubb.threads") {
                 if let Some(out) = extract_ubb(doc, opts) {
                     lxb_html_document_destroy(doc);
-                    return out;
+                    return md_post_passes(out);
                 }
             }
             if let Some(out) = extract_invision(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             if let Some(out) = extract_smf(doc, opts) {
                 lxb_html_document_destroy(doc);
-                return out;
+                return md_post_passes(out);
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
@@ -1934,7 +1934,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             ] {
                 if let Some(out) = handler(doc, opts) {
                     lxb_html_document_destroy(doc);
-                    return out;
+                    return md_post_passes(out);
                 }
             }
             // Generic post-stream rebuilder measured NEGATIVE twice
@@ -1945,7 +1945,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             if false {
                 if let Some(out) = extract_generic_posts(doc, opts) {
                     lxb_html_document_destroy(doc);
-                    return out;
+                    return md_post_passes(out);
                 }
             }
         }
@@ -2207,7 +2207,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 if !result.is_empty() {
                     result.push_str("\n\n");
                 }
-                result.push_str(&block);
+                result.push_str(&md_post_passes(block));
             }
         }
 
@@ -4802,9 +4802,12 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // rationale as content_len excluding markdown punctuation.
             // Measured both ways (0035): post-rescue ordering trades ~3
             // beneficial rescues for 1 junk rescue and nets worse.
+            // tabs first: plain-rendered table cells join with '\t' and
+            // must collapse before the exact-line strip can see them
+            // ("Author\tMessage", 0048)
+            text = normalize_tabs(text);
             text = strip_ui_label_lines(text);
             text = promote_heading_levels(text);
-            text = normalize_tabs(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
             // gold keeps repeats on some templates; disabled pending
             // containment-aware port of the jusText version.
@@ -4961,6 +4964,15 @@ fn normalize_tabs(text: String) -> String {
         out.push_str(cur.trim_end());
     }
     out
+}
+
+/// Markdown post-passes bundle (0048): engine-handler outputs and
+/// appended rebuild blocks exit before impl2's interior post-passes and
+/// were shipping unstripped chrome lines ("Author Message") and raw tabs.
+fn md_post_passes(text: String) -> String {
+    let text = normalize_tabs(text);
+    let text = strip_ui_label_lines(text);
+    promote_heading_levels(text)
 }
 
 fn strip_ui_label_lines(text: String) -> String {
