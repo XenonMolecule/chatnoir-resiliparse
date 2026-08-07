@@ -29,3 +29,12 @@ dev 2 improved / 0 regressed (byline-exact on both probe docs). train
 Patch-script heredocs MUST use raw strings — a `\u{2013}` in a non-raw
 triple-quote silently failed the patch while the eval measured the old
 binary as if it were the new one. Caught by metric identity.
+
+## Follow-up (0043b, same day)
+The blanket quote-strip reduced `total` below the 25% coverage guard on
+quote-heavy threads — the handler located the thread, then disqualified
+itself (homebrewtalk fell back to the generic walk in the harness while
+the pre-strip spot-check passed). Guard now counts each post's FULL
+pre-strip mass. dev **0.8090 / 0.7116** (+1 doc); train 0.7988/0.6964
+(8 up / 3 down; gen3insight −0.15 — a quote-keeper gold where the guard
+rejection had been accidentally protective; 27%-side cost, logged).

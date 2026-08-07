@@ -3512,7 +3512,10 @@ unsafe fn extract_xenforo(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> 
             if text.trim().is_empty() || author.is_empty() {
                 continue;
             }
-            total += text.len();
+            // coverage counts the post's FULL mass (quotes included): the
+            // guard asks "did we locate the thread", not "how much did the
+            // quote-strip remove" — stripping must not fail the guard
+            total += get_collapsed_string(&get_node_text(bn)).len();
             if !out.is_empty() {
                 out.push_str("\n\n");
             }
