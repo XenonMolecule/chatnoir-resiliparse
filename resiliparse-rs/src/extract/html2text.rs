@@ -5007,6 +5007,14 @@ fn strip_ui_label_lines(text: String) -> String {
         "you may not post new threads", "you may not post replies",
         "subscribe to: post comments (atom)",
         "get every new post delivered to your inbox.",
+        "you cannot vote in polls in this forum",
+        "likeliked by 1 person", "likeliked by 2 people",
+        "likeliked by 3 people", "likeliked by 4 people",
+        "rate this thread", "search this thread", "display modes",
+        "html code is on", "html code is off", "bb code is on",
+        "smilies are on", "[img] code is on", "posting rules",
+        "thread tools", "you may not post attachments",
+        "you may not edit your posts",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
