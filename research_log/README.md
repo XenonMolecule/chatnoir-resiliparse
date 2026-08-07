@@ -129,3 +129,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8223** / Lev **0.7260**
 - [0053 — n120d6 model](0053-n120-model.md) — AUC 0.8503, re-swept 0.35/0.65: +0.0008 F1 dev, +0.0017/+0.0017 train
 - [0054 — v4 page features](0054-v4-page-features.md) — forms/articles/comment-cls counts, AUC 0.8550, veto 0.40/keep 0.60: +0.0013 F1 / +0.0014 Lev dev
 - [0055 — v5 page features](0055-v5-page-features.md) — nav share/generator/block count, AUC 0.8592: +0.0017 F1 / +0.0013 Lev dev; train cross-check now standard for sweeps
+- [0056 — NEGATIVE: positional features](0056-NEGATIVE-positional-features.md) — AUC +0.0036 but live −0.001: position anti-correlates on comments; first AUC/live divergence
