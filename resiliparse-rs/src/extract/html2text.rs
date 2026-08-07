@@ -2723,7 +2723,7 @@ const MODEL_VETO_THRESHOLD: f64 = 0.35;
 const MODEL_VETO_ENABLED: bool = true;
 /// Whitelist tier: blocks scoring above this override rule/template vetoes.
 const MODEL_VETO_BIG_THRESHOLD: f64 = 0.10;
-const MODEL_KEEP_THRESHOLD: f64 = 0.70;
+const MODEL_KEEP_THRESHOLD: f64 = 0.65;
 
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
