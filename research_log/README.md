@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8086** / Lev **0.7109** (0041) · train 0.7985/0.6958. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8086** / Lev **0.7109** (0042) · train 0.7986/0.6959. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -115,3 +115,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8086** / Lev **0.7109**
 - [0039 — Blogspot comment rebuild](0039-blogspot-comment-rebuild.md) — gold rewrites "NAME said..." as `**NAME — TIME**`: +0.0014 F1 / +0.0018 Lev dev; fixed latent effective-veto-set bug in rescue retries
 - [0040 — Comment-template probes](0040-comment-template-probes.md) — WP selector fixes ship clean (+0.0001 Lev); Highlander-force & old-Blogger pairing measured negative (per-doc gold variance, wall #10)
 - [0041 — phpBB subSilver2 handler](0041-phpbb-subsilver2.md) — b.postauthor table skin: +0.0009 F1 / +0.0014 Lev dev, zero regressions
+- [0042 — vBulletin variants](0042-vbulletin-variants.md) — vB4 markup gate + member.php author fallback: small clean win

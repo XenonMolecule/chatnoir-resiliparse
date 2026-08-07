@@ -1884,7 +1884,8 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // vBulletin: generator meta, or (0021) markup fallback — many vB
             // installs strip the meta; the postbit ids are unmistakable.
             let vb_markup = !body_ptr.is_null()
-                && query_selector_all_raw(doc, body_ptr, b"div[id^=\"post_message_\"]").len() >= 2;
+                && (query_selector_all_raw(doc, body_ptr, b"div[id^=\"post_message_\"]").len() >= 2
+                    || query_selector_all_raw(doc, body_ptr, b"li[id^=\"post_\"] blockquote.postcontent").len() >= 2);
             if generator.starts_with(b"vbulletin") || vb_markup {
                 if let Some(out) = extract_vbulletin(doc, opts) {
                     lxb_html_document_destroy(doc);
@@ -2796,10 +2797,19 @@ unsafe fn extract_vbulletin(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -
         for c in containers {
             // author
             let author_nodes = query_selector_all_raw(doc, c, b"a.bigusername, a.username");
-            let author = author_nodes
+            let mut author = author_nodes
                 .first()
                 .map(|&n| String::from_utf8_lossy(&get_collapsed_string(&get_node_text(n))).trim().to_string())
                 .unwrap_or_default();
+            if author.is_empty() {
+                // some skins leave the class empty on the profile anchor
+                // (rcgroups, 0042) — fall back to the member.php link text
+                author = query_selector_all_raw(doc, c, b"a[href^=\"member.php\"]")
+                    .iter()
+                    .map(|&n| String::from_utf8_lossy(&get_collapsed_string(&get_node_text(n))).trim().to_string())
+                    .find(|t| !t.is_empty() && t.len() <= 40)
+                    .unwrap_or_default();
+            }
             // body: vB3 div[id^=post_message_], vB4 blockquote.postcontent
             let body_nodes = query_selector_all_raw(doc, c, b"div[id^=\"post_message_\"], blockquote.postcontent");
             let Some(&bn) = body_nodes.first() else { continue };
