@@ -222,6 +222,7 @@ tag_consts!(
     LXB_TAG_INPUT,
     LXB_TAG_LI,
     LXB_TAG_MAIN,
+    LXB_TAG_META,
     LXB_TAG_NAV,
     LXB_TAG_OL,
     LXB_TAG_P,
@@ -265,6 +266,7 @@ const BLOCK_ELEMENTS: &[lxb_tag_id_t] = &[
     LXB_TAG_HR,
     LXB_TAG_LI,
     LXB_TAG_MAIN,
+    LXB_TAG_META,
     LXB_TAG_NAV,
     LXB_TAG_OL,
     LXB_TAG_P,
@@ -1601,6 +1603,41 @@ const RESCUE_BODY_FACTOR: usize = 30;
 /// main-content output.
 const RESCUE_KEEP_FACTOR: usize = 20;
 
+/// Whether the document declares `<meta name="generator" content="blogger">`
+/// (Blogger/Blogspot platform signature; cycle 0010).
+unsafe fn is_blogger_doc(doc: *mut lxb_html_document_t) -> bool {
+    unsafe {
+        let head: *mut lxb_dom_node_t = (*doc).head.cast();
+        if head.is_null() {
+            return false;
+        }
+        let mut child = (*head).first_child;
+        while !child.is_null() {
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT && (*child).local_name == LXB_TAG_META {
+                let name = get_node_attr(child, b"name");
+                if name.eq_ignore_ascii_case(b"generator")
+                    && get_node_attr(child, b"content").to_ascii_lowercase().starts_with(b"blogger")
+                {
+                    return true;
+                }
+            }
+            child = (*child).next;
+        }
+        false
+    }
+}
+
+/// Blogger chrome that the lpv11 gold consistently drops (share buttons,
+/// labels line, pagers, feed links). Gold-inconsistent items ("Posted by",
+/// comment headers) are deliberately NOT here (kept 28/62 — a wall).
+const BLOGGER_CHROME_SELECTORS: &[&[u8]] = &[
+    b".post-share-buttons",
+    b".feed-links",
+    b".blog-pager",
+    b"#blog-pager",
+    b".post-labels",
+];
+
 unsafe fn extract_plain_text_from_doc(
     doc: *mut lxb_html_document_t,
     opts: &ExtractOpts,
@@ -1644,6 +1681,11 @@ unsafe fn extract_plain_text_from_doc_impl(
         }
         if !opts.form_fields {
             for sel in [b"textarea".as_slice(), b"input", b"button", b"select", b"option", b"label"] {
+                skip_selectors.insert(sel.to_vec());
+            }
+        }
+        if opts.main_content && is_blogger_doc(doc) {
+            for sel in BLOGGER_CHROME_SELECTORS {
                 skip_selectors.insert(sel.to_vec());
             }
         }

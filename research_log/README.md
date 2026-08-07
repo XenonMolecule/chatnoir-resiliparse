@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7809** / Lev **0.6701**. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7811** / Lev **0.6705** (0010). Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -84,3 +84,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7809** / Lev **0.6701**
 - [0007 — Article-teaser repair](0007-article-teaser.md) — RelaxFlags generalization + short-article retry: dev +1/0 reg, train +12/−1(noise); rescue buckets overlap tier-1
 - [0008 — Selection ceiling](0008-selection-ceiling.md) — block-oracle 0.77 (< current!), line-oracle 0.86; transformation is load-bearing for the 0.90 goal; GOALS.md set
 - [0009 — Markdown mode v1](0009-markdown-mode-v1.md) — headings/bold/bullets/hard-breaks: Lev +0.0024, F1 flat, +0.4% cost; markdown is now the lpv11 config; label-bold + md-links queued
+- [0010 — Blogger chrome handler](0010-blogger-chrome.md) — meta-generator-gated skip of share/labels/pager chrome: 110 docs improved across dev sets, 0 meaningful reg; gold-consistency check kept "Posted by" untouched (28/62 wall)
