@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML): F1 **0.7801** (0006) · train +0.0156 vs baseline · speed ratio 1.20×. Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML): F1 **0.7805** (0007) · train 0.7753 (+0.0162 vs baseline) · speed ratio 1.19×. Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -81,3 +81,4 @@ lpv11/dev (raw HTML): F1 **0.7801** (0006) · train +0.0156 vs baseline · speed
 - [0004 — Near-empty rescue](0004-near-empty-rescue.md) — **+0.0163 F1**, 29↑/0↓ dev (+0.012 both guardrails, 0 reg); gated fallback, sweep-tuned, no speed cost
 - [0005 — ul-rule repair](0005-ul-rule-repair.md) — tier-2 rescue for text-heavy lists: +1 doc/set, 0 reg, ~1% speed cost; bigger variant queued (needs widget signal)
 - [0006 — Widget signal + error-stub guard](0006-widget-signal.md) — widget/meta/hide veto unlocks stronger list exemption: +9 docs/0 reg on dev sets; train 312↑/50↓ (+0.0156) with logged trade-off; 2 robustness fixes
+- [0007 — Article-teaser repair](0007-article-teaser.md) — RelaxFlags generalization + short-article retry: dev +1/0 reg, train +12/−1(noise); rescue buckets overlap tier-1

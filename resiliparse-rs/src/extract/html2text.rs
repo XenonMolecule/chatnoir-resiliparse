@@ -989,6 +989,16 @@ const BLACKLIST_ARIA_ROLES: &[&[u8]] = &[
     b"tooltip",
 ];
 
+/// Rule relaxations active only during the tier-2 rescue retry (never on the
+/// primary extraction pass).
+#[derive(Clone, Copy, Default, PartialEq)]
+struct RelaxFlags {
+    /// Keep text-heavy `<ul>`s regardless of depth/link-ratio (cycle 0005).
+    text_heavy_lists: bool,
+    /// Skip the `<article>` teaser link-cluster check (cycle 0007).
+    short_articles: bool,
+}
+
 /// Rule-based check whether the given element is a "main-content" element.
 unsafe fn is_main_content_node(
     node: *mut lxb_dom_node_t,
@@ -996,7 +1006,7 @@ unsafe fn is_main_content_node(
     keep_comments: bool,
     keep_post_meta: bool,
     keep_hidden: bool,
-    ul_exemption: bool,
+    relax: RelaxFlags,
 ) -> bool {
     unsafe {
         if (*node).type_ == LXB_DOM_NODE_TYPE_TEXT {
@@ -1041,13 +1051,15 @@ unsafe fn is_main_content_node(
             // text is main content (obituaries, docs pages, news briefs), no
             // matter how shallow. Nav menus are short and link-dense, so they
             // can't qualify.
-            if !(ul_exemption && is_text_heavy_list(node)) && (body_depth < 4 || is_link_cluster(node, 0.2, 0)) {
+            if !(relax.text_heavy_lists && is_text_heavy_list(node))
+                && (body_depth < 4 || is_link_cluster(node, 0.2, 0))
+            {
                 return false;
             }
         }
         // Teaser articles
         else if local_name == LXB_TAG_ARTICLE {
-            if body_depth > 2 && is_link_cluster(node, 0.2, 500) {
+            if !relax.short_articles && body_depth > 2 && is_link_cluster(node, 0.2, 500) {
                 return false;
             }
         }
@@ -1294,7 +1306,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             lxb_html_document_destroy(doc);
             return String::new();
         }
-        let (mut result, dropped_uls) = extract_plain_text_from_doc_impl(doc, opts, false);
+        let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default());
 
         // Self-correcting rescues (cycles 0004/0005). Gated on the extraction
         // having lost most of the page's text, so they cannot fire on (and
@@ -1336,34 +1348,65 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     main_content: false,
                     ..opts.clone()
                 };
-                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, false);
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default());
                 if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
                     result = fallback;
                     rescued = true;
                 }
             }
 
-            // Tier 2 (0005): a rescue-eligible dropped list + output that is a
-            // small fraction of the page text → retry with the
-            // text-heavy-list exemption (the <ul> blacklist rule dropping
-            // list-structured main content), kept only if it recovers
+            // Tier 2 (0005/0007): a rescue-eligible dropped node + output
+            // that is a small fraction of the page text → retry with the
+            // corresponding rule relaxed, kept only if it recovers
             // substantially more. Eligibility runs before the body-text
-            // materialization: dropped ULs are usually a handful of small nav
-            // lists, so testing them is much cheaper than a full-page
-            // text_content.
-            if !rescued
-                && !is_error_stub
-                && !dropped_uls.is_empty()
-                && dropped_uls.iter().any(|&(n, d)| {
-                    is_main_content_node(n, d, opts.comments, opts.post_meta, opts.hidden_elements, true)
-                })
-                && (result.len() as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
-            {
-                let retry = extract_plain_text_from_doc(doc, opts, true);
-                if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
-                    && !duplicates_existing_content(&result, &retry)
+            // materialization: dropped candidates are usually a handful of
+            // small nav lists, so testing them is much cheaper than a
+            // full-page text_content.
+            if !rescued && !is_error_stub && !dropped_nodes.is_empty() {
+                let mut relax = RelaxFlags::default();
+                // Text-heavy list dropped by the <ul> rule (0005)?
+                if dropped_nodes.iter().any(|&(n, d)| {
+                    (*n).local_name == LXB_TAG_UL
+                        && is_main_content_node(
+                            n,
+                            d,
+                            opts.comments,
+                            opts.post_meta,
+                            opts.hidden_elements,
+                            RelaxFlags { text_heavy_lists: true, ..Default::default() },
+                        )
+                }) {
+                    relax.text_heavy_lists = true;
+                }
+                // Short real story dropped by the teaser rule (0007)? Teasers
+                // come in streams — only pages with few <article> elements
+                // qualify.
+                if dropped_nodes.iter().any(|&(n, _)| (*n).local_name == LXB_TAG_ARTICLE)
+                    && count_articles(doc) <= ARTICLE_RESCUE_MAX_COUNT
+                    && dropped_nodes.iter().any(|&(n, d)| {
+                        (*n).local_name == LXB_TAG_ARTICLE
+                            && is_main_content_node(
+                                n,
+                                d,
+                                opts.comments,
+                                opts.post_meta,
+                                opts.hidden_elements,
+                                RelaxFlags { short_articles: true, ..Default::default() },
+                            )
+                    })
                 {
-                    result = retry;
+                    relax.short_articles = true;
+                }
+
+                if relax != RelaxFlags::default()
+                    && (result.len() as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
+                {
+                    let retry = extract_plain_text_from_doc(doc, opts, relax);
+                    if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
+                        && !duplicates_existing_content(&result, &retry)
+                    {
+                        result = retry;
+                    }
                 }
             }
         }
@@ -1378,6 +1421,25 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
 /// Sweep-tuned on lpv11 dev under the zero-regression constraint.
 const UL_RESCUE_MAX_OUTPUT_RATIO: f64 = 0.3;
 const UL_RESCUE_KEEP_FACTOR: f64 = 2.0;
+
+/// Pages with more `<article>` elements than this are teaser streams; the
+/// short-article relaxation (cycle 0007) never fires on them.
+const ARTICLE_RESCUE_MAX_COUNT: usize = 3;
+
+/// Number of `<article>` elements in the document body.
+unsafe fn count_articles(doc: *mut lxb_html_document_t) -> usize {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return 0;
+        }
+        let dom_coll = lxb_dom_collection_make_noi((*body).owner_document, 8);
+        lxb_dom_elements_by_tag_name(body.cast(), dom_coll, b"article".as_ptr(), 7);
+        let n = lxb_dom_collection_length_noi(dom_coll);
+        lxb_dom_collection_destroy(dom_coll, true);
+        n
+    }
+}
 
 /// Error/stub-page phrases that mark a tiny extraction as the page's true
 /// content (rescue veto, cycle 0006).
@@ -1433,24 +1495,25 @@ const RESCUE_KEEP_FACTOR: usize = 20;
 unsafe fn extract_plain_text_from_doc(
     doc: *mut lxb_html_document_t,
     opts: &ExtractOpts,
-    ul_exemption: bool,
+    relax: RelaxFlags,
 ) -> String {
-    unsafe { extract_plain_text_from_doc_impl(doc, opts, ul_exemption).0 }
+    unsafe { extract_plain_text_from_doc_impl(doc, opts, relax).0 }
 }
 
-/// Returns the extracted text plus the `<ul>` nodes (with their body depth)
-/// dropped by the main-content blacklist — recorded so the tier-2 rescue can
-/// lazily test rescue eligibility only when its output-size gate fires.
+/// Returns the extracted text plus the `<ul>`/`<article>` nodes (with their
+/// body depth) dropped by the main-content blacklist — recorded so the tier-2
+/// rescue can lazily test rescue eligibility only when its output-size gate
+/// fires.
 unsafe fn extract_plain_text_from_doc_impl(
     doc: *mut lxb_html_document_t,
     opts: &ExtractOpts,
-    ul_exemption: bool,
+    relax: RelaxFlags,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
-    let mut dropped_uls: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+    let mut dropped_nodes: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
         if body.is_null() {
-            return (String::new(), dropped_uls);
+            return (String::new(), dropped_nodes);
         }
 
         // Build the skip selector (BTreeSet: Python uses a set; order does not
@@ -1503,7 +1566,7 @@ unsafe fn extract_plain_text_from_doc_impl(
             ctx.root_node = n;
             ctx.node = n;
             if n.is_null() {
-                return (String::new(), dropped_uls);
+                return (String::new(), dropped_nodes);
             }
         }
 
@@ -1551,17 +1614,17 @@ unsafe fn extract_plain_text_from_doc_impl(
                         opts.comments,
                         opts.post_meta,
                         opts.hidden_elements,
-                        ul_exemption,
+                        relax,
                     ))
             {
-                if !ul_exemption
+                if relax == RelaxFlags::default()
                     && opts.main_content
-                    && dropped_uls.len() < 64
+                    && dropped_nodes.len() < 64
                     && (*ctx.node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
-                    && (*ctx.node).local_name == LXB_TAG_UL
+                    && matches!((*ctx.node).local_name, LXB_TAG_UL | LXB_TAG_ARTICLE)
                     && !blacklisted_nodes.contains(&ctx.node)
                 {
-                    dropped_uls.push((ctx.node, ctx.depth + base_depth));
+                    dropped_nodes.push((ctx.node, ctx.depth + base_depth));
                 }
                 is_end_tag = true;
                 ctx.node = next_node(ctx.root_node, ctx.node, &mut ctx.depth, &mut is_end_tag);
@@ -1585,6 +1648,6 @@ unsafe fn extract_plain_text_from_doc_impl(
             (chars_extracted as f64 * 1.2) as usize,
         );
         rstrip_in_place(&mut output);
-        (decode_utf8_ignore(output), dropped_uls)
+        (decode_utf8_ignore(output), dropped_nodes)
     }
 }
