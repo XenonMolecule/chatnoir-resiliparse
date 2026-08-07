@@ -1763,7 +1763,15 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
         }
 
-        let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default());
+        let tpl_set: Option<HashSet<*mut lxb_dom_node_t>> =
+            if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
+                let body: *mut lxb_dom_node_t = (*doc).body.cast();
+                if body.is_null() { None } else { Some(tpl_vetoes(body)) }
+            } else {
+                None
+            };
+        let tpl_ref = tpl_set.as_ref();
+        let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), tpl_ref);
 
         // Self-correcting rescues (cycles 0004/0005). Gated on the extraction
         // having lost most of the page's text, so they cannot fire on (and
@@ -1817,7 +1825,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     main_content: false,
                     ..opts.clone()
                 };
-                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default());
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), tpl_ref);
                 if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
                     result = fallback;
                     rescued = true;
@@ -1872,7 +1880,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 if relax != RelaxFlags::default()
                     && (result_content_len as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
                 {
-                    let retry = extract_plain_text_from_doc(doc, opts, relax);
+                    let retry = extract_plain_text_from_doc(doc, opts, relax, tpl_ref);
                     if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
                         && !duplicates_existing_content(&result, &retry)
                     {
@@ -1967,6 +1975,172 @@ const RESCUE_BODY_FACTOR: usize = 30;
 /// Keep the fallback only if it is at least this many times larger than the
 /// main-content output.
 const RESCUE_KEEP_FACTOR: usize = 20;
+
+// ---------------------------------------------------------------------------
+// Structural template subtraction (cycle 0019)
+// ---------------------------------------------------------------------------
+// Boilerplate is built from repeated sibling subtrees (nav lists, card
+// grids); main content is structurally diverse. Prototype measured +0.06-0.08
+// F1 over a dump baseline (held-out confirmed); the load-bearing conjunct is
+// repetition AND link-density (repetition alone kills content lists/tables).
+// See research_log/analysis-template-subtraction.md.
+
+const TPL_MIN_CHILDREN: usize = 3;
+const TPL_MIN_REPEATED: usize = 3;
+const TPL_MIN_FRAC: f64 = 0.5;
+const TPL_LINK_DENSITY: f64 = 0.7;
+const TPL_MAX_CONTAINER_FRAC: f64 = 0.3;
+/// Absolute cap: chrome containers are small; repeated-structure containers
+/// above this are content (photo series, verse lists, instruction sequences —
+/// 33 train catastrophes without it).
+const TPL_MAX_CONTAINER_TEXT: usize = 2500;
+/// Skip subtraction entirely on listing-like pages (gold keeps chrome there).
+const TPL_PAGE_LINK_DENSITY_MAX: f64 = 0.7;
+const TPL_MIN_PAGE_TEXT: usize = 1500;
+
+#[allow(dead_code)]
+struct TplNode {
+    ptr: *mut lxb_dom_node_t,
+    text_len: usize,
+    link_len: usize,
+    n_imgs: usize,
+    sig1: u64,
+    sig2: u64,
+}
+
+fn tpl_hash(first: u64, rest: &[u64]) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    h.write_u64(first);
+    for i in rest {
+        h.write_u64(*i);
+    }
+    h.finish()
+}
+
+fn tpl_base_sig(tag: lxb_tag_id_t, cls: &[u8]) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    h.write_usize(tag);
+    // digit runs normalized so per-item classes (`post-1234`) collide
+    let mut prev_digit = false;
+    for &b in cls {
+        let d = b.is_ascii_digit();
+        if d && prev_digit {
+            continue;
+        }
+        h.write_u8(if d { b'N' } else { b.to_ascii_lowercase() });
+        prev_digit = d;
+    }
+    h.finish()
+}
+
+/// Bottom-up scan: computes per-element structural signatures and marks
+/// repeated∧link-dense containers in `vetoes`. Returns (text_len, link_len).
+unsafe fn tpl_scan(
+    node: *mut lxb_dom_node_t,
+    in_link: bool,
+    vetoes: &mut HashSet<*mut lxb_dom_node_t>,
+    candidates: &mut Vec<(*mut lxb_dom_node_t, usize)>,
+) -> TplNode {
+    unsafe {
+        let tag = (*node).local_name;
+        let is_link = in_link || tag == LXB_TAG_A;
+        let mut text_len = 0usize;
+        let mut link_len = 0usize;
+        let mut n_imgs = if tag == LXB_TAG_IMG { 1 } else { 0 };
+        let mut child_sig1: Vec<u64> = Vec::new();
+        let mut child_sig2: Vec<u64> = Vec::new();
+        let mut n_children = 0usize;
+        let mut child = (*node).first_child;
+        while !child.is_null() {
+            match (*child).type_ {
+                LXB_DOM_NODE_TYPE_TEXT => {
+                    let cd = child as *const lxb_dom_character_data_t;
+                    let t = slice::from_raw_parts((*cd).data.data, (*cd).data.length);
+                    let n = t.iter().filter(|b| !c_isspace(**b)).count();
+                    text_len += n;
+                    if is_link {
+                        link_len += n;
+                    }
+                }
+                LXB_DOM_NODE_TYPE_ELEMENT => {
+                    // script/style/etc are excluded from the walk by the
+                    // blacklist; exclude their text here too
+                    if !matches!(
+                        std::str::from_utf8(get_qualified_name(child)).unwrap_or(""),
+                        "script" | "style" | "noscript" | "template" | "svg" | "iframe"
+                    ) {
+                        let c = tpl_scan(child, is_link, vetoes, candidates);
+                        text_len += c.text_len;
+                        link_len += c.link_len;
+                        n_imgs += c.n_imgs;
+                        child_sig1.push(c.sig1);
+                        child_sig2.push(c.sig2);
+                        n_children += 1;
+                    }
+                }
+                _ => {}
+            }
+            child = (*child).next;
+        }
+        let cls = get_node_attr(node, b"class");
+        let sig0 = tpl_base_sig(tag, cls);
+        let sig1 = tpl_hash(sig0, &child_sig1);
+        let sig2 = tpl_hash(sig0, &child_sig2);
+
+        // candidate check (page-level guards applied by the caller once
+        // body totals are known — single pass)
+        if n_children >= TPL_MIN_CHILDREN
+            && text_len > 0
+            && text_len <= TPL_MAX_CONTAINER_TEXT
+            && link_len as f64 / text_len as f64 >= TPL_LINK_DENSITY
+        {
+            let mut counts: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
+            for s2 in &child_sig2 {
+                *counts.entry(*s2).or_insert(0) += 1;
+            }
+            let repeated: usize = counts.values().filter(|v| **v >= 2).sum();
+            if repeated >= TPL_MIN_REPEATED && repeated as f64 / n_children as f64 >= TPL_MIN_FRAC {
+                vetoes.insert(node);
+                candidates.push((node, text_len));
+            }
+        }
+        TplNode { ptr: node, text_len, link_len, n_imgs, sig1, sig2 }
+    }
+}
+
+unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
+    unsafe {
+        let mut len = 0usize;
+        let p = lxb_dom_element_qualified_name(node.cast(), &mut len);
+        if p.is_null() { &[] } else { slice::from_raw_parts(p, len) }
+    }
+}
+
+/// Compute the template-subtraction veto set for a document body.
+unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> HashSet<*mut lxb_dom_node_t> {
+    unsafe {
+        let mut vetoes = HashSet::new();
+        let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+        let totals = tpl_scan(body, false, &mut vetoes, &mut candidates);
+        if totals.text_len < TPL_MIN_PAGE_TEXT
+            || totals.link_len as f64 / totals.text_len as f64 > TPL_PAGE_LINK_DENSITY_MAX
+        {
+            // Listing-like or thin page: on thin pages whatever repeats is
+            // usually the content (package-instruction pages, profiles).
+            vetoes.clear();
+            return vetoes;
+        }
+        // container-fraction guard, applied now that body totals are known
+        for (n, tl) in candidates {
+            if (tl as f64) > TPL_MAX_CONTAINER_FRAC * totals.text_len as f64 {
+                vetoes.remove(&n);
+            }
+        }
+        vetoes
+    }
+}
 
 /// Generator-meta content (lowercased) if present (engine detection).
 unsafe fn generator_meta(doc: *mut lxb_html_document_t) -> Vec<u8> {
@@ -2436,8 +2610,9 @@ unsafe fn extract_plain_text_from_doc(
     doc: *mut lxb_html_document_t,
     opts: &ExtractOpts,
     relax: RelaxFlags,
+    tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> String {
-    unsafe { extract_plain_text_from_doc_impl(doc, opts, relax).0 }
+    unsafe { extract_plain_text_from_doc_impl(doc, opts, relax, tpl).0 }
 }
 
 /// Extract from an arbitrary subtree root, reusing the full serialization
@@ -2455,7 +2630,7 @@ unsafe fn extract_plain_text_from_node(
             main_content: false,
             ..opts.clone()
         };
-        extract_plain_text_from_doc_impl2(doc, Some(root), &sub_opts, RelaxFlags::default()).0
+        extract_plain_text_from_doc_impl2(doc, Some(root), &sub_opts, RelaxFlags::default(), None).0
     }
 }
 
@@ -2467,8 +2642,9 @@ unsafe fn extract_plain_text_from_doc_impl(
     doc: *mut lxb_html_document_t,
     opts: &ExtractOpts,
     relax: RelaxFlags,
+    tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
-    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax) }
+    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax, tpl) }
 }
 
 unsafe fn extract_plain_text_from_doc_impl2(
@@ -2476,6 +2652,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
     root_override: Option<*mut lxb_dom_node_t>,
     opts: &ExtractOpts,
     relax: RelaxFlags,
+    tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
     let mut dropped_nodes: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
     unsafe {
@@ -2556,8 +2733,17 @@ unsafe fn extract_plain_text_from_doc_impl2(
         }
 
         // Select all blacklisted elements and store them in a set
-        let blacklisted_nodes: HashSet<*mut lxb_dom_node_t> =
+        let mut blacklisted_nodes: HashSet<*mut lxb_dom_node_t> =
             query_selector_all_raw(doc, ctx.root_node, &skip_selector).into_iter().collect();
+
+        // Structural template subtraction (cycle 0019; markdown config only):
+        // repeated∧link-dense containers join the skip set. The veto set is
+        // computed once per document (rescue retries reuse it).
+        if let Some(tpl) = tpl {
+            for v in tpl {
+                blacklisted_nodes.insert(*v);
+            }
+        }
 
         let mut base_depth: usize = 0;
         let mut pnode = ctx.node;
