@@ -2345,6 +2345,9 @@ pub fn collect_block_features(html: &str) -> String {
                 page_text,
                 page_ld,
                 totals.n_headings,
+                totals.n_forms,
+                totals.n_articles,
+                totals.n_comment_cls,
             );
             let text = get_collapsed_string(&get_node_text(b.ptr));
             let text_snip: String = String::from_utf8_lossy(&text)
@@ -2402,6 +2405,9 @@ unsafe fn build_block_features(
     page_text: usize,
     page_ld: f64,
     page_headings: usize,
+    page_forms: usize,
+    page_articles: usize,
+    page_comment_cls: usize,
 ) -> block_model::BlockFeatures {
     unsafe {
         let cls = get_node_attr(b.ptr, b"class");
@@ -2440,6 +2446,9 @@ unsafe fn build_block_features(
             comments: hits.contains(&10) as u8 as f64,
             headings: b.n_headings as f64,
             page_headings: page_headings as f64,
+            page_forms: ((page_forms + 1) as f64).ln(),
+            page_articles: ((page_articles + 1) as f64).ln(),
+            page_comment_cls: ((page_comment_cls + 1) as f64).ln(),
             prev_ld: prev.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
             next_ld: next.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
             prev_len: prev.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
@@ -2738,11 +2747,11 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 /// Model-veto threshold (cycle 0025): blocks scoring below this predicted
 /// gold-containment join the skip set. Chosen from held-out tier analysis
 /// (veto@0.10 ≈ 2% coverage at <1% false-veto on the n60d5 GBM).
-const MODEL_VETO_THRESHOLD: f64 = 0.35;
+const MODEL_VETO_THRESHOLD: f64 = 0.40;
 const MODEL_VETO_ENABLED: bool = true;
 /// Whitelist tier: blocks scoring above this override rule/template vetoes.
 const MODEL_VETO_BIG_THRESHOLD: f64 = 0.10;
-const MODEL_KEEP_THRESHOLD: f64 = 0.65;
+const MODEL_KEEP_THRESHOLD: f64 = 0.60;
 
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
@@ -2788,6 +2797,9 @@ unsafe fn tpl_vetoes(
                     page_text,
                     pld,
                     totals.n_headings,
+                    totals.n_forms,
+                    totals.n_articles,
+                    totals.n_comment_cls,
                 );
                 let score = block_model::score_block(&f);
                 // Size-tiered veto authority (0051): the aggressive

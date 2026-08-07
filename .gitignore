@@ -184,3 +184,8 @@ vcpkg_installed/
 # auto-research benchmark data (large, symlinked/untracked)
 benchmark/datasets*
 benchmark/runs/
+benchmark/experiments/big_v3_cache/
+benchmark/experiments/big_v4_cache/
+benchmark/experiments/*.joblib
+benchmark/experiments/big_cache/
+benchmark/experiments/*.npz
