@@ -924,6 +924,31 @@ unsafe fn serialize_extract_nodes(
                             md_cell_index = 0;
                         } else {
                             rstrip_in_place(&mut output);
+                            // Collapse space runs inside the finished row —
+                            // source whitespace leaks into cells ("|   WK")
+                            // and gold single-spaces them (0036).
+                            {
+                                let line_start = output
+                                    .iter()
+                                    .rposition(|&b| b == b'\n')
+                                    .map(|i| i + 1)
+                                    .unwrap_or(0);
+                                let mut collapsed = Vec::with_capacity(output.len() - line_start);
+                                let mut prev_space = false;
+                                for &b in &output[line_start..] {
+                                    if b == b' ' {
+                                        if prev_space {
+                                            continue;
+                                        }
+                                        prev_space = true;
+                                    } else {
+                                        prev_space = false;
+                                    }
+                                    collapsed.push(b);
+                                }
+                                output.truncate(line_start);
+                                output.extend_from_slice(&collapsed);
+                            }
                             if output.last() == Some(&b'|') {
                                 // empty row: drop the dangling "|"
                                 output.pop();
@@ -932,10 +957,14 @@ unsafe fn serialize_extract_nodes(
                                 output.extend_from_slice(b" |");
                                 if md_row_index == 0 {
                                     md_row0_cells = md_cell_index.max(1);
+                                    // Tight minimal separator (0036): gold
+                                    // never uses the spaced ` --- |` style;
+                                    // width-padded dashes measured worse
+                                    // (chrome tables pay the extra bytes).
                                     output.push(b'\n');
                                     output.push(b'|');
                                     for _ in 0..md_row0_cells {
-                                        output.extend_from_slice(b" --- |");
+                                        output.extend_from_slice(b"---|");
                                     }
                                 }
                             }
@@ -1965,7 +1994,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             fn content_len(t: &str) -> usize {
                 // exclude markdown structure punctuation only — whitespace
                 // stays counted so plain-mode gate behavior is unchanged
-                t.bytes().filter(|b| !matches!(b, b'|' | b'#' | b'*')).count()
+                t.bytes().filter(|b| !matches!(b, b'|' | b'#' | b'*' | b'-')).count()
             }
             let result_content_len = content_len(&result);
 
@@ -1980,8 +2009,23 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // Tier 1 (0004): near-empty output → unfiltered fallback, kept
             // only if it yields much more content (classifier false negative
             // wiped the whole page).
+            // A rendered pipe table with substantive cells in the base
+            // output is structured content (acronym/stat pages extract to
+            // a compact table) — the page was not wiped, and the
+            // unfiltered fallback would swap the table for the site shell
+            // (0036: keep-factor flips on formatting-byte changes made
+            // this family unstable). Number-only tables (calendars) are
+            // navigation chrome and do NOT block the rescue.
+            let has_md_table = (result.contains("\n|---") || result.contains("\n| ---"))
+                && result.lines().any(|l| {
+                    l.starts_with('|')
+                        && l.split('|').any(|cell| {
+                            cell.chars().filter(|c| c.is_alphabetic()).count() >= 16
+                        })
+                });
             let mut rescued = false;
             if !is_error_stub
+                && !has_md_table
                 && result_content_len < RESCUE_NEAR_EMPTY_ABS
                 && body_text_len(doc) > RESCUE_BODY_FACTOR * result_content_len.max(1)
             {
