@@ -77,3 +77,9 @@ fixes).
 
 Milestone reviews at M1/M2/M3 are the declared `--allow-test` points
 (vaulted-test policy): run test once per milestone, record in the log.
+
+## M1 checkpoint — RECORDED 2026-08-07 (cycle 0051)
+Condition: dev F1 ≥ 0.81 AND Lev ≥ 0.72 → met at 0051 (0.8174 / 0.7211).
+**Vaulted test (first authorized measurement): F1 0.8218 / Lev 0.7225.**
+Test ≥ dev on both metrics — no dev overfitting; the sweep-heavy cycles
+(0046/0051 threshold tuning) generalize. Next milestone M2: 0.85 / 0.76.

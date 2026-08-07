@@ -40,3 +40,6 @@ highs, and the crater family is the established wall. General dev plain
 
 ## M1 MILESTONE: dev F1 0.8174 ≥ 0.81 AND Lev 0.7211 ≥ 0.72 — both
 targets crossed. The declared `--allow-test` checkpoint is due.
+
+## M1 vaulted-test checkpoint (authorized by GOALS.md)
+test F1 **0.8218** / Lev **0.7225** — above dev on both metrics.
