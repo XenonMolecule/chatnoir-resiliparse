@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7977** / Lev **0.6960** (0026) · train 0.7924. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8013** / Lev **0.7010** (0030) · train 0.7946. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -103,3 +103,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7977** / Lev **0.6960**
 - [0027 — Model v2 scaling (NEGATIVE)](0027-model-v2-scaling-negative.md) — 10× data → AUC +0.001, live wash; features are the frontier, not rows
 - [0028 — Model v3 features (in progress)](0028-model-v3-features.md) — wordbag+context features: AUC 0.8551 (+0.005); calibration pending, exact next steps logged
 - [0029 — Generic post-stream (NEGATIVE)](0029-generic-poststream-negative.md) — 2 gate rounds, −0.020/−0.002; fifth discriminator-wall confirmation; per-engine gates only
+- [0030 — Respond-form veto](0030-respond-form.md) — residual diagnosis → one-line fix: **+0.0035 F1 / +0.0049 Lev** (101↑/8↓); F1 > 0.80, Lev > 0.70
