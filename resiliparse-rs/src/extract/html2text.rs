@@ -1623,6 +1623,10 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     return out;
                 }
             }
+            if let Some(out) = extract_phpbb(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
+            }
         }
 
         let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default());
@@ -1906,6 +1910,81 @@ unsafe fn extract_vbulletin(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -
         }
         if posts >= 2 { Some(out) } else { None }
     }
+}
+
+/// phpBB3 thread handler (cycle 0015): same pattern as vBulletin — posts
+/// from `div.post`, author/date from `p.author` ("by USER » DATE"), body
+/// `div.postbody div.content`. Gate: `<body id="phpbb">`.
+unsafe fn extract_phpbb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() || !get_node_attr(body, b"id").eq_ignore_ascii_case(b"phpbb") {
+            return None;
+        }
+        // Only thread views: search results / member pages share the postbody
+        // markup but the gold treats them differently (bogleheads search page,
+        // train −0.23).
+        let body_cls = get_node_attr(body, b"class");
+        if body_cls.windows(8).any(|w| w == b"section-") && !contains_subslice(body_cls, b"section-viewtopic") {
+            return None;
+        }
+        let mut out = String::new();
+        // Thread title: the gold keeps it as an H1-style heading.
+        if let Some(&h) = query_selector_all_raw(doc, body, b"h2.topic-title, div#page-body h2, h2").first() {
+            let t = String::from_utf8_lossy(&get_collapsed_string(&get_node_text(h))).trim().to_string();
+            if !t.is_empty() && t.len() <= 120 {
+                out.push_str(&format!("# {t}"));
+            }
+        }
+        let containers = query_selector_all_raw(doc, body, b"div.post");
+        let mut posts = 0;
+        let mut authored = 0;
+        for c in containers {
+            let body_nodes = query_selector_all_raw(doc, c, b"div.postbody div.content, div.content");
+            let Some(&bn) = body_nodes.first() else { continue };
+            let author_line = query_selector_all_raw(doc, c, b"p.author")
+                .first()
+                .map(|&n| String::from_utf8_lossy(&get_collapsed_string(&get_node_text(n))).trim().to_string())
+                .unwrap_or_default();
+            // "by USER » DATE", "Post by USER » DATE" (post-icon skins,
+            // jusText 0080), "DATE by USER" (WP-integrated skins, 0072).
+            let rest = author_line.strip_prefix("by ").map(str::to_string).or_else(|| {
+                author_line.find(" by ").map(|i| author_line[i + 4..].to_string())
+            });
+            let (author, date) = match rest {
+                Some(r) => match r.split_once(" \u{bb} ") {
+                    Some((a, d)) => (a.trim().to_string(), d.trim().to_string()),
+                    None => (r.trim().to_string(), String::new()),
+                },
+                None => (String::new(), String::new()),
+            };
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                authored += 1;
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2013} {date}**"));
+                }
+                out.push_str("\n\n");
+            }
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        // Without authors the rebuild only subtracts (titles, inline
+        // attribution) from the generic walk — fall back.
+        if posts >= 2 && authored >= 2 { Some(out) } else { None }
+    }
+}
+
+fn contains_subslice(hay: &[u8], needle: &[u8]) -> bool {
+    hay.windows(needle.len()).any(|w| w == needle)
 }
 
 /// Whether the document declares `<meta name="generator" content="blogger">`
