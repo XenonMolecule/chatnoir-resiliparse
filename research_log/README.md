@@ -120,3 +120,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8120** / Lev **0.7153**
 - [0044 — MovableType rebuild](0044-movabletype-rebuild.md) — commentText + "Posted by: X | date" pairs: one dev doc +0.014 F1 / +0.027 Lev
 - [0045 — Tab normalization](0045-tab-normalization.md) — gold is 99.6% tab-free: interior-run collapse with code-listing/fence/indent guards: +0.0002 Lev, 57 dev docs up
 - [0046 — Model threshold re-sweep](0046-model-threshold-resweep.md) — veto 0.10→0.25 + rollback tier: **+0.0030 F1 / +0.0035 Lev dev**, largest single cycle; M1 F1 target crossed
+- [0047 — NEGATIVE: table bold-strip](0047-NEGATIVE-table-bold-strip.md) — 97% gold convention, flat aggregate + keep-test flip crater; reverted
