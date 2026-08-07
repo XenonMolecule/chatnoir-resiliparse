@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7960** / Lev **0.6940** (0024) · train 0.7912. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7974** / Lev **0.6956** (0025, model tier) · train 0.7921. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -98,3 +98,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7960** / Lev **0.6940**
 - [0022 — Byline + related (wall)](0022-byline-related.md) — byline-context rel=author kept, ad-tech tokens only; related-family confirmed rule-uncapturable (3rd confirmation); +0.0002
 - [0023 — Listing rescue (NEGATIVE)](0023-listing-rescue-negative.md) — three gate variants unstable at scale; listing/article discriminator needs page-type classifier; plumbing kept
 - [0024 — dl + classifier groundwork](0024-dl-and-classifier-groundwork.md) — **label:** value dl lines (5↑/0↓); classifier v0 AUC 0.84, safe veto/whitelist tiers identified
+- [0025 — Model tier](0025-model-tier.md) — exported 60-tree GBM, veto+whitelist tiers in the walk: dev +0.0015 (7↑/0↓); first model-in-loop cycle; ~10% markdown-only speed cost logged

@@ -1842,19 +1842,16 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         }
 
         let mut page_has_card_grid = false;
+        let mut model_whitelist: HashSet<*mut lxb_dom_node_t> = HashSet::new();
         let tpl_set: Option<HashSet<*mut lxb_dom_node_t>> =
             if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
                 let body: *mut lxb_dom_node_t = (*doc).body.cast();
                 if body.is_null() {
                     None
                 } else {
-                    let (mut v, grid) = tpl_vetoes(body);
+                    let (v, grid, wl) = tpl_vetoes(body);
                     page_has_card_grid = grid;
-                    if MODEL_VETO_ENABLED {
-                        for m in model_vetoes(body) {
-                            v.insert(m);
-                        }
-                    }
+                    model_whitelist = wl;
                     Some(v)
                 }
             } else {
@@ -1866,8 +1863,9 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             None
         };
         let tpl_ref = tpl_set.as_ref();
+        let wl_ref = if model_whitelist.is_empty() { None } else { Some(&model_whitelist) };
         let (mut result, mut dropped_nodes) =
-            extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), tpl_ref);
+            extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), tpl_ref, wl_ref);
         // Gold mirrors each theme's native comment rendering; rebuild only
         // when the native walk LOSES attribution (>=half the authors absent).
         let mut wp_comments: Option<String> = None;
@@ -1878,7 +1876,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 for v in &vetoes {
                     set2.insert(*v);
                 }
-                let (r2, d2) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), Some(&set2));
+                let (r2, d2) = extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), Some(&set2), wl_ref);
                 result = r2;
                 dropped_nodes = d2;
                 wp_comments = Some(block);
@@ -1937,7 +1935,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     main_content: false,
                     ..opts.clone()
                 };
-                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), tpl_ref);
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), tpl_ref, wl_ref);
                 if fallback.len() > RESCUE_KEEP_FACTOR * result.len().max(1) {
                     result = fallback;
                     rescued = true;
@@ -2011,7 +2009,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     } else {
                         UL_RESCUE_KEEP_FACTOR
                     };
-                    let retry = extract_plain_text_from_doc(doc, opts, relax, tpl_ref);
+                    let retry = extract_plain_text_from_doc(doc, opts, relax, tpl_ref, wl_ref);
                     if retry.len() as f64 > keep_factor * result.len().max(1) as f64
                         && !duplicates_existing_content(&result, &retry)
                     {
@@ -2175,6 +2173,29 @@ pub fn collect_block_features(html: &str) -> String {
     }
 }
 
+/// All 11 class-family patterns as one RegexSet — a single haystack scan for
+/// the model's feature bits (11 separate scans measured ~10% total runtime).
+/// Pattern strings MUST mirror the individual statics above.
+static FEATURE_CLS_SET: LazyLock<regex::bytes::RegexSet> = LazyLock::new(|| {
+    regex::bytes::RegexSetBuilder::new([
+        NAV_CLS.as_str(),
+        FOOTER_CLS.as_str(),
+        HEADER_CLS.as_str(),
+        SIDEBAR_CLS.as_str(),
+        SOCIAL_CLS.as_str(),
+        ARTICLE_CLS.as_str(),
+        MD_CHROME_CLS.as_str(),
+        BYLINE_CLS.as_str(),
+        WIDGETISH_CLS.as_str(),
+        RECOMMENDED_CLS.as_str(),
+        COMMENTS_CLS.as_str(),
+    ])
+    .case_insensitive(true)
+    .unicode(false)
+    .build()
+    .unwrap()
+});
+
 unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> block_model::BlockFeatures {
     unsafe {
         let cls = get_node_attr(b.ptr, b"class");
@@ -2183,6 +2204,11 @@ unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> 
         combo.push(b' ');
         combo.extend_from_slice(id);
         let tl = b.text_len.max(1);
+        let hits: Vec<usize> = if combo.len() > 1 {
+            FEATURE_CLS_SET.matches(&combo).into_iter().collect()
+        } else {
+            Vec::new()
+        };
         block_model::BlockFeatures {
             tag: b.tag as f64,
             depth: b.depth as f64,
@@ -2195,17 +2221,17 @@ unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> 
             digit: b.digits as f64 / tl as f64,
             upper: b.upper as f64 / tl as f64,
             avgw: b.text_len as f64 / b.words.max(1) as f64,
-            nav: regex_search_not_empty(&combo, &NAV_CLS) as u8 as f64,
-            footer: regex_search_not_empty(&combo, &FOOTER_CLS) as u8 as f64,
-            header: regex_search_not_empty(&combo, &HEADER_CLS) as u8 as f64,
-            sidebar: regex_search_not_empty(&combo, &SIDEBAR_CLS) as u8 as f64,
-            social: regex_search_not_empty(&combo, &SOCIAL_CLS) as u8 as f64,
-            article: regex_search_not_empty(&combo, &ARTICLE_CLS) as u8 as f64,
-            chrome: regex_search_not_empty(&combo, &MD_CHROME_CLS) as u8 as f64,
-            byline: regex_search_not_empty(&combo, &BYLINE_CLS) as u8 as f64,
-            widget: regex_search_not_empty(&combo, &WIDGETISH_CLS) as u8 as f64,
-            recommended: regex_search_not_empty(&combo, &RECOMMENDED_CLS) as u8 as f64,
-            comments: regex_search_not_empty(&combo, &COMMENTS_CLS) as u8 as f64,
+            nav: hits.contains(&0) as u8 as f64,
+            footer: hits.contains(&1) as u8 as f64,
+            header: hits.contains(&2) as u8 as f64,
+            sidebar: hits.contains(&3) as u8 as f64,
+            social: hits.contains(&4) as u8 as f64,
+            article: hits.contains(&5) as u8 as f64,
+            chrome: hits.contains(&6) as u8 as f64,
+            byline: hits.contains(&7) as u8 as f64,
+            widget: hits.contains(&8) as u8 as f64,
+            recommended: hits.contains(&9) as u8 as f64,
+            comments: hits.contains(&10) as u8 as f64,
         }
     }
 }
@@ -2434,38 +2460,44 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 /// gold-containment join the skip set. Chosen from held-out tier analysis
 /// (veto@0.10 ≈ 2% coverage at <1% false-veto on the n60d5 GBM).
 const MODEL_VETO_THRESHOLD: f64 = 0.10;
-const MODEL_VETO_ENABLED: bool = false; // flipped on when the exported model lands
-
-/// Learned block vetoes (markdown config): score every classifier decision
-/// point with the exported GBM; confident-junk blocks are skipped.
-unsafe fn model_vetoes(body: *mut lxb_dom_node_t) -> HashSet<*mut lxb_dom_node_t> {
-    unsafe {
-        let mut dummy_v = HashSet::new();
-        let mut dummy_c: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
-        let mut blocks: Vec<RawBlock> = Vec::new();
-        let mut coll = Some(&mut blocks);
-        let totals = tpl_scan(body, false, 0, &mut dummy_v, &mut dummy_c, &mut coll);
-        let page_text = totals.text_len.max(1);
-        let page_ld = totals.link_len as f64 / page_text as f64;
-        let mut out = HashSet::new();
-        for b in &blocks {
-            let f = build_block_features(b, page_text, page_ld);
-            if block_model::score_block(&f) < MODEL_VETO_THRESHOLD {
-                out.insert(b.ptr);
-            }
-        }
-        out
-    }
-}
+const MODEL_VETO_ENABLED: bool = true;
+/// Whitelist tier: blocks scoring above this override rule/template vetoes.
+const MODEL_KEEP_THRESHOLD: f64 = 0.90;
 
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
 /// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
-unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> (HashSet<*mut lxb_dom_node_t>, bool) {
+unsafe fn tpl_vetoes(
+    body: *mut lxb_dom_node_t,
+) -> (HashSet<*mut lxb_dom_node_t>, bool, HashSet<*mut lxb_dom_node_t>) {
     unsafe {
         let mut vetoes = HashSet::new();
         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
-        let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut None);
+        let mut blocks: Vec<RawBlock> = Vec::new();
+        let mut coll = if MODEL_VETO_ENABLED { Some(&mut blocks) } else { None };
+        let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut coll);
+        // model tiers on the same scan (cycle 0025). Applied outside the tpl
+        // page-guards (the model has its own calibration) and only to blocks
+        // >=150 bytes: smaller ones can't move either tier and the per-block
+        // regex features dominate the cost.
+        let mut whitelist = HashSet::new();
+        let mut model_veto: Vec<*mut lxb_dom_node_t> = Vec::new();
+        if MODEL_VETO_ENABLED {
+            let page_text = totals.text_len.max(1);
+            let pld = totals.link_len as f64 / page_text as f64;
+            for b in &blocks {
+                if b.text_len < 150 {
+                    continue;
+                }
+                let f = build_block_features(b, page_text, pld);
+                let score = block_model::score_block(&f);
+                if score < MODEL_VETO_THRESHOLD {
+                    model_veto.push(b.ptr);
+                } else if score > MODEL_KEEP_THRESHOLD {
+                    whitelist.insert(b.ptr);
+                }
+            }
+        }
         let large_repeated = candidates.iter().any(|&(_, tl)| tl >= 3000)
             || (totals.text_len > 0
                 && totals.link_len as f64 / totals.text_len as f64 > TPL_PAGE_LINK_DENSITY_MAX);
@@ -2475,7 +2507,13 @@ unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> (HashSet<*mut lxb_dom_node_t>
             // Listing-like or thin page: on thin pages whatever repeats is
             // usually the content (package-instruction pages, profiles).
             vetoes.clear();
-            return (vetoes, large_repeated);
+            for m in &model_veto {
+                vetoes.insert(*m);
+            }
+            for w in &whitelist {
+                vetoes.remove(w);
+            }
+            return (vetoes, large_repeated, whitelist);
         }
         // container-fraction guard, applied now that body totals are known
         for (n, tl) in candidates {
@@ -2483,7 +2521,13 @@ unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> (HashSet<*mut lxb_dom_node_t>
                 vetoes.remove(&n);
             }
         }
-        (vetoes, large_repeated)
+        for m in &model_veto {
+            vetoes.insert(*m);
+        }
+        for w in &whitelist {
+            vetoes.remove(w);
+        }
+        (vetoes, large_repeated, whitelist)
     }
 }
 
@@ -3009,7 +3053,7 @@ unsafe fn extract_plain_text_from_node_opts(
     root: *mut lxb_dom_node_t,
     opts: &ExtractOpts,
 ) -> String {
-    unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None).0 }
+    unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None, None).0 }
 }
 
 /// phpBB 2.x thread handler (cycle 0021): classic table skins — author in
@@ -3117,8 +3161,9 @@ unsafe fn extract_plain_text_from_doc(
     opts: &ExtractOpts,
     relax: RelaxFlags,
     tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
+    whitelist: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> String {
-    unsafe { extract_plain_text_from_doc_impl(doc, opts, relax, tpl).0 }
+    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax, tpl, whitelist).0 }
 }
 
 /// Extract from an arbitrary subtree root, reusing the full serialization
@@ -3136,7 +3181,7 @@ unsafe fn extract_plain_text_from_node(
             main_content: false,
             ..opts.clone()
         };
-        extract_plain_text_from_doc_impl2(doc, Some(root), &sub_opts, RelaxFlags::default(), None).0
+        extract_plain_text_from_doc_impl2(doc, Some(root), &sub_opts, RelaxFlags::default(), None, None).0
     }
 }
 
@@ -3150,7 +3195,7 @@ unsafe fn extract_plain_text_from_doc_impl(
     relax: RelaxFlags,
     tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
-    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax, tpl) }
+    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax, tpl, None) }
 }
 
 unsafe fn extract_plain_text_from_doc_impl2(
@@ -3159,6 +3204,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
     opts: &ExtractOpts,
     relax: RelaxFlags,
     tpl: Option<&HashSet<*mut lxb_dom_node_t>>,
+    whitelist: Option<&HashSet<*mut lxb_dom_node_t>>,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
     let mut dropped_nodes: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
     unsafe {
@@ -3273,6 +3319,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // Skip blacklisted or non-main-content nodes
             if blacklisted_nodes.contains(&ctx.node)
                 || (opts.main_content
+                    && !whitelist.map(|w| w.contains(&ctx.node)).unwrap_or(false)
                     && !is_main_content_node(
                         ctx.node,
                         ctx.depth + base_depth,
