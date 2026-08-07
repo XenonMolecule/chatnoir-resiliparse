@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7116** (0043) · train 0.7988/0.6964. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7116** (0044) · train 0.7988/0.6964. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -117,3 +117,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7116**
 - [0041 — phpBB subSilver2 handler](0041-phpbb-subsilver2.md) — b.postauthor table skin: +0.0009 F1 / +0.0014 Lev dev, zero regressions
 - [0042 — vBulletin variants](0042-vbulletin-variants.md) — vB4 markup gate + member.php author fallback: small clean win
 - [0043 — XenForo handler](0043-xenforo-handler.md) — XF1+XF2, title-attr times, quote-strip per gold majority: +0.0003 F1 / +0.0006 Lev dev
+- [0044 — MovableType rebuild](0044-movabletype-rebuild.md) — commentText + "Posted by: X | date" pairs: one dev doc 0.03→0.55 F1

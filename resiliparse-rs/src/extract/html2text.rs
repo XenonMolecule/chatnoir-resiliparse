@@ -2000,8 +2000,11 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         // Blogspot comments (0039): gold rewrites the native rendering
         // ("NAME said..." + footer timestamp -> `**NAME — TIME**`), so a
         // successful parse always rebuilds — no native-first check.
+        // MovableType (0044) has the same always-rebuild semantics.
         if wp_comments.is_none() && opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
-            if let Some((block, vetoes, _authors)) = blogspot_comment_rebuild(doc, opts) {
+            if let Some((block, vetoes, _authors)) = blogspot_comment_rebuild(doc, opts)
+                .or_else(|| movabletype_comment_rebuild(doc, opts))
+            {
                 let mut set2 = effective_tpl.clone().unwrap_or_default();
                 for v in &vetoes {
                     set2.insert(*v);
@@ -3436,6 +3439,74 @@ unsafe fn blogspot_comment_rebuild(
                     vetoes.push(n);
                 }
             }
+            Some((out, vetoes, authors))
+        } else {
+            None
+        }
+    }
+}
+
+/// MovableType comment rebuild (cycle 0044; jusText-0085 family): the
+/// source renders body-first (`div.commentText`) with the attribution
+/// AFTER it (`p.posted`: "Posted by: NAME | DATE | ..."); gold emits
+/// `**NAME — DATE**` before the body. Always-rebuild semantics (gold
+/// rewrites the native form).
+unsafe fn movabletype_comment_rebuild(
+    doc: *mut lxb_html_document_t,
+    opts: &ExtractOpts,
+) -> Option<(String, Vec<*mut lxb_dom_node_t>, Vec<String>)> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let merged = query_selector_all_raw(doc, body, b"div.commentText, p.posted");
+        let mut out = String::new();
+        let mut vetoes: Vec<*mut lxb_dom_node_t> = Vec::new();
+        let mut authors: Vec<String> = Vec::new();
+        let mut attributed = 0usize;
+        let mut pending_body: Option<*mut lxb_dom_node_t> = None;
+        for &n in &merged {
+            if (*n).local_name == LXB_TAG_DIV {
+                pending_body = Some(n);
+                continue;
+            }
+            // p.posted — must follow a commentText
+            let Some(bn) = pending_body.take() else { continue };
+            let meta = collapsed_text(n);
+            let Some(rest) = meta.strip_prefix("Posted by:").map(str::trim) else {
+                continue;
+            };
+            let mut parts = rest.split('|').map(str::trim);
+            let author = parts.next().unwrap_or("").to_string();
+            let date = parts
+                .next()
+                .filter(|d| d.len() <= 48 && d.bytes().any(|b| b.is_ascii_digit()))
+                .unwrap_or("")
+                .to_string();
+            if author.is_empty() || author.len() > 48 {
+                continue;
+            }
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            attributed += 1;
+            authors.push(author.clone());
+            vetoes.push(bn);
+            vetoes.push(n);
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("  \n");
+            out.push_str(text.trim_end());
+        }
+        if attributed >= 2 {
             Some((out, vetoes, authors))
         } else {
             None
