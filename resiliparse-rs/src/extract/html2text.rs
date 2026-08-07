@@ -1653,6 +1653,20 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 lxb_html_document_destroy(doc);
                 return out;
             }
+            if generator.starts_with(b"ubb.threads") {
+                if let Some(out) = extract_ubb(doc, opts) {
+                    lxb_html_document_destroy(doc);
+                    return out;
+                }
+            }
+            if let Some(out) = extract_invision(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
+            }
+            if let Some(out) = extract_smf(doc, opts) {
+                lxb_html_document_destroy(doc);
+                return out;
+            }
         }
 
         let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default());
@@ -2011,6 +2025,280 @@ unsafe fn extract_phpbb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Op
 
 fn contains_subslice(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
+}
+
+/// Collapsed, trimmed text content of a node (header-fragment helper for the
+/// forum engine handlers).
+unsafe fn collapsed_text(node: *mut lxb_dom_node_t) -> String {
+    unsafe {
+        String::from_utf8_lossy(&get_collapsed_string(&get_node_text(node)))
+            .trim()
+            .to_string()
+    }
+}
+
+/// Invision Power Board thread handler (cycle 0017): same rebuild pattern as
+/// vBulletin/phpBB — `**user — date**` header then the post body. Covers the
+/// two skins in lpv11: IPB 3.x (gate: `<body id="ipboard_body">`, posts in
+/// `div.post_block`) and IPS 4.x (gate: `body.ipsApp` with
+/// `data-pagecontroller="topic"`, posts in `article.ipsComment`). Falls back
+/// to generic extraction unless >=2 authored posts are found.
+unsafe fn extract_invision(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let ipb3 = get_node_attr(body, b"id").eq_ignore_ascii_case(b"ipboard_body");
+        let ips4 = !ipb3
+            && contains_subslice(get_node_attr(body, b"class"), b"ipsApp")
+            && get_node_attr(body, b"data-pagecontroller") == b"topic";
+        if !ipb3 && !ips4 {
+            return None;
+        }
+        let (container_sel, author_sel, date_sel, body_sel, sig_sel): (&[u8], &[u8], &[u8], &[u8], &[u8]) =
+            if ipb3 {
+                (
+                    b"div.post_block",
+                    b"span.author.vcard",
+                    b"abbr.published",
+                    b"div.post.entry-content",
+                    b"div.signature",
+                )
+            } else {
+                (
+                    b"article.ipsComment",
+                    b".cAuthorPane_author a",
+                    b".ipsComment_meta time",
+                    b"div[data-role=\"commentContent\"]",
+                    b"div[data-role=\"memberSignature\"]",
+                )
+            };
+        let mut out = String::new();
+        // Thread title (IPB3 skins only — the gold keeps it there; IPS4 golds
+        // start at the first post).
+        if ipb3 {
+            if let Some(&h) = query_selector_all_raw(doc, body, b"h1.ipsType_pagetitle").first() {
+                let t = collapsed_text(h);
+                if !t.is_empty() && t.len() <= 200 {
+                    out.push_str(&format!("# {t}"));
+                }
+            }
+        }
+        let containers = query_selector_all_raw(doc, body, container_sel);
+        let mut posts = 0;
+        let mut authored = 0;
+        for c in containers {
+            let Some(&bn) = query_selector_all_raw(doc, c, body_sel).first() else { continue };
+            let author = query_selector_all_raw(doc, c, author_sel)
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let mut date = query_selector_all_raw(doc, c, date_sel)
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            if date.len() > 40 {
+                date.clear();
+            }
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            // The gold keeps member signatures right after the post body (both
+            // IPB3 `div.signature` and IPS4 `memberSignature`).
+            let sig = query_selector_all_raw(doc, c, sig_sel)
+                .first()
+                .map(|&n| extract_plain_text_from_node(doc, n, opts))
+                .unwrap_or_default();
+            // Photo-only posts have an empty body but the gold still headers
+            // them — emit the header alone rather than dropping the post.
+            if text.trim().is_empty() && author.is_empty() {
+                continue;
+            }
+            let mut segments: Vec<String> = Vec::new();
+            if !author.is_empty() {
+                authored += 1;
+                if date.is_empty() {
+                    segments.push(format!("**{author}**"));
+                } else {
+                    segments.push(format!("**{author} \u{2014} {date}**"));
+                }
+            }
+            if !text.trim().is_empty() {
+                segments.push(text.trim_end().to_string());
+                posts += 1;
+            }
+            if !sig.trim().is_empty() {
+                segments.push(sig.trim_end().to_string());
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            out.push_str(&segments.join("\n\n"));
+        }
+        if posts >= 2 && authored >= 2 { Some(out) } else { None }
+    }
+}
+
+/// UBB.threads thread handler (cycle 0017). Gate (checked by the caller):
+/// `<meta name="generator" content="UBB.threads ...">`. Each post is a table
+/// whose rows carry `td.subjecttable` (`span.date` + `span.time`),
+/// `td.author-content` (author in the first `<b>`) and `td.post-content`
+/// (body in `div.post_inner div[id^=body]`). The generator gate is exact, so
+/// single-post threads are kept too (>=1 authored post).
+unsafe fn extract_ubb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let containers = query_selector_all_raw(doc, body, b"div.post_inner");
+        let mut out = String::new();
+        // Thread title: the first post's subject cell (`td.subjecttable b`).
+        if let Some(&b) = query_selector_all_raw(doc, body, b"td.subjecttable b").first() {
+            let t = collapsed_text(b);
+            if !t.is_empty() && t.len() <= 200 {
+                out.push_str(&format!("# {t}"));
+            }
+        }
+        let mut authored = 0;
+        for c in containers {
+            let Some(&bn) = query_selector_all_raw(doc, c, b"div[id^=\"body\"]").first() else {
+                continue;
+            };
+            // The author/date cells live in the same per-post table as the
+            // body cell — climb to the nearest <table> ancestor.
+            let mut table = (*c).parent;
+            while !table.is_null() && (*table).local_name != LXB_TAG_TABLE {
+                table = (*table).parent;
+            }
+            let mut author = String::new();
+            let mut date = String::new();
+            if !table.is_null() {
+                author = query_selector_all_raw(doc, table, b"td.author-content b")
+                    .first()
+                    .map(|&n| collapsed_text(n))
+                    .unwrap_or_default();
+                let d = query_selector_all_raw(doc, table, b"td.subjecttable span.date")
+                    .first()
+                    .map(|&n| collapsed_text(n))
+                    .unwrap_or_default();
+                let t = query_selector_all_raw(doc, table, b"td.subjecttable span.time")
+                    .first()
+                    .map(|&n| collapsed_text(n))
+                    .unwrap_or_default();
+                date = if t.is_empty() { d } else if d.is_empty() { t } else { format!("{d} {t}") };
+                if date.len() > 40 {
+                    date.clear();
+                }
+            }
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                authored += 1;
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2014} {date}**"));
+                }
+                out.push_str("\n\n");
+            }
+            out.push_str(text.trim_end());
+        }
+        if authored >= 1 { Some(out) } else { None }
+    }
+}
+
+/// Simple Machines Forum (SMF 2.0) thread handler (cycle 0017). Gate: the
+/// thread-view container `<div id="forumposts">` plus the post structure
+/// itself. Posts are `div.post_wrapper`; author `div.poster h4`; date the
+/// `div.keyinfo div.smalltext` line ("« Reply #N on: DATE »" — keep the part
+/// after "on:"); body `div.post div.inner`. Falls back to generic extraction
+/// unless >=2 authored posts.
+unsafe fn extract_smf(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let Some(&forum) = query_selector_all_raw(doc, body, b"div#forumposts").first() else {
+            return None;
+        };
+        let containers = query_selector_all_raw(doc, forum, b"div.post_wrapper");
+        let mut out = String::new();
+        // Thread title: the category bar reads "Author Topic: TITLE (Read N
+        // times)" — keep the TITLE part.
+        if let Some(&h) = query_selector_all_raw(doc, forum, b"h3.catbg").first() {
+            let t = collapsed_text(h);
+            if let Some(pos) = t.find("Topic:") {
+                let mut t = t[pos + 6..].trim().to_string();
+                if let Some(read) = t.rfind("(Read ") {
+                    t.truncate(read);
+                }
+                let t = t.trim();
+                if !t.is_empty() && t.len() <= 200 {
+                    out.push_str(&format!("# {t}"));
+                }
+            }
+        }
+        let mut posts = 0;
+        let mut authored = 0;
+        for c in containers {
+            let Some(&bn) = query_selector_all_raw(doc, c, b"div.post div.inner").first() else {
+                continue;
+            };
+            let author = query_selector_all_raw(doc, c, b"div.poster h4")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let mut date = query_selector_all_raw(doc, c, b"div.keyinfo div.smalltext")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            // "« on: March 24, 2006, 06:09:41 PM »" / "« Reply #50 on: ... »"
+            if let Some(pos) = date.find("on:") {
+                date = date[pos + 3..].to_string();
+            }
+            date = date
+                .trim_matches(|ch: char| ch == '\u{ab}' || ch == '\u{bb}' || ch.is_whitespace())
+                .to_string();
+            if date.len() > 40 {
+                date.clear();
+            }
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            // The gold drops SMF quote-attribution lines ("Quote from: X on
+            // DATE ...") while keeping the quoted text itself.
+            let text = text
+                .lines()
+                .filter(|l| {
+                    let t = l.trim();
+                    t != "Quote" && !t.starts_with("Quote from:")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            if text.trim().is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                authored += 1;
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2014} {date}**"));
+                }
+                out.push_str("\n\n");
+            }
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts >= 2 && authored >= 2 { Some(out) } else { None }
+    }
 }
 
 /// Whether the document declares `<meta name="generator" content="blogger">`
