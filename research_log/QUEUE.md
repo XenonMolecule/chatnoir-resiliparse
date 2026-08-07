@@ -25,3 +25,11 @@ comment-convention per-doc variance (Highlander 41/27, old-Blogger) /
 11. blockquote `> ` prefix (41/59) / 12. em-vs-en dash (61/39) /
 plus: hard-breaks beyond BR (bluffcountry), U+2011/U+202F typography,
 md-links/images (base-rate), tweet-wall golds.
+
+## Profiling result (cycle 0055 window)
+Markdown-config overhead (~75% over plain) is DIFFUSE: disabling the
+model entirely makes it SLOWER (3.04 vs 2.61 ms/doc) — vetoes shrink
+downstream serialization/rescue work and pay for themselves. No single
+hot lever; criterion micro-profiling deprioritized. Floor-10 quality
+margin stays blocked unless a structural change (e.g., feature reuse
+between tpl scan and model) lands.
