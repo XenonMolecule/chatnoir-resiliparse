@@ -4776,6 +4776,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // beneficial rescues for 1 junk rescue and nets worse.
             text = strip_ui_label_lines(text);
             text = promote_heading_levels(text);
+            text = normalize_tabs(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
             // gold keeps repeats on some templates; disabled pending
             // containment-aware port of the jusText version.
@@ -4866,6 +4867,74 @@ fn promote_heading_levels(text: String) -> String {
 /// exactly a comment-widget verb is never content. Curated, exact-match after
 /// stripping list markers. "Author", "Comments", "Quote" excluded (real
 /// content in some gold).
+/// Gold is tab-free in 99.6% of docs (0045): tabs surviving the walk
+/// (white-space:pre contexts, layout tables) collapse to a single space
+/// in prose and expand to 4 spaces inside code fences.
+fn normalize_tabs(text: String) -> String {
+    if !text.contains('\t') {
+        return text;
+    }
+    // Code-listing pages (gold keeps their tabs) opt out wholesale: if a
+    // large share of lines carry tabs, this is source code, not layout.
+    let mut tab_lines = 0usize;
+    let mut nonempty = 0usize;
+    for line in text.split('\n') {
+        if line.trim().is_empty() {
+            continue;
+        }
+        nonempty += 1;
+        if line.contains('\t') {
+            tab_lines += 1;
+        }
+    }
+    if nonempty == 0 || tab_lines * 4 > nonempty {
+        return text;
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut in_fence = false;
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            out.push_str(line);
+            continue;
+        }
+        if in_fence || !line.contains('\t') {
+            // fenced code keeps its tabs (gold does)
+            out.push_str(line);
+            continue;
+        }
+        // collapse INTERIOR whitespace runs containing a tab to one space;
+        // leading indentation is preserved (pre-rendered code alignment)
+        let lead_end = line.len() - line.trim_start().len();
+        let mut cur = String::with_capacity(line.len());
+        cur.push_str(&line[..lead_end]);
+        let mut run: Vec<char> = Vec::new();
+        for ch in line[lead_end..].chars() {
+            if ch == ' ' || ch == '\t' {
+                run.push(ch);
+            } else {
+                if !run.is_empty() {
+                    if run.contains(&'\t') {
+                        cur.push(' ');
+                    } else {
+                        cur.extend(run.iter());
+                    }
+                    run.clear();
+                }
+                cur.push(ch);
+            }
+        }
+        if !run.is_empty() && !run.contains(&'\t') {
+            cur.extend(run.iter());
+        }
+        out.push_str(cur.trim_end());
+    }
+    out
+}
+
 fn strip_ui_label_lines(text: String) -> String {
     const LABELS: &[&str] = &[
         "reply", "like", "report", "share", "permalink", "profile",
