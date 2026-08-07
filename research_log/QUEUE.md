@@ -35,3 +35,9 @@ delete it when a cycle rules it out (and link the cycle).
   handler (44 docs) → phpBB (25) → reply-form detector. jusText refs: 0058
   XenForo, 0063 vB4 postcontent, 0072 phpBB date-before-author, 0079
   broadening NEGATIVE (stay engine-gated).
+- **Typography (measured wall, 0026)**: dash/quote flavors are per-site style
+  the gold mirrors (en/em split by site; the 15.9K en-dash mass was one
+  decorative outlier + recall confounds). No directional normalization fix.
+- **md-links [text](href) (deferred, 0026)**: 196 gold docs / 892 instances vs
+  tens of thousands of kept anchors — same base-rate problem as images
+  (0011); joins the learned-selection queue.
