@@ -80,4 +80,10 @@ pub mod _extract_rs {
         };
         Ok(py.detach(|| impl_::extract_plain_text(html, &opts)))
     }
+
+    /// Debug: per-block features for classifier training (jsonl).
+    #[pyfunction]
+    pub fn block_features(py: Python<'_>, html: &str) -> PyResult<String> {
+        Ok(py.detach(|| impl_::collect_block_features(html)))
+    }
 }

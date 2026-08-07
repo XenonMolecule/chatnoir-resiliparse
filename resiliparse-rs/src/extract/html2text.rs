@@ -863,6 +863,36 @@ unsafe fn serialize_extract_nodes(
                 }
             }
 
+            // Markdown definition lists (cycle 0024): gold renders dl as
+            // `**label:** value` lines — dt bolded with a colon, dd on the
+            // same line.
+            if opts.preserve_formatting == FormattingOpts::Markdown && !md_in_table {
+                if current_node.tag_id == LXB_TAG_DT {
+                    if !current_node.is_end_tag {
+                        element_text_prefix = b"**".to_vec();
+                    } else {
+                        // close the bold around the label, folding a trailing
+                        // colon inside
+                        rstrip_in_place(&mut output);
+                        if output.ends_with(b"**") {
+                            // empty dt: drop the opener
+                            output.truncate(output.len() - 2);
+                        } else {
+                            if output.last() == Some(&b':') {
+                                output.pop();
+                            }
+                            output.extend_from_slice(b":** ");
+                        }
+                    }
+                } else if current_node.tag_id == LXB_TAG_DD && !current_node.is_end_tag {
+                    // dd continues the dt's line
+                    current_node.make_block = false;
+                    if margin_size == 1 {
+                        margin_size = 0;
+                    }
+                }
+            }
+
             // Markdown pipe tables (cycle 0012)
             if opts.preserve_formatting == FormattingOpts::Markdown && current_node.md_table {
                 match current_node.tag_id {
@@ -2085,6 +2115,135 @@ const RESCUE_BODY_FACTOR: usize = 30;
 /// Keep the fallback only if it is at least this many times larger than the
 /// main-content output.
 const RESCUE_KEEP_FACTOR: usize = 20;
+
+// ---------------------------------------------------------------------------
+// Block feature export (learned-classifier groundwork, cycle 0024)
+// ---------------------------------------------------------------------------
+// Emits per-block features for training; the SAME code paths feed the model
+// at inference time, so features agree by construction.
+
+pub fn collect_block_features(html: &str) -> String {
+    unsafe {
+        let doc = lxb_html_document_create();
+        if doc.is_null() {
+            return String::new();
+        }
+        if lxb_html_document_parse(doc, html.as_ptr(), html.len()) != lexbor_status_t::LXB_STATUS_OK {
+            lxb_html_document_destroy(doc);
+            return String::new();
+        }
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            lxb_html_document_destroy(doc);
+            return String::new();
+        }
+        // per-node repetition stats via the tpl machinery
+        let mut vetoes = HashSet::new();
+        let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+        let totals = tpl_scan(body, false, &mut vetoes, &mut candidates);
+        let page_text = totals.text_len.max(1);
+        let page_link_density = totals.link_len as f64 / page_text as f64;
+
+        let mut out = String::new();
+        let mut node = body;
+        let mut depth = 0usize;
+        let mut end_tag = false;
+        let mut idx = 0usize;
+        while !node.is_null() {
+            if !end_tag
+                && (*node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                && depth > 1
+                && (is_block_element((*node).local_name) || (*node).local_name == LXB_TAG_TD)
+            {
+                let cls = get_node_attr(node, b"class");
+                let id = get_node_attr(node, b"id");
+                if !cls.is_empty() || !id.is_empty() {
+                    let text = get_collapsed_string(&get_node_text(node));
+                    if !text.is_empty() {
+                        let mut combo = cls.to_vec();
+                        combo.push(b' ');
+                        combo.extend_from_slice(id);
+                        let mut link_len = 0usize;
+                        let coll = lxb_dom_collection_make_noi((*node).owner_document, 8);
+                        lxb_dom_elements_by_tag_name(node.cast(), coll, b"a".as_ptr(), 1);
+                        let n_links = lxb_dom_collection_length_noi(coll);
+                        for i in 0..n_links {
+                            link_len += get_collapsed_string(&get_node_text(lxb_dom_collection_node_noi(coll, i))).len();
+                        }
+                        lxb_dom_collection_destroy(coll, true);
+                        let regex_hits: Vec<(&str, bool)> = vec![
+                            ("nav", regex_search_not_empty(&combo, &NAV_CLS)),
+                            ("footer", regex_search_not_empty(&combo, &FOOTER_CLS)),
+                            ("header", regex_search_not_empty(&combo, &HEADER_CLS)),
+                            ("sidebar", regex_search_not_empty(&combo, &SIDEBAR_CLS)),
+                            ("social", regex_search_not_empty(&combo, &SOCIAL_CLS)),
+                            ("article", regex_search_not_empty(&combo, &ARTICLE_CLS)),
+                            ("chrome", regex_search_not_empty(&combo, &MD_CHROME_CLS)),
+                            ("byline", regex_search_not_empty(&combo, &BYLINE_CLS)),
+                            ("widget", regex_search_not_empty(&combo, &WIDGETISH_CLS)),
+                            ("recommended", regex_search_not_empty(&combo, &RECOMMENDED_CLS)),
+                            ("comments", regex_search_not_empty(&combo, &COMMENTS_CLS)),
+                        ];
+                        // text-shape features (prose vs chrome discriminators)
+                        let n_bytes = text.len().max(1);
+                        let punct = text.iter().filter(|b| matches!(b, b'.' | b',' | b'!' | b'?' | b';')).count();
+                        let digits = text.iter().filter(|b| b.is_ascii_digit()).count();
+                        let upper = text.iter().filter(|b| b.is_ascii_uppercase()).count();
+                        let words = text.split(|b| *b == b' ').filter(|w| !w.is_empty()).count().max(1);
+                        let avg_word = n_bytes as f64 / words as f64;
+                        let text_snip: String = String::from_utf8_lossy(&text)
+                            .chars()
+                            .take(600)
+                            .collect::<String>()
+                            .replace('\t', " ")
+                            .replace('\n', " ");
+                        let hits: String = regex_hits
+                            .iter()
+                            .map(|(n, b)| format!("\"{}\":{}", n, if *b { 1 } else { 0 }))
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        out.push_str(&format!(
+                            "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.3},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.2},{},\"text\":{}}}\n",
+                            idx,
+                            (*node).local_name,
+                            depth,
+                            text.len(),
+                            link_len,
+                            n_links,
+                            page_text,
+                            page_link_density,
+                            punct as f64 / n_bytes as f64,
+                            digits as f64 / n_bytes as f64,
+                            upper as f64 / n_bytes as f64,
+                            avg_word,
+                            hits,
+                            serde_escape(&text_snip),
+                        ));
+                        idx += 1;
+                    }
+                }
+            }
+            node = next_node(body, node, &mut depth, &mut end_tag);
+        }
+        lxb_html_document_destroy(doc);
+        out
+    }
+}
+
+fn serde_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push(' '),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
 
 // ---------------------------------------------------------------------------
 // Structural template subtraction (cycle 0019)
