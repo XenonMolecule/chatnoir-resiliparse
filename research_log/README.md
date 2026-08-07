@@ -87,3 +87,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7819** / Lev **0.6712**
 - [0010 — Blogger chrome handler](0010-blogger-chrome.md) — meta-generator-gated skip of share/labels/pager chrome: 110 docs improved across dev sets, 0 meaningful reg; gold-consistency check kept "Posted by" untouched (28/62 wall)
 - [0011 — Markdown images (NEGATIVE)](0011-markdown-images-negative.md) — `![alt](src)` reverted: gold keeps 3.4% of images, no DOM rule reaches viable precision (−0.022 ungated → −0.001 best gate); needs learned selection
 - [0012 — Pipe tables](0012-pipe-tables.md) — per-cell nodes + data-table gate + pipe serializer; renders 105/109; F1 +0.0007 dev, +0.0008 train; rescue gates hardened to content-length
+- [0013 — Code fences](0013-code-fences.md) — <pre> → ``` fences: 36 docs, ΣΔLev +0.039, F1 exactly 0, quality-correct ship

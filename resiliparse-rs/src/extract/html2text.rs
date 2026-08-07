@@ -899,6 +899,33 @@ unsafe fn serialize_extract_nodes(
                 }
             }
 
+            // Markdown code fences (cycle 0013): <pre> content is already
+            // verbatim via the pre_depth machinery; wrap it in ``` fences.
+            if opts.preserve_formatting == FormattingOpts::Markdown
+                && current_node.tag_id == LXB_TAG_PRE
+                && !md_in_table
+                && !(*current_node.reference_node).first_child.is_null()
+            {
+                if !current_node.is_end_tag {
+                    make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
+                    if !output.is_empty() && *output.last().unwrap() != b'\n' {
+                        output.push(b'\n');
+                    }
+                    output.extend_from_slice(b"```");
+                    margin_size = 0;
+                    current_node.make_block = false;
+                } else {
+                    rstrip_in_place(&mut output);
+                    if output.ends_with(b"```") {
+                        // empty pre: drop the opener instead of ``````
+                        output.truncate(output.len() - 3);
+                    } else {
+                        output.push(b'\n');
+                        output.extend_from_slice(b"```");
+                    }
+                }
+            }
+
             // Minimal HTML formatting only
             if opts.preserve_formatting == FormattingOpts::MinimalHtml {
                 // Add <pre> tags immediately with newlines and skip usual block logic for opening tags
@@ -1048,6 +1075,12 @@ unsafe fn serialize_extract_nodes(
 
             output.extend_from_slice(&element_text_prefix);
             element_text_prefix.clear();
+            if opts.preserve_formatting == FormattingOpts::Markdown
+                && output.ends_with(b"```")
+                && !element_text.starts_with(b"\n")
+            {
+                output.push(b'\n');
+            }
             output.extend_from_slice(&element_text);
         }
 
