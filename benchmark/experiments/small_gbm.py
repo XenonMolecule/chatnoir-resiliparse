@@ -35,7 +35,9 @@ else:
                           b["punct"], b["digit"], b["upper"], b["avgw"],
                           b["nav"], b["footer"], b["header"], b["sidebar"], b["social"],
                           b["article"], b["chrome"], b["byline"], b["widget"],
-                          b["recommended"], b["comments"]])
+                          b["recommended"], b["comments"],
+                          b["headings"], b["page_headings"], b["prev_ld"], b["next_ld"],
+                          b["prev_len"], b["next_len"], *b["wb"]])
                 y.append(contained/nb); any_row = True
             if any_row:
                 groups.extend([docs]*(len(X)-len(groups))); docs += 1
@@ -47,7 +49,7 @@ yb = (y > 0.5).astype(int)
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import roc_auc_score
 import joblib
-for n, d in ((30,5),(60,5),(60,6)):
+for n, d in ((60,5),):
     m = GradientBoostingRegressor(n_estimators=n, max_depth=d, learning_rate=0.15, subsample=0.7)
     m.fit(X[tr], y[tr])
     pred = m.predict(X[te])
