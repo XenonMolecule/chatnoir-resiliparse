@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7819** / Lev **0.6712** (0012). Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7850** / Lev **0.6758** (0014) · train 0.7823. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -88,3 +88,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7819** / Lev **0.6712**
 - [0011 — Markdown images (NEGATIVE)](0011-markdown-images-negative.md) — `![alt](src)` reverted: gold keeps 3.4% of images, no DOM rule reaches viable precision (−0.022 ungated → −0.001 best gate); needs learned selection
 - [0012 — Pipe tables](0012-pipe-tables.md) — per-cell nodes + data-table gate + pipe serializer; renders 105/109; F1 +0.0007 dev, +0.0008 train; rescue gates hardened to content-length
 - [0013 — Code fences](0013-code-fences.md) — <pre> → ``` fences: 36 docs, ΣΔLev +0.039, F1 exactly 0, quality-correct ship
+- [0014 — vBulletin handler](0014-vbulletin-handler.md) — engine-gated thread rebuild (**user – date** + body walk): dev +0.0031 (18↑/0↓), train +0.0059 (258↑/13↓); handler pattern established

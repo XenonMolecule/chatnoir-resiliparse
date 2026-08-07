@@ -1613,6 +1613,18 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             lxb_html_document_destroy(doc);
             return String::new();
         }
+        // Engine handlers (markdown mode only — the gold's post format is
+        // markdown; plain/guardrail behavior untouched).
+        if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
+            let generator = generator_meta(doc);
+            if generator.starts_with(b"vbulletin") {
+                if let Some(out) = extract_vbulletin(doc, opts) {
+                    lxb_html_document_destroy(doc);
+                    return out;
+                }
+            }
+        }
+
         let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default());
 
         // Self-correcting rescues (cycles 0004/0005). Gated on the extraction
@@ -1816,6 +1828,86 @@ const RESCUE_BODY_FACTOR: usize = 30;
 /// main-content output.
 const RESCUE_KEEP_FACTOR: usize = 20;
 
+/// Generator-meta content (lowercased) if present (engine detection).
+unsafe fn generator_meta(doc: *mut lxb_html_document_t) -> Vec<u8> {
+    unsafe {
+        let head: *mut lxb_dom_node_t = (*doc).head.cast();
+        if head.is_null() {
+            return Vec::new();
+        }
+        let mut child = (*head).first_child;
+        while !child.is_null() {
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                && (*child).local_name == LXB_TAG_META
+                && get_node_attr(child, b"name").eq_ignore_ascii_case(b"generator")
+            {
+                return get_node_attr(child, b"content").to_ascii_lowercase();
+            }
+            child = (*child).next;
+        }
+        Vec::new()
+    }
+}
+
+/// vBulletin thread-page handler (cycle 0014): rebuild the thread as the gold
+/// formats it — `**user – date**` header then the post body — instead of
+/// letting the generic walk keep the postbit chrome. Markdown mode only;
+/// falls back to generic extraction unless >=2 well-formed posts are found.
+unsafe fn extract_vbulletin(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        // vB3 posts are `table[id^=post]`, vB4 `li[id^=post_]`.
+        let containers = query_selector_all_raw(doc, body, b"table[id^=\"post\"], li[id^=\"post_\"]");
+        let mut out = String::new();
+        let mut posts = 0;
+        for c in containers {
+            // author
+            let author_nodes = query_selector_all_raw(doc, c, b"a.bigusername, a.username");
+            let author = author_nodes
+                .first()
+                .map(|&n| String::from_utf8_lossy(&get_collapsed_string(&get_node_text(n))).trim().to_string())
+                .unwrap_or_default();
+            // body: vB3 div[id^=post_message_], vB4 blockquote.postcontent
+            let body_nodes = query_selector_all_raw(doc, c, b"div[id^=\"post_message_\"], blockquote.postcontent");
+            let Some(&bn) = body_nodes.first() else { continue };
+            // date: first .thead/.date/.postdate text that looks date-like
+            let date_nodes = query_selector_all_raw(doc, c, b"td.thead, .postdate, .date, span.time, div.normal");
+            let mut date = String::new();
+            for &dn in date_nodes.iter().take(4) {
+                let t = String::from_utf8_lossy(&get_collapsed_string(&get_node_text(dn))).trim().to_string();
+                if t.len() <= 40 && t.bytes().filter(|b| b.is_ascii_digit()).count() >= 4 {
+                    date = t;
+                    break;
+                }
+            }
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            // A post whose author anchor didn't match still keeps its body —
+            // dropping whole posts is far worse than a missing header
+            // (found via thread-starter skins, train −0.38 ×2).
+            if !author.is_empty() {
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2013} {date}**"));
+                }
+                out.push_str("\n\n");
+            }
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts >= 2 { Some(out) } else { None }
+    }
+}
+
 /// Whether the document declares `<meta name="generator" content="blogger">`
 /// (Blogger/Blogspot platform signature; cycle 0010).
 unsafe fn is_blogger_doc(doc: *mut lxb_html_document_t) -> bool {
@@ -1859,6 +1951,25 @@ unsafe fn extract_plain_text_from_doc(
     unsafe { extract_plain_text_from_doc_impl(doc, opts, relax).0 }
 }
 
+/// Extract from an arbitrary subtree root, reusing the full serialization
+/// machinery (markdown, fences, tables). Used by engine handlers.
+unsafe fn extract_plain_text_from_node(
+    doc: *mut lxb_html_document_t,
+    root: *mut lxb_dom_node_t,
+    opts: &ExtractOpts,
+) -> String {
+    unsafe {
+        // Engine handlers pick the container themselves; run the generic walk
+        // WITHOUT main-content filtering (the handler's selection is the
+        // filter) but with the blacklist (script/style/etc).
+        let sub_opts = ExtractOpts {
+            main_content: false,
+            ..opts.clone()
+        };
+        extract_plain_text_from_doc_impl2(doc, Some(root), &sub_opts, RelaxFlags::default()).0
+    }
+}
+
 /// Returns the extracted text plus the `<ul>`/`<article>` nodes (with their
 /// body depth) dropped by the main-content blacklist — recorded so the tier-2
 /// rescue can lazily test rescue eligibility only when its output-size gate
@@ -1868,9 +1979,18 @@ unsafe fn extract_plain_text_from_doc_impl(
     opts: &ExtractOpts,
     relax: RelaxFlags,
 ) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
+    unsafe { extract_plain_text_from_doc_impl2(doc, None, opts, relax) }
+}
+
+unsafe fn extract_plain_text_from_doc_impl2(
+    doc: *mut lxb_html_document_t,
+    root_override: Option<*mut lxb_dom_node_t>,
+    opts: &ExtractOpts,
+    relax: RelaxFlags,
+) -> (String, Vec<(*mut lxb_dom_node_t, usize)>) {
     let mut dropped_nodes: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
     unsafe {
-        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        let body: *mut lxb_dom_node_t = root_override.unwrap_or_else(|| (*doc).body.cast());
         if body.is_null() {
             return (String::new(), dropped_nodes);
         }
