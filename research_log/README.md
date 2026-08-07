@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8013** / Lev **0.7010** (0030) · train 0.7946. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8046** / Lev **0.7050** (0032) · train 0.7948. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -105,3 +105,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8013** / Lev **0.7010**
 - [0029 — Generic post-stream (NEGATIVE)](0029-generic-poststream-negative.md) — 2 gate rounds, −0.020/−0.002; fifth discriminator-wall confirmation; per-engine gates only
 - [0030 — Respond-form veto](0030-respond-form.md) — residual diagnosis → one-line fix: **+0.0035 F1 / +0.0049 Lev** (101↑/8↓); F1 > 0.80, Lev > 0.70
 - [0031 — Dedup (NEGATIVE)](0031-dedup-negative.md) — naive exact-dup: dev +0.001/train −0.0004; gold keeps template repeats; containment-aware port queued
+- [0032 — Seven one-off engines](0032-oneoff-engines.md) — agent-built per-engine gates: **+0.0033 F1 / +0.0040 Lev**, 7↑/0↓, train spotless; forum family essentially solved

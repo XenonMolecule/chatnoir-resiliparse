@@ -1848,6 +1848,21 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 lxb_html_document_destroy(doc);
                 return out;
             }
+            // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
+            for handler in [
+                extract_perlmonks,
+                extract_nabble,
+                extract_webbbs,
+                extract_fool,
+                extract_cafemom,
+                extract_slashdot,
+                extract_glp_report,
+            ] {
+                if let Some(out) = handler(doc, opts) {
+                    lxb_html_document_destroy(doc);
+                    return out;
+                }
+            }
             // Generic post-stream rebuilder measured NEGATIVE twice
             // (cycle 0029): repeated-blocks + head-anchored author/date
             // cannot separate threads from slideshows/datelined grids.
@@ -3215,6 +3230,595 @@ unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> O
         let body_total = get_collapsed_string(&get_node_text(body)).len();
         if out.len() * 4 < body_total {
             return None;
+        }
+        Some(out)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// One-off engine handlers (cycle 0030): per-engine exact gates, 0017-style.
+// Each fires on markup unique to its engine and rebuilds the post stream as
+// `**user — date**` + body; generic fallback whenever the gate or the
+// authored/coverage guards decline.
+// ---------------------------------------------------------------------------
+
+/// Collapsed text length of `<body>` (coverage-guard denominator).
+unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
+    unsafe { get_collapsed_string(&get_node_text(body)).len() }
+}
+
+/// PerlMonks note page (gate: `table#monkbar` + `div.notetext`, the 2001
+/// "monkbar" skin's unmistakable ids). Author/date live in the two
+/// `span.attribution` fragments of the title bars; body is `div.notetext`;
+/// the gold keeps the trailing "In Section …" link-back line.
+unsafe fn extract_perlmonks(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        if query_selector_all_raw(doc, body, b"table#monkbar").is_empty() {
+            return None;
+        }
+        let notes = query_selector_all_raw(doc, body, b"div.notetext");
+        if notes.is_empty() {
+            return None;
+        }
+        let author = query_selector_all_raw(doc, body, b"td.titlechooser span.attribution a")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        let mut date = String::new();
+        for &n in &query_selector_all_raw(doc, body, b"td.titlechooser span.attribution") {
+            let t = collapsed_text(n);
+            if let Some(r) = t.strip_prefix("on ") {
+                date = r.trim().to_string();
+                break;
+            }
+        }
+        if author.is_empty() || date.len() > 48 {
+            return None;
+        }
+        let mut out = String::new();
+        if date.is_empty() {
+            out.push_str(&format!("**{author}**"));
+        } else {
+            out.push_str(&format!("**{author} \u{2014} {date}**"));
+        }
+        let mut have_body = false;
+        for &n in &notes {
+            let text = extract_plain_text_from_node(doc, n, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            out.push_str("\n\n");
+            out.push_str(text.trim());
+            have_body = true;
+        }
+        if !have_body {
+            return None;
+        }
+        if let Some(&lb) = query_selector_all_raw(doc, body, b"div.link-back").first() {
+            let t = collapsed_text(lb);
+            if !t.is_empty() && t.len() <= 120 {
+                out.push_str("\n\n");
+                out.push_str(&t);
+            }
+        }
+        Some(out)
+    }
+}
+
+/// Nabble archive thread (gate: `div.classic-row` post containers with the
+/// `classic-author-name` / `message-text` cells of the classic view). Dates
+/// are rendered by JS only, so headers carry the author alone; mail-quote
+/// blocks, gmail signatures and mailing-list footers are dropped (the gold
+/// keeps each post's own words only).
+unsafe fn extract_nabble(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let rows = query_selector_all_raw(doc, body, b"div.classic-row");
+        if rows.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        if let Some(&h) = query_selector_all_raw(doc, body, b"h1#post-title").first() {
+            let t = collapsed_text(h);
+            if !t.is_empty() && t.len() <= 200 {
+                out.push_str(&format!("# {t}"));
+            }
+        }
+        let mut posts = 0;
+        let mut authored = 0;
+        for &r in &rows {
+            let Some(&bn) = query_selector_all_raw(doc, r, b"div.message-text").first() else {
+                continue;
+            };
+            let author = query_selector_all_raw(doc, r, b"div.classic-author-name a")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let mut sub = opts.clone();
+            sub.skip_elements.push("div.gmail_quote".to_string());
+            sub.skip_elements.push("div.gmail_signature".to_string());
+            sub.skip_elements.push("blockquote".to_string());
+            let text = extract_plain_text_from_node(doc, bn, &sub);
+            // Mailing-list footer ("____… slicer-users mailing list …"),
+            // Outlook reply headers ("From: … Sent: … Subject: …") and bare
+            // signature dashes are chrome the gold drops.
+            let mut kept: Vec<&str> = Vec::new();
+            for line in text.lines() {
+                let lt = line.trim();
+                if lt.len() >= 10 && lt.bytes().all(|b| b == b'_') {
+                    break;
+                }
+                if lt.starts_with("**From:**") || (lt.starts_with("From:") && lt.contains("[mailto:")) {
+                    break;
+                }
+                if lt == "--" {
+                    continue;
+                }
+                kept.push(line);
+            }
+            let text = kept.join("\n");
+            if text.trim().is_empty() {
+                continue;
+            }
+            if posts > 0 {
+                out.push_str("\n\n---\n\n");
+            } else if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                authored += 1;
+                out.push_str(&format!("**{author}**  \n"));
+            }
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts >= 2 && authored >= 2 { Some(out) } else { None }
+    }
+}
+
+/// WebBBS / WWWBoard message page (vegsource skin). Gate: the exact
+/// From:/Subject:/Date: header table (author as a mailto link) plus the
+/// `<a name="followups">` anchor every WebBBS message view carries. The body
+/// is the sibling run between the header table and the "Reply To This Post"
+/// footer chrome.
+unsafe fn extract_webbbs(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        if query_selector_all_raw(doc, body, b"a[name=\"followups\"]").is_empty() {
+            return None;
+        }
+        let mut header: Option<*mut lxb_dom_node_t> = None;
+        let mut header_text = String::new();
+        for &t in &query_selector_all_raw(doc, body, b"table") {
+            let txt = collapsed_text(t);
+            if txt.len() <= 300
+                && txt.starts_with("From:")
+                && txt.contains("Subject:")
+                && txt.contains("Date:")
+            {
+                header = Some(t);
+                header_text = txt;
+                // keep scanning: the innermost matching table wins
+            }
+        }
+        let header = header?;
+        let author = query_selector_all_raw(doc, header, b"a[href^=\"mailto:\"]")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        if author.is_empty() {
+            return None;
+        }
+        let date = header_text
+            .find("Date:")
+            .map(|p| header_text[p + 5..].trim().to_string())
+            .unwrap_or_default();
+        // Body: document-order successors of the header table (loose 90s
+        // markup scatters the message <p>s across wrapper boundaries) up to
+        // the reply/followups chrome.
+        unsafe fn next_no_descend(
+            mut n: *mut lxb_dom_node_t,
+            root: *mut lxb_dom_node_t,
+        ) -> *mut lxb_dom_node_t {
+            unsafe {
+                loop {
+                    if n.is_null() || n == root {
+                        return std::ptr::null_mut();
+                    }
+                    if !(*n).next.is_null() {
+                        return (*n).next;
+                    }
+                    n = (*n).parent;
+                }
+            }
+        }
+        let mut text = String::new();
+        let mut n = next_no_descend(header, body);
+        'walk: while !n.is_null() {
+            if (*n).type_ == LXB_DOM_NODE_TYPE_ELEMENT {
+                if (*n).local_name == LXB_TAG_HR {
+                    break;
+                }
+                let is_followups = get_node_attr(n, b"name") == b"followups";
+                if is_followups {
+                    break;
+                }
+                if !query_selector_all_raw(doc, n, b"a[name=\"followups\"]").is_empty() {
+                    // The stop anchor is inside: descend to find the boundary.
+                    n = (*n).first_child;
+                    continue 'walk;
+                }
+                let t = extract_plain_text_from_node(doc, n, opts);
+                let tt = t.trim();
+                if tt.starts_with("Reply To This Post") {
+                    break;
+                }
+                if !tt.is_empty() {
+                    if !text.is_empty() {
+                        text.push_str("\n\n");
+                    }
+                    text.push_str(tt);
+                }
+            }
+            n = next_no_descend(n, body);
+        }
+        if text.trim().is_empty() {
+            return None;
+        }
+        let mut out = String::new();
+        if date.is_empty() || date.len() > 48 {
+            out.push_str(&format!("**{author}**  \n\n"));
+        } else {
+            out.push_str(&format!("**{author}** \u{2013} {date}  \n\n"));
+        }
+        out.push_str(text.trim_end());
+        Some(out)
+    }
+}
+
+/// Motley Fool boards single-message page. Gate: the message header block
+/// (`table.messageMeta` / `div.messageMetaBar`) plus the message body
+/// `blockquote.pbmsg` — markup unique to boards.fool.com.
+unsafe fn extract_fool(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let metas = query_selector_all_raw(doc, body, b"table.messageMeta, div.messageMetaBar");
+        let Some(&meta) = metas.first() else {
+            return None;
+        };
+        let Some(&bq) = query_selector_all_raw(doc, body, b"blockquote.pbmsg").first() else {
+            return None;
+        };
+        let mut author = String::new();
+        for &a in &query_selector_all_raw(doc, meta, b"a.pbnavlink") {
+            if contains_subslice(get_node_attr(a, b"href"), b"Profile.asp") {
+                author = collapsed_text(a);
+                break;
+            }
+        }
+        if author.is_empty() {
+            return None;
+        }
+        let mut date = String::new();
+        for &d in &query_selector_all_raw(doc, meta, b"td.pbnav, div.msgDate") {
+            let t = collapsed_text(d);
+            if let Some(r) = t.strip_prefix("Date:") {
+                let r = r.trim();
+                if !r.is_empty() && r.len() <= 40 {
+                    date = r.to_string();
+                }
+                break;
+            }
+        }
+        let text = extract_plain_text_from_node(doc, bq, opts);
+        if text.trim().is_empty() {
+            return None;
+        }
+        let mut out = String::new();
+        if date.is_empty() {
+            out.push_str(&format!("**{author}**  \n\n"));
+        } else {
+            out.push_str(&format!("**{author}** \u{2013} {date}  \n\n"));
+        }
+        out.push_str(text.trim_end());
+        Some(out)
+    }
+}
+
+/// CafeMom group-forum thread. Gate: `div.boardPostBody` (opening post) plus
+/// `div.forumReplyBody` replies. Headers come from the "by USER on DATE"
+/// meta rows; nested quote blocks and the mobile signature are dropped (gold
+/// keeps one level of "Quoting X:"). Coverage-guarded: some CafeMom golds
+/// keep the whole sidebar (featured posts, like tallies) — when the post
+/// stream is a small share of the page the generic walk serves those better.
+unsafe fn extract_cafemom(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let Some(&first_body) = query_selector_all_raw(doc, body, b"div.boardPostBody").first() else {
+            return None;
+        };
+        let replies = query_selector_all_raw(doc, body, b"div.commentBlock");
+        if replies.is_empty() {
+            return None;
+        }
+        // "by USER … on DATE" → (USER from the screen-name anchor, DATE).
+        let parse_meta = |meta: *mut lxb_dom_node_t| -> (String, String) {
+            let author = query_selector_all_raw(doc, meta, b".screennameMenu a")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let t = collapsed_text(meta);
+            let date = t
+                .rfind(" on ")
+                .map(|p| t[p + 4..].trim().to_string())
+                .filter(|d| !d.is_empty() && d.len() <= 40)
+                .unwrap_or_default();
+            (author, date)
+        };
+        let extract_post = |bn: *mut lxb_dom_node_t| -> String {
+            let mut sub = opts.clone();
+            sub.skip_elements.push("div.mobile-sig".to_string());
+            sub.skip_elements.push("blockquote blockquote".to_string());
+            extract_plain_text_from_node(doc, bn, &sub)
+        };
+        let mut out = String::new();
+        if let Some(&h) = query_selector_all_raw(doc, body, b"h1.post").first() {
+            let t = collapsed_text(h);
+            if !t.is_empty() && t.len() <= 200 {
+                out.push_str(&format!("# {t}"));
+            }
+        }
+        let mut authored = 0;
+        let mut posts = 0;
+        let mut seen: HashSet<String> = HashSet::new();
+        let push_post = |out: &mut String,
+                             seen: &mut HashSet<String>,
+                             authored: &mut usize,
+                             posts: &mut usize,
+                             author: String,
+                             date: String,
+                             text: String| {
+            if text.trim().is_empty() && author.is_empty() {
+                return;
+            }
+            let key = format!("{author}\u{0}{}", &text.trim()[..text.trim().len().min(120)]);
+            if !seen.insert(key) {
+                return; // desktop+mobile duplicate markup
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if !author.is_empty() {
+                *authored += 1;
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**  \n\n"));
+                } else {
+                    out.push_str(&format!("**{author}** \u{2013} {date}  \n\n"));
+                }
+            }
+            out.push_str(text.trim_end());
+            *posts += 1;
+        };
+        // Opening post: body in `#body_toggle .boardPostBody`, meta in the
+        // `div.topicTool` bar right after it.
+        {
+            let (author, date) = query_selector_all_raw(doc, body, b"div.topicTool")
+                .first()
+                .map(|&m| parse_meta(m))
+                .unwrap_or_default();
+            let text = extract_post(first_body);
+            push_post(&mut out, &mut seen, &mut authored, &mut posts, author, date, text);
+        }
+        for &c in &replies {
+            let Some(&bn) = query_selector_all_raw(doc, c, b"div.forumReplyBody").first() else {
+                continue;
+            };
+            let (author, date) = query_selector_all_raw(doc, c, b"div.forumReplyAuthor")
+                .first()
+                .map(|&m| parse_meta(m))
+                .unwrap_or_default();
+            let text = extract_post(bn);
+            push_post(&mut out, &mut seen, &mut authored, &mut posts, author, date, text);
+        }
+        if posts < 2 || authored < 2 {
+            return None;
+        }
+        // Coverage guard (matches the golds' split policy): fire only when
+        // the rebuilt thread carries >=12% of the page text — CafeMom pages
+        // whose gold keeps the sidebar modules (featured posts, like
+        // tallies) sit well below this; post-dominated threads sit above.
+        if out.len() * 25 < body_text_total(body) * 3 {
+            return None;
+        }
+        Some(out)
+    }
+}
+
+/// Slashdot story page (gate: `article.fhitem` with `span.story-title` — the
+/// slashcode D2 firehose markup). Story byline + intro, then each fully
+/// rendered comment (`li.comment` with a non-empty `div.commentBody`) as
+/// `**author** – date` + body. Submission pages lack the fhitem article and
+/// fall through to the generic walk.
+unsafe fn extract_slashdot(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        // Story pages only: exactly one `article.fhitem-story`. Journal and
+        // firehose pages carry streams of fhitem articles (a journal page
+        // regressed −0.90 in testing) and keep their generic extraction.
+        let arts = query_selector_all_raw(doc, body, b"article.fhitem-story");
+        if arts.len() != 1 {
+            return None;
+        }
+        let art = arts[0];
+        let Some(&title_n) = query_selector_all_raw(doc, art, b"span.story-title").first() else {
+            return None;
+        };
+        let title = collapsed_text(title_n);
+        if title.is_empty() {
+            return None;
+        }
+        let byline = query_selector_all_raw(doc, art, b".story-byline")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        let story = query_selector_all_raw(doc, art, b"div.body")
+            .first()
+            .map(|&n| extract_plain_text_from_node(doc, n, opts))
+            .unwrap_or_default();
+        if story.trim().is_empty() {
+            return None;
+        }
+        let mut out = format!("**{title}**");
+        if !byline.is_empty() && byline.len() <= 160 {
+            out.push_str(&format!("  \n*{byline}*"));
+        }
+        out.push_str("\n\n");
+        out.push_str(story.trim());
+        let mut comments = String::new();
+        for &c in &query_selector_all_raw(doc, body, b"li.comment") {
+            // First commentBody in document order is the comment's own; the
+            // nested replies are separate li.comment matches.
+            let Some(&cb) = query_selector_all_raw(doc, c, b"div.commentBody").first() else {
+                continue;
+            };
+            let text = extract_plain_text_from_node(doc, cb, opts);
+            if text.trim().is_empty() {
+                continue;
+            }
+            let Some(&details) = query_selector_all_raw(doc, c, b".details").first() else {
+                continue;
+            };
+            let author = query_selector_all_raw(doc, details, b".by a")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_else(|| {
+                    collapsed_text(
+                        *query_selector_all_raw(doc, details, b".by").first().unwrap_or(&details),
+                    )
+                    .trim_start_matches("by ")
+                    .trim()
+                    .to_string()
+                });
+            if author.is_empty() {
+                continue;
+            }
+            let mut date = String::new();
+            let od = query_selector_all_raw(doc, details, b".otherdetails")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            if let Some(p) = od.find("on ") {
+                let rest = &od[p + 3..];
+                let end = rest.find(" (#").unwrap_or(rest.len());
+                let cand = rest[..end].trim();
+                if !cand.is_empty() && cand.len() <= 48 {
+                    date = cand.to_string();
+                }
+            }
+            if !comments.is_empty() {
+                comments.push_str("\n\n");
+            }
+            if date.is_empty() {
+                comments.push_str(&format!("**{author}**  \n\n"));
+            } else {
+                comments.push_str(&format!("**{author}** \u{2013} {date}  \n\n"));
+            }
+            comments.push_str(text.trim_end());
+        }
+        if !comments.is_empty() {
+            out.push_str("\n\n---\n\n**Comments**\n\n");
+            out.push_str(&comments);
+        }
+        Some(out)
+    }
+}
+
+/// Godlike Productions report-a-post page (gate: the GLP banner image id +
+/// the `table.posting` report form whose title cell starts with "REPORT").
+/// The gold keeps the form's subject/handle/content fields; thread and
+/// reply pages have different title cells and fall through.
+unsafe fn extract_glp_report(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        if query_selector_all_raw(doc, body, b"img#glpbanner").is_empty() {
+            return None;
+        }
+        let Some(&posting) = query_selector_all_raw(doc, body, b"table.posting").first() else {
+            return None;
+        };
+        let title = query_selector_all_raw(doc, posting, b"td.title")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        if !title.starts_with("REPORT") || title.len() > 80 {
+            return None;
+        }
+        let names = query_selector_all_raw(doc, posting, b"td.fieldname");
+        let mut subject = String::new();
+        let mut handle = String::new();
+        let mut content = String::new();
+        for &fname in &names {
+            let label = collapsed_text(fname);
+            // The paired value cell is the next element sibling.
+            let mut v = (*fname).next;
+            while !v.is_null() && (*v).type_ != LXB_DOM_NODE_TYPE_ELEMENT {
+                v = (*v).next;
+            }
+            if v.is_null() {
+                continue;
+            }
+            match label.as_str() {
+                "Message Subject" => subject = collapsed_text(v),
+                "Poster Handle" => handle = collapsed_text(v),
+                "Post Content" => content = extract_plain_text_from_node(doc, v, opts),
+                _ => {}
+            }
+        }
+        if subject.is_empty() && handle.is_empty() && content.trim().is_empty() {
+            return None;
+        }
+        let mut out = format!("**{title}**");
+        if !subject.is_empty() {
+            out.push_str(&format!("\n\n**Message Subject:** {subject}"));
+        }
+        if !handle.is_empty() {
+            out.push_str(&format!("\n\n**Poster Handle:** {handle}"));
+        }
+        if !content.trim().is_empty() {
+            out.push_str(&format!("\n\n**Post Content:**\n{}", content.trim()));
+        }
+        // A content-free report (smiley-only post) leaves the sidebar news
+        // panel as the page's only substantive content — the gold keeps it.
+        if content.trim().len() < 50 {
+            if let Some(&news) = query_selector_all_raw(doc, body, b"div.Panel ul.ba").first() {
+                let t = extract_plain_text_from_node(doc, news, opts);
+                if !t.trim().is_empty() {
+                    out.push_str("\n\n---\n\n**News**\n\n");
+                    out.push_str(t.trim_end());
+                }
+            }
         }
         Some(out)
     }
