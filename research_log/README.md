@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7959** / Lev **0.6941** (0022) · train 0.7911. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7959** / Lev **0.6941** (0022; 0023 negative) · train 0.7911. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -96,3 +96,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7959** / Lev **0.6941**
 - [0020 — WP comment attribution](0020-wp-comment-attribution.md) — native-first rebuild: dev +0.0009, train +0.0011; "gold mirrors the page" lesson
 - [0021 — Forum gates](0021-forum-gates.md) — vB markup fallback + phpBB2 + coverage guard: dev +0.0014 (7↑/0↓), train clean (0 < −0.1)
 - [0022 — Byline + related (wall)](0022-byline-related.md) — byline-context rel=author kept, ad-tech tokens only; related-family confirmed rule-uncapturable (3rd confirmation); +0.0002
+- [0023 — Listing rescue (NEGATIVE)](0023-listing-rescue-negative.md) — three gate variants unstable at scale; listing/article discriminator needs page-type classifier; plumbing kept

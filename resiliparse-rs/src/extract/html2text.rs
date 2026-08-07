@@ -1420,6 +1420,10 @@ struct RelaxFlags {
     text_heavy_lists: bool,
     /// Skip the `<article>` teaser link-cluster check (cycle 0007).
     short_articles: bool,
+    /// Listing-page retry (cycle 0023): skip the div/ul link-cluster rules so
+    /// teaser-card grids survive (gold keeps every card on tag/search/archive
+    /// pages).
+    listing_cards: bool,
 }
 
 /// Rule-based check whether the given element is a "main-content" element.
@@ -1475,7 +1479,8 @@ unsafe fn is_main_content_node(
             // text is main content (obituaries, docs pages, news briefs), no
             // matter how shallow. Nav menus are short and link-dense, so they
             // can't qualify.
-            if !(relax.text_heavy_lists && is_text_heavy_list(node))
+            if !relax.listing_cards
+                && !(relax.text_heavy_lists && is_text_heavy_list(node))
                 && (body_depth < 4 || is_link_cluster(node, 0.2, 0))
             {
                 return false;
@@ -1483,7 +1488,7 @@ unsafe fn is_main_content_node(
         }
         // Teaser articles
         else if local_name == LXB_TAG_ARTICLE {
-            if !relax.short_articles && body_depth > 2 && is_link_cluster(node, 0.2, 500) {
+            if !relax.short_articles && !relax.listing_cards && body_depth > 2 && is_link_cluster(node, 0.2, 500) {
                 return false;
             }
         }
@@ -1542,7 +1547,7 @@ unsafe fn is_main_content_node(
         let id_attr = get_node_attr(node, b"id");
         // Only elements with class or id attributes from here on
         if cls_attr.is_empty() && id_attr.is_empty() {
-            if local_name == LXB_TAG_DIV {
+            if local_name == LXB_TAG_DIV && !relax.listing_cards {
                 return body_depth <= 5 || !is_link_cluster(node, 0.6, 800);
             }
             return true;
@@ -1711,7 +1716,7 @@ unsafe fn is_main_content_node(
             return false;
         }
 
-        if body_depth > 2 && local_name == LXB_TAG_DIV && is_link_cluster(node, 0.6, 1500) {
+        if body_depth > 2 && local_name == LXB_TAG_DIV && !relax.listing_cards && is_link_cluster(node, 0.6, 1500) {
             return false;
         }
 
@@ -1805,10 +1810,17 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
         }
 
+        let mut page_has_card_grid = false;
         let tpl_set: Option<HashSet<*mut lxb_dom_node_t>> =
             if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
                 let body: *mut lxb_dom_node_t = (*doc).body.cast();
-                if body.is_null() { None } else { Some(tpl_vetoes(body)) }
+                if body.is_null() {
+                    None
+                } else {
+                    let (v, grid) = tpl_vetoes(body);
+                    page_has_card_grid = grid;
+                    Some(v)
+                }
             } else {
                 None
             };
@@ -1941,11 +1953,30 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     relax.short_articles = true;
                 }
 
+                // Listing-card retry (cycle 0023): a deep loss (output under
+                // 15% of body text) with dropped div/ul containers suggests a
+                // tag/search/archive page whose teaser cards were
+                // link-cluster-vetoed; gold keeps every card.
+                // Listing-card retry: three gate variants measured, all
+                // negative or unstable at train scale (see 0023 log) — the
+                // listing/article discriminator needs the page-type
+                // classifier. Plumbing (RelaxFlags::listing_cards) kept for
+                // that era; the gate is disabled.
+                let _ = page_has_card_grid;
+
                 if relax != RelaxFlags::default()
                     && (result_content_len as f64) < UL_RESCUE_MAX_OUTPUT_RATIO * body_text_len(doc) as f64
                 {
+                    // Listing retries must multiply content hard (real card
+                    // grids are 5-15x the base); chrome flooding on ordinary
+                    // articles rarely reaches 4x.
+                    let keep_factor = if relax.listing_cards {
+                        LISTING_RESCUE_KEEP_FACTOR
+                    } else {
+                        UL_RESCUE_KEEP_FACTOR
+                    };
                     let retry = extract_plain_text_from_doc(doc, opts, relax, tpl_ref);
-                    if retry.len() as f64 > UL_RESCUE_KEEP_FACTOR * result.len().max(1) as f64
+                    if retry.len() as f64 > keep_factor * result.len().max(1) as f64
                         && !duplicates_existing_content(&result, &retry)
                     {
                         result = retry;
@@ -1976,6 +2007,8 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
 /// collapsed body text; keep the retry only if it is this many times larger.
 /// Sweep-tuned on lpv11 dev under the zero-regression constraint.
 const UL_RESCUE_MAX_OUTPUT_RATIO: f64 = 0.3;
+const LISTING_RESCUE_MAX_OUTPUT_RATIO: f64 = 0.15;
+const LISTING_RESCUE_KEEP_FACTOR: f64 = 4.0;
 const UL_RESCUE_KEEP_FACTOR: f64 = 2.0;
 
 /// Pages with more `<article>` elements than this are teaser streams; the
@@ -2196,18 +2229,24 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 }
 
 /// Compute the template-subtraction veto set for a document body.
-unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> HashSet<*mut lxb_dom_node_t> {
+/// Returns the veto set plus whether the page carries a LARGE repeated-
+/// structure container (>=3000B) — the positive signal that this is a
+/// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
+unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> (HashSet<*mut lxb_dom_node_t>, bool) {
     unsafe {
         let mut vetoes = HashSet::new();
         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
         let totals = tpl_scan(body, false, &mut vetoes, &mut candidates);
+        let large_repeated = candidates.iter().any(|&(_, tl)| tl >= 3000)
+            || (totals.text_len > 0
+                && totals.link_len as f64 / totals.text_len as f64 > TPL_PAGE_LINK_DENSITY_MAX);
         if totals.text_len < TPL_MIN_PAGE_TEXT
             || totals.link_len as f64 / totals.text_len as f64 > TPL_PAGE_LINK_DENSITY_MAX
         {
             // Listing-like or thin page: on thin pages whatever repeats is
             // usually the content (package-instruction pages, profiles).
             vetoes.clear();
-            return vetoes;
+            return (vetoes, large_repeated);
         }
         // container-fraction guard, applied now that body totals are known
         for (n, tl) in candidates {
@@ -2215,7 +2254,7 @@ unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> HashSet<*mut lxb_dom_node_t> 
                 vetoes.remove(&n);
             }
         }
-        vetoes
+        (vetoes, large_repeated)
     }
 }
 
@@ -3019,7 +3058,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
                     && opts.main_content
                     && dropped_nodes.len() < 64
                     && (*ctx.node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
-                    && matches!((*ctx.node).local_name, LXB_TAG_UL | LXB_TAG_ARTICLE)
+                    && matches!((*ctx.node).local_name, LXB_TAG_UL | LXB_TAG_ARTICLE | LXB_TAG_DIV)
                     && !blacklisted_nodes.contains(&ctx.node)
                 {
                     dropped_nodes.push((ctx.node, ctx.depth + base_depth));
