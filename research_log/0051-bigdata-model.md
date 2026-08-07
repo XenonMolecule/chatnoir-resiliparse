@@ -10,8 +10,8 @@
    (15.4k lines). The 0028-era "data-scaling plateau" verdict was an
    artifact of the CONSERVATIVE thresholds — with real veto authority,
    more data pays.
-2. **Thresholds re-swept for the new calibration:** veto 0.30
-   (small blocks), keep 0.70. At the old 0.25/0.85 the new model
+2. **Thresholds re-swept for the new calibration:** 
+   (small blocks; 0.30–0.35 measured byte-identical — the score distribution has a gap there), keep 0.70. At the old 0.25/0.85 the new model
    measured WORSE — sweeps do not transfer between calibrations.
 3. **Size-tiered veto (the structural piece):** blocks >1500B need
    score < 0.10 to be vetoed — a large block is an article-body
