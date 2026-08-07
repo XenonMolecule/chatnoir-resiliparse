@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8049** / Lev **0.7057** (0034) · train 0.7950. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8058** / Lev **0.7069** (0035) · train 0.7950. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -108,3 +108,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8049** / Lev **0.7057**
 - [0032 — Seven one-off engines](0032-oneoff-engines.md) — agent-built per-engine gates: **+0.0033 F1 / +0.0040 Lev**, 7↑/0↓, train spotless; forum family essentially solved
 - [0033 — Author-bio + relative guard](0033-author-bio.md) — 10%-keep bio boxes vetoed, >40%-of-page abstention added: +0.0003/+0.0005
 - [0034 — Heading promotion](0034-heading-promotion.md) — gold re-levels to #-min (98%): +0.0002 Lev; ungated hard-breaks re-measured negative (gate twice-confirmed)
+- [0035 — UI-line strip extension](0035-ui-line-strip-extension.md) — census-driven chrome lines + heading/bold normalization fix: +0.0009 F1 / +0.0012 Lev; bold-coverage & Tags-lines walls confirmed

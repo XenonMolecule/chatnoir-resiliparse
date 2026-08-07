@@ -4267,6 +4267,11 @@ unsafe fn extract_plain_text_from_doc_impl2(
         rstrip_in_place(&mut output);
         let mut text = decode_utf8_ignore(output);
         if opts.preserve_formatting == FormattingOpts::Markdown {
+            // Post-passes run INSIDE the extraction so the rescue-ladder
+            // gates measure stripped (chrome-free) content length — same
+            // rationale as content_len excluding markdown punctuation.
+            // Measured both ways (0035): post-rescue ordering trades ~3
+            // beneficial rescues for 1 junk rescue and nets worse.
             text = strip_ui_label_lines(text);
             text = promote_heading_levels(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
@@ -4367,14 +4372,38 @@ fn strip_ui_label_lines(text: String) -> String {
         "read more", "continue reading",
         "leave a reply", "leave a comment", "post comment", "submit comment",
         "notify me of new posts by email.", "notify me of follow-up comments by email.",
+        "leave a reply cancel reply", "%d bloggers like this:",
+        "advertisement", "advertisements",
+        "skip to content", "skip to main content",
+        "newer post older post home",
+        "recent posts", "advanced search", "search for:",
+        "this site uses akismet to reduce spam. learn how your comment data is processed.",
+        "who is online", "author message", "post subject:",
+        "display posts from previous: sort by",
+        "print view previous topic | next topic",
+        "view unanswered posts | view active topics",
+        "you cannot post new topics in this forum",
+        "you cannot reply to topics in this forum",
+        "you cannot edit your posts in this forum",
+        "you cannot delete your posts in this forum",
+        "you cannot post attachments in this forum",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
     for line in text.split('\n') {
-        let t = line.trim().trim_start_matches(['-', '\u{2022}', ' ']).trim();
+        let was_heading = line.trim_start().starts_with('#');
+        let t = line.trim().trim_start_matches(['-', '\u{2022}', '#', ' ']).trim();
         let t = t.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.').trim();
-        let tl = t.to_lowercase();
-        if !tl.is_empty() && LABELS.contains(&tl.as_str()) {
+        let tl = if t.contains('*') {
+            t.replace("**", "").replace('*', "").trim().to_lowercase()
+        } else {
+            t.to_lowercase()
+        };
+        // Single short words rendered as headings ("# Reply") are sometimes
+        // genuine gold content (form pages); only strip heading lines whose
+        // label is unambiguous chrome (multi-word or long).
+        let heading_ok = !was_heading || tl.contains(' ') || tl.len() >= 10;
+        if !tl.is_empty() && heading_ok && LABELS.contains(&tl.as_str()) {
             removed_any = true;
             continue;
         }
