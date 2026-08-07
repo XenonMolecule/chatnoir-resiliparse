@@ -1961,7 +1961,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 if body.is_null() {
                     None
                 } else {
-                    let (v, grid, wl, mv, mvm, pld) = tpl_vetoes(body);
+                    let (v, grid, wl, mv, mvm, pld) = tpl_vetoes(generator_kind(doc), body);
                     page_has_card_grid = grid;
                     model_whitelist = wl;
                     model_veto_nodes = mv;
@@ -2351,6 +2351,9 @@ pub fn collect_block_features(html: &str) -> String {
                 totals.n_forms,
                 totals.n_articles,
                 totals.n_comment_cls,
+                nav_share,
+                gen_kind,
+                n_substantial,
             );
             let text = get_collapsed_string(&get_node_text(b.ptr));
             let text_snip: String = String::from_utf8_lossy(&text)
@@ -2412,6 +2415,9 @@ unsafe fn build_block_features(
     page_forms: usize,
     page_articles: usize,
     page_comment_cls: usize,
+    page_nav_share: f64,
+    page_generator: u8,
+    page_n_blocks: usize,
 ) -> block_model::BlockFeatures {
     unsafe {
         let cls = get_node_attr(b.ptr, b"class");
@@ -2453,6 +2459,9 @@ unsafe fn build_block_features(
             page_forms: ((page_forms + 1) as f64).ln(),
             page_articles: ((page_articles + 1) as f64).ln(),
             page_comment_cls: ((page_comment_cls + 1) as f64).ln(),
+            page_nav_share,
+            page_generator: page_generator as f64,
+            page_n_blocks: ((page_n_blocks + 1) as f64).ln(),
             prev_ld: prev.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
             next_ld: next.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
             prev_len: prev.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
@@ -2769,6 +2778,7 @@ const MODEL_KEEP_THRESHOLD: f64 = 0.60;
 /// structure container (>=3000B) — the positive signal that this is a
 /// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
 unsafe fn tpl_vetoes(
+    gen_kind: u8,
     body: *mut lxb_dom_node_t,
 ) -> (
     HashSet<*mut lxb_dom_node_t>,
@@ -2794,6 +2804,8 @@ unsafe fn tpl_vetoes(
         if MODEL_VETO_ENABLED {
             let page_text = totals.text_len.max(1);
             let pld = totals.link_len as f64 / page_text as f64;
+            let nav_share = totals.nav_text as f64 / page_text as f64;
+            let n_substantial = blocks.iter().filter(|b| b.text_len >= 150).count();
             for (i, b) in blocks.iter().enumerate() {
                 // 40-byte floor (0052): swept 150->10; quality rises
                 // monotonically as the floor drops but below 40B the extra
@@ -2812,6 +2824,9 @@ unsafe fn tpl_vetoes(
                     totals.n_forms,
                     totals.n_articles,
                     totals.n_comment_cls,
+                    nav_share,
+                    gen_kind,
+                    n_substantial,
                 );
                 let score = block_model::score_block(&f);
                 // Size-tiered veto authority (0051): the aggressive

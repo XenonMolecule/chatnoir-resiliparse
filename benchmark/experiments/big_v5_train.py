@@ -64,7 +64,7 @@ print("extraction done", flush=True)
 
 # lean train
 rng = np.random.default_rng(3)
-TARGET = 3_000_000
+TARGET = 2_500_000
 files = sorted(f for f in os.listdir(OUT) if f.startswith("chunk_"))
 tot = 0; sizes = []
 for fn in files:
@@ -80,7 +80,7 @@ for fn in files:
     take = rng.random(len(tr)) < frac
     Xtr.append(Xc[tr[take]]); ytr.append(yc[tr[take]])
     if len(te):
-        keep = rng.random(len(te)) < 0.5
+        keep = rng.random(len(te)) < 0.25
         Xte.append(Xc[te[keep]]); yte.append(yc[te[keep]])
     del d, Xc, yc, g; gc.collect()
 Xtr = np.concatenate(Xtr); ytr = np.concatenate(ytr)

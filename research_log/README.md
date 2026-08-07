@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8206** / Lev **0.7247** (0054) · train 0.8136/0.7149 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8223** / Lev **0.7260** (0055) · train 0.8142/0.7154 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -128,3 +128,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8206** / Lev **0.7247**
 - [0052 — Model block-floor sweep](0052-model-block-floor.md) — 150→40B floor, speed-free: +0.0011 F1 / +0.0021 Lev dev
 - [0053 — n120d6 model](0053-n120-model.md) — AUC 0.8503, re-swept 0.35/0.65: +0.0008 F1 dev, +0.0017/+0.0017 train
 - [0054 — v4 page features](0054-v4-page-features.md) — forms/articles/comment-cls counts, AUC 0.8550, veto 0.40/keep 0.60: +0.0013 F1 / +0.0014 Lev dev
+- [0055 — v5 page features](0055-v5-page-features.md) — nav share/generator/block count, AUC 0.8592: +0.0017 F1 / +0.0013 Lev dev; train cross-check now standard for sweeps
