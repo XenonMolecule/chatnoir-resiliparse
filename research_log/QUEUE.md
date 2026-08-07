@@ -41,3 +41,6 @@ delete it when a cycle rules it out (and link the cycle).
 - **md-links [text](href) (deferred, 0026)**: 196 gold docs / 892 instances vs
   tens of thousands of kept anchors — same base-rate problem as images
   (0011); joins the learned-selection queue.
+- **Model-placeholder guard (from 0029)**: add a test asserting
+  score_block returns non-constant output on two distinct feature vectors,
+  so a placeholder can never silently ship again.

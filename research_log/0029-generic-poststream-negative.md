@@ -24,3 +24,14 @@
 - Batch the one-off engines (Nabble, PerlMonks, Slash, WebBBS, …) to a
   worktree agent with per-engine gates, 0017-style.
 - Content-chunk residual diagnosis (20% of Lev diff mass) remains open.
+
+## Correction (same day)
+The 0028 staging commit had overwritten `block_model.rs` with the placeholder
+(score=0.5 → no tiers firing); cycles 0029-generic/generic2 therefore ran
+without the model tier, and their measured deltas included that −0.0015 loss.
+Corrected accounting: generic round 2's true effect ≈ −0.0004 — still
+negative, verdict unchanged. Model re-exported in the current 60-feature
+order; dev restored to **0.7978 / 0.6961** (marginally above 0026). Lesson:
+the placeholder pattern needs a build-time guard — added a compile-warning
+comment; a golden test asserting a non-constant score would be better
+(queued).
