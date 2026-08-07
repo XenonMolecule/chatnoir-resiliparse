@@ -2354,8 +2354,9 @@ pub fn collect_block_features(html: &str) -> String {
                 .replace('\t', " ")
                 .replace('\n', " ");
             out.push_str(&format!(
-                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
+                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"page_forms\":{},\"page_articles\":{},\"page_comment_cls\":{},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
                 idx, b.tag, b.depth, b.text_len, b.link_len, b.n_a, page_text, page_ld,
+                totals.n_forms, totals.n_articles, totals.n_comment_cls,
                 f.punct, f.digit, f.upper, f.avgw,
                 f.nav as u8, f.footer as u8, f.header as u8, f.sidebar as u8, f.social as u8,
                 f.article as u8, f.chrome as u8, f.byline as u8, f.widget as u8,
@@ -2501,6 +2502,9 @@ struct TplNode {
     link_len: usize,
     n_imgs: usize,
     n_a: usize,
+    n_forms: usize,
+    n_articles: usize,
+    n_comment_cls: usize,
     punct: usize,
     digits: usize,
     upper: usize,
@@ -2570,6 +2574,15 @@ unsafe fn tpl_scan(
         let mut link_len = 0usize;
         let mut n_imgs = if tag == LXB_TAG_IMG { 1 } else { 0 };
         let mut n_a = if tag == LXB_TAG_A { 1 } else { 0 };
+        let mut n_forms = if tag == LXB_TAG_FORM { 1 } else { 0 };
+        let mut n_articles = if tag == LXB_TAG_ARTICLE { 1 } else { 0 };
+        let mut n_comment_cls = if (*node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+            && contains_subslice(&get_node_attr(node, b"class").to_ascii_lowercase(), b"comment")
+        {
+            1
+        } else {
+            0
+        };
         let mut punct = 0usize;
         let mut digits = 0usize;
         let mut upper = 0usize;
@@ -2628,6 +2641,9 @@ unsafe fn tpl_scan(
                         link_len += c.link_len;
                         n_imgs += c.n_imgs;
                         n_a += c.n_a;
+                        n_forms += c.n_forms;
+                        n_articles += c.n_articles;
+                        n_comment_cls += c.n_comment_cls;
                         punct += c.punct;
                         digits += c.digits;
                         upper += c.upper;
@@ -2695,6 +2711,9 @@ unsafe fn tpl_scan(
             link_len,
             n_imgs,
             n_a,
+            n_forms,
+            n_articles,
+            n_comment_cls,
             punct,
             digits,
             upper,
