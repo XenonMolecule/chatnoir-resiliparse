@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7935** / Lev **0.6917** (0019) · train 0.7891. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7944** / Lev **0.6921** (0020) · train 0.7902. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -93,3 +93,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7935** / Lev **0.6917**
 - [0017 — IPB/UBB/SMF handlers](0017-forum-handlers-ipb-ubb-smf.md) — agent-built, battery-verified: dev +0.0023 (14↑/0↓), Lev +0.0035, train +0.0013; forum arc cumulative +0.0058 F1
 - [0018 — Chrome drops](0018-chrome-drops.md) — audit-backed veto, 7 hardening variants (negations, size cap, content markers): dev +0.0017/+0.0023, train +0.0015 (30:1), guardrails clean
 - [0019 — Template subtraction](0019-template-subtraction.md) — structural repetition∧link-density veto: **dev +0.0041 F1 / +0.0075 Lev**, train +0.0037/+0.0062; largest cycle gain; ~10% speed cost markdown-only (logged)
+- [0020 — WP comment attribution](0020-wp-comment-attribution.md) — native-first rebuild: dev +0.0009, train +0.0011; "gold mirrors the page" lesson
