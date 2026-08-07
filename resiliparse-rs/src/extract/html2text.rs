@@ -832,6 +832,34 @@ const UL_EXEMPT_MAX_LINK_RATIO: f64 = 0.5;
 /// and FAQ indexes whose items are a link plus a few keywords.
 const UL_EXEMPT_MIN_TEXT_PER_ITEM: usize = 150;
 
+/// Class words marking widget containers or hidden/meta lists (checked on the
+/// list and its ancestors). Word-boundary match, ASCII case-insensitive.
+static WIDGETISH_CLS: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"(?:^|[\s_-])(?:widgets?|hide|meta)(?:$|[\s_-])")
+        .case_insensitive(true)
+        .unicode(false)
+        .build()
+        .unwrap()
+});
+
+/// Whether the node or any ancestor element carries a widget/hidden/meta
+/// class — platform sidebar machinery that can hold text-heavy junk lists.
+unsafe fn has_widgetish_ancestry(node: *mut lxb_dom_node_t) -> bool {
+    unsafe {
+        let mut n = node;
+        while !n.is_null() && (*n).type_ == LXB_DOM_NODE_TYPE_ELEMENT {
+            if (*n).local_name == LXB_TAG_BODY {
+                return false;
+            }
+            if regex_search_not_empty(get_node_attr(n, b"class"), &WIDGETISH_CLS) {
+                return true;
+            }
+            n = (*n).parent;
+        }
+        false
+    }
+}
+
 /// Whether a list element carries substantial, mostly-non-link text.
 unsafe fn is_text_heavy_list(node: *mut lxb_dom_node_t) -> bool {
     unsafe {
@@ -860,10 +888,10 @@ unsafe fn is_text_heavy_list(node: *mut lxb_dom_node_t) -> bool {
             }
             child = (*child).next;
         }
-        // A link directory / blogroll / index has multiple links per item
-        // (title + inline links); genuine list-structured prose has at most
-        // about one.
-        if n_links > n_li.max(1) {
+        // Veto lists inside platform widget containers (Blogger/WordPress
+        // blogrolls, recent-posts, etc.) and lists that are metadata or
+        // hidden by class — text-heavy but never main content.
+        if has_widgetish_ancestry(node) {
             return false;
         }
         element_text.len().saturating_sub(link_len) / n_li.max(1) >= UL_EXEMPT_MIN_TEXT_PER_ITEM
@@ -1288,11 +1316,20 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 })
             };
 
+            // Error/stub pages ("We're sorry", "page not found", "out of
+            // stock") legitimately extract to a tiny message inside a huge
+            // site shell — rescuing them swaps the correct answer for the
+            // shell. Their tiny output names the condition, so a keyword
+            // veto is cheap and can't fire on wiped-article scraps.
+            let is_error_stub = result.len() < RESCUE_NEAR_EMPTY_ABS + 100
+                && regex_search_not_empty(result.as_bytes(), &ERROR_STUB_TEXT);
+
             // Tier 1 (0004): near-empty output → unfiltered fallback, kept
             // only if it yields much more content (classifier false negative
             // wiped the whole page).
             let mut rescued = false;
-            if result.len() < RESCUE_NEAR_EMPTY_ABS
+            if !is_error_stub
+                && result.len() < RESCUE_NEAR_EMPTY_ABS
                 && body_text_len(doc) > RESCUE_BODY_FACTOR * result.len().max(1)
             {
                 let fallback_opts = ExtractOpts {
@@ -1315,6 +1352,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // lists, so testing them is much cheaper than a full-page
             // text_content.
             if !rescued
+                && !is_error_stub
                 && !dropped_uls.is_empty()
                 && dropped_uls.iter().any(|&(n, d)| {
                     is_main_content_node(n, d, opts.comments, opts.post_meta, opts.hidden_elements, true)
@@ -1341,6 +1379,18 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
 const UL_RESCUE_MAX_OUTPUT_RATIO: f64 = 0.3;
 const UL_RESCUE_KEEP_FACTOR: f64 = 2.0;
 
+/// Error/stub-page phrases that mark a tiny extraction as the page's true
+/// content (rescue veto, cycle 0006).
+static ERROR_STUB_TEXT: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(
+        r"(?:an error (?:has )?occurred|we(?:'|\u{2019})?re (?:very )?sorry|page (?:you requested )?(?:was |is )?not (?:be )?found|(?:page|item|product) (?:is )?(?:currently )?(?:un|not )avail|out of stock|404 (?:error|not found)|no longer (?:available|exists)|has been (?:removed|deleted))",
+    )
+    .case_insensitive(true)
+    .unicode(false)
+    .build()
+    .unwrap()
+});
+
 /// Whether `retry` repeats content already present once in `base` (template
 /// widgets — e.g. Blogspot — can render the same post inside a list, so the
 /// list exemption would emit it twice). Detects a mid-`base` probe appearing
@@ -1364,7 +1414,7 @@ fn duplicates_existing_content(base: &str, retry: &str) -> bool {
         if count >= 2 {
             return true;
         }
-        hay = &hay[pos + 1..];
+        hay = &hay[pos + probe.len()..];
     }
     false
 }

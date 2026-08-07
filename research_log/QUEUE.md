@@ -14,14 +14,6 @@ delete it when a cycle rules it out (and link the cycle).
   heuristics need; may reveal fragile signals worth hardening.
 - **Markdown output mode** — the planned big lever (playbook §8.4); scheduled
   after the 0002 spike resolves which implementation iterates.
-- **EMPTY_PRED / UNDER_EXTRACT rescues** (from 0001): 13 empty + 97
-  under-extracted docs on lpv11 dev; jusText-style self-correcting rescues
-  (gated on near-empty output) are the known-safe pattern.
-- **Widget-class junk signal** (from 0005): Blogger/WordPress `widget`-class
-  containers hold blogrolls/junk that defeat the text-heavy-list exemption.
-  Adding it as a classifier junk signal (or exemption veto) would unlock the
-  stronger 0005 variant (+12 docs across sets, currently blocked by one −0.46
-  blogroll admission on general dev; tags 0005-final/0005-ul-peritem).
 - **Article-teaser rule repair** (from 0003): 8-doc bucket; `<article>` with
   ≤500 chars + links rejected as teaser even when it's the real (short) story.
   Same rescue-tier pattern as 0005.

@@ -77,8 +77,12 @@ def _extract(item):
     try:
         prediction = _EXTRACT_FN(html, **_EXTRACT_KWARGS)
         error = None
-    except Exception as exc:  # one bad doc must not kill the run
-        prediction, error = "", repr(exc)
+    except KeyboardInterrupt:
+        raise
+    except BaseException as exc:  # one bad doc must not kill the run
+        # BaseException: pyo3 PanicException is not an Exception subclass,
+        # and exotic exception types may not survive pool pickling.
+        prediction, error = "", f"{type(exc).__name__}: {exc}"
     return {
         "index": index,
         "prediction": prediction,
