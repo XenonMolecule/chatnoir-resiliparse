@@ -33,3 +33,24 @@ downstream serialization/rescue work and pay for themselves. No single
 hot lever; criterion micro-profiling deprioritized. Floor-10 quality
 margin stays blocked unless a structural change (e.g., feature reuse
 between tpl scan and model) lands.
+
+## Strategic map after the golden reset (post-0059)
+Scoreboard: original 0.8223/0.7260 · golden 0.8330/0.7450.
+Local rules are exhausted (deficiency ledger = singleton page
+structures; empty-section list family = 3 docs; yahoo-mb = 1).
+
+**Next big swing: MODEL-PRIMARY SELECTION.** Replace the rule cascade
+as the primary keep/drop decision: score EVERY block (floor ~40B),
+keep iff score >= tau (sweep on golden + original-cross-check), rules
+demoted to tie-breakers; engine handlers/rebuilds still run first;
+rescue ladder becomes the safety net for model wipes. Justification:
+AUC 0.86 on 12M blocks, five straight wins from raising model
+authority, walls doctrine (12 confirmations) says only global judgment
+moves the remaining mass. Implementation sketch: new
+SELECTION_MODE=ModelPrimary in tpl_vetoes -> emit veto set = blocks
+below tau (no is_main_content_node gating), whitelist = everything
+else; sweep tau in {0.3..0.6}.
+
+Also queued: learned per-image selection (0059 verdict); v7 features
+gated on live-dev only (0056 lesson); 27 fleet flags for owner review;
+empty-section list drops (3 docs); Yahoo message-board handler.
