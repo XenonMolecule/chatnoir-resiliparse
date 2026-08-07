@@ -117,4 +117,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7116**
 - [0041 — phpBB subSilver2 handler](0041-phpbb-subsilver2.md) — b.postauthor table skin: +0.0009 F1 / +0.0014 Lev dev, zero regressions
 - [0042 — vBulletin variants](0042-vbulletin-variants.md) — vB4 markup gate + member.php author fallback: small clean win
 - [0043 — XenForo handler](0043-xenforo-handler.md) — XF1+XF2, title-attr times, quote-strip per gold majority: +0.0003 F1 / +0.0006 Lev dev
-- [0044 — MovableType rebuild](0044-movabletype-rebuild.md) — commentText + "Posted by: X | date" pairs: one dev doc 0.03→0.55 F1
+- [0044 — MovableType rebuild](0044-movabletype-rebuild.md) — commentText + "Posted by: X | date" pairs: one dev doc +0.014 F1 / +0.027 Lev

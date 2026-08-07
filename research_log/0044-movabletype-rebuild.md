@@ -12,7 +12,7 @@ Doc-order body→byline pairing, always-rebuild semantics, chained after
 the Blogspot rebuild. Byline-exact on the probe doc (146 bylines).
 
 ## Results
-dev **0.8090 / 0.7116**: 1 doc transformed (wizardsinsider
-F1 0.030→0.549, Lev 0.014→0.487), 0 regressions. train: 1 tiny
+dev **0.8090 / 0.7116**: 1 doc improved (wizardsinsider
+F1 0.769→0.783, Lev 0.595→0.622), 0 regressions. train: 1 tiny
 regression (−0.003, a sibling blog with a variant p.posted format).
 General dev plain 1000/1000 identical; goldens pass.
