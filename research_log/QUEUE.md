@@ -25,3 +25,13 @@ delete it when a cycle rules it out (and link the cycle).
   net-negative). Features measured in 0011; revisit in the classifier era.
 - **Rescue-shape veto** (from 0010): tier-1 rescue swaps shells onto tiny
   image-blog pages whose heading+image output was already gold-shaped.
+- **Forum engine handlers** (0014 diagnosis, 2026-08-07): 104 forum docs on
+  dev, mean F1 0.707 (corpus 0.782). Engines: vBulletin 44, phpBB 25,
+  Invision 8, custom 21, XenForo/UBB/SMF 2 each. Gold post format:
+  `**user – MM-DD-YYYY, HH:MM**` header (dash variants), body below, posts
+  separated by blank line (sometimes `---`); "Quote: Originally Posted by
+  **user**" KEPT. Worst docs are reply-form pages (newreply.php — should
+  extract almost nothing) and whole-thread chrome. Build order: vBulletin
+  handler (44 docs) → phpBB (25) → reply-form detector. jusText refs: 0058
+  XenForo, 0063 vB4 postcontent, 0072 phpBB date-before-author, 0079
+  broadening NEGATIVE (stay engine-gated).
