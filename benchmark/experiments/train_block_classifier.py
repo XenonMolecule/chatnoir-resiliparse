@@ -38,6 +38,8 @@ with gzip.open("benchmark/datasets_rawhtml/lpv11/train.jsonl.gz", "rt") as f:
                 b["nav"], b["footer"], b["header"], b["sidebar"], b["social"],
                 b["article"], b["chrome"], b["byline"], b["widget"],
                 b["recommended"], b["comments"],
+                b["headings"], b["page_headings"], b["prev_ld"], b["next_ld"],
+                b["prev_len"], b["next_len"], *b["wb"],
             ], label))
         if not rows: continue
         for f_, l_ in rows:
@@ -51,7 +53,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import roc_auc_score
 cut = int(docs * 0.8)
 tr = groups < cut; te = ~tr
-m = HistGradientBoostingRegressor(max_iter=200, max_depth=6, learning_rate=0.08)
+m = HistGradientBoostingRegressor(max_iter=300, max_depth=6, learning_rate=0.08)
 m.fit(X[tr], y[tr])
 pred = m.predict(X[te])
 yb = (y[te] > 0.5).astype(int)

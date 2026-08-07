@@ -2159,7 +2159,14 @@ pub fn collect_block_features(html: &str) -> String {
         let page_ld = totals.link_len as f64 / page_text as f64;
         let mut out = String::new();
         for (idx, b) in blocks.iter().enumerate() {
-            let f = build_block_features(b, page_text, page_ld);
+            let f = build_block_features(
+                b,
+                if idx > 0 { blocks.get(idx - 1) } else { None },
+                blocks.get(idx + 1),
+                page_text,
+                page_ld,
+                totals.n_headings,
+            );
             let text = get_collapsed_string(&get_node_text(b.ptr));
             let text_snip: String = String::from_utf8_lossy(&text)
                 .chars()
@@ -2168,12 +2175,15 @@ pub fn collect_block_features(html: &str) -> String {
                 .replace('\t', " ")
                 .replace('\n', " ");
             out.push_str(&format!(
-                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"text\":{}}}\n",
+                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"headings\":{},\"page_headings\":{},\"prev_ld\":{:.4},\"next_ld\":{:.4},\"prev_len\":{:.3},\"next_len\":{:.3},\"wb\":{:?},\"text\":{}}}\n",
                 idx, b.tag, b.depth, b.text_len, b.link_len, b.n_a, page_text, page_ld,
                 f.punct, f.digit, f.upper, f.avgw,
                 f.nav as u8, f.footer as u8, f.header as u8, f.sidebar as u8, f.social as u8,
                 f.article as u8, f.chrome as u8, f.byline as u8, f.widget as u8,
                 f.recommended as u8, f.comments as u8,
+                f.headings as u64, f.page_headings as u64,
+                f.prev_ld, f.next_ld, f.prev_len, f.next_len,
+                f.wb.iter().map(|v| (v * 1000.0).round() / 1000.0).collect::<Vec<_>>(),
                 serde_escape(&text_snip),
             ));
         }
@@ -2205,7 +2215,14 @@ static FEATURE_CLS_SET: LazyLock<regex::bytes::RegexSet> = LazyLock::new(|| {
     .unwrap()
 });
 
-unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> block_model::BlockFeatures {
+unsafe fn build_block_features(
+    b: &RawBlock,
+    prev: Option<&RawBlock>,
+    next: Option<&RawBlock>,
+    page_text: usize,
+    page_ld: f64,
+    page_headings: usize,
+) -> block_model::BlockFeatures {
     unsafe {
         let cls = get_node_attr(b.ptr, b"class");
         let id = get_node_attr(b.ptr, b"id");
@@ -2241,6 +2258,20 @@ unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> 
             widget: hits.contains(&8) as u8 as f64,
             recommended: hits.contains(&9) as u8 as f64,
             comments: hits.contains(&10) as u8 as f64,
+            headings: b.n_headings as f64,
+            page_headings: page_headings as f64,
+            prev_ld: prev.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
+            next_ld: next.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
+            prev_len: prev.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
+            next_len: next.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
+            wb: {
+                let total = b.wordbag.iter().sum::<u32>().max(1) as f64;
+                let mut wb = [0.0f64; 32];
+                for (o, v) in wb.iter_mut().zip(b.wordbag.iter()) {
+                    *o = *v as f64 / total;
+                }
+                wb
+            },
         }
     }
 }
@@ -2282,6 +2313,8 @@ const TPL_MAX_CONTAINER_TEXT: usize = 2500;
 const TPL_PAGE_LINK_DENSITY_MAX: f64 = 0.7;
 const TPL_MIN_PAGE_TEXT: usize = 1500;
 
+const WORDBAG_DIM: usize = 32;
+
 #[allow(dead_code)]
 struct TplNode {
     ptr: *mut lxb_dom_node_t,
@@ -2293,6 +2326,8 @@ struct TplNode {
     digits: usize,
     upper: usize,
     words: usize,
+    n_headings: usize,
+    wordbag: [u32; WORDBAG_DIM],
     sig1: u64,
     sig2: u64,
 }
@@ -2337,6 +2372,8 @@ struct RawBlock {
     digits: usize,
     upper: usize,
     words: usize,
+    n_headings: usize,
+    wordbag: [u32; WORDBAG_DIM],
 }
 
 unsafe fn tpl_scan(
@@ -2358,6 +2395,8 @@ unsafe fn tpl_scan(
         let mut digits = 0usize;
         let mut upper = 0usize;
         let mut words = 0usize;
+        let mut n_headings = if matches!(tag, LXB_TAG_H1 | LXB_TAG_H2 | LXB_TAG_H3 | LXB_TAG_H4 | LXB_TAG_H5 | LXB_TAG_H6) { 1 } else { 0 };
+        let mut wordbag = [0u32; WORDBAG_DIM];
         let mut child_sig1: Vec<u64> = Vec::new();
         let mut child_sig2: Vec<u64> = Vec::new();
         let mut n_children = 0usize;
@@ -2376,13 +2415,26 @@ unsafe fn tpl_scan(
                     digits += t.iter().filter(|b| b.is_ascii_digit()).count();
                     upper += t.iter().filter(|b| b.is_ascii_uppercase()).count();
                     let mut in_word = false;
+                    let mut wh: u64 = 0xcbf29ce484222325;
                     for &b in t {
                         if c_isspace(b) {
+                            if in_word {
+                                wordbag[(wh % WORDBAG_DIM as u64) as usize] += 1;
+                                wh = 0xcbf29ce484222325;
+                            }
                             in_word = false;
-                        } else if !in_word {
-                            words += 1;
-                            in_word = true;
+                        } else {
+                            // FNV-1a over lowercased bytes
+                            wh ^= b.to_ascii_lowercase() as u64;
+                            wh = wh.wrapping_mul(0x100000001b3);
+                            if !in_word {
+                                words += 1;
+                                in_word = true;
+                            }
                         }
+                    }
+                    if in_word {
+                        wordbag[(wh % WORDBAG_DIM as u64) as usize] += 1;
                     }
                 }
                 LXB_DOM_NODE_TYPE_ELEMENT => {
@@ -2401,6 +2453,10 @@ unsafe fn tpl_scan(
                         digits += c.digits;
                         upper += c.upper;
                         words += c.words;
+                        n_headings += c.n_headings;
+                        for (a, b) in wordbag.iter_mut().zip(c.wordbag.iter()) {
+                            *a += *b;
+                        }
                         child_sig1.push(c.sig1);
                         child_sig2.push(c.sig2);
                         n_children += 1;
@@ -2428,6 +2484,8 @@ unsafe fn tpl_scan(
                     digits,
                     upper,
                     words,
+                    n_headings,
+                    wordbag,
                 });
             }
         }
@@ -2452,7 +2510,21 @@ unsafe fn tpl_scan(
                 candidates.push((node, text_len));
             }
         }
-        TplNode { ptr: node, text_len, link_len, n_imgs, n_a, punct, digits, upper, words, sig1, sig2 }
+        TplNode {
+            ptr: node,
+            text_len,
+            link_len,
+            n_imgs,
+            n_a,
+            punct,
+            digits,
+            upper,
+            words,
+            n_headings,
+            wordbag,
+            sig1,
+            sig2,
+        }
     }
 }
 
@@ -2494,11 +2566,18 @@ unsafe fn tpl_vetoes(
         if MODEL_VETO_ENABLED {
             let page_text = totals.text_len.max(1);
             let pld = totals.link_len as f64 / page_text as f64;
-            for b in &blocks {
+            for (i, b) in blocks.iter().enumerate() {
                 if b.text_len < 150 {
                     continue;
                 }
-                let f = build_block_features(b, page_text, pld);
+                let f = build_block_features(
+                    b,
+                    if i > 0 { blocks.get(i - 1) } else { None },
+                    blocks.get(i + 1),
+                    page_text,
+                    pld,
+                    totals.n_headings,
+                );
                 let score = block_model::score_block(&f);
                 if score < MODEL_VETO_THRESHOLD {
                     model_veto.push(b.ptr);
