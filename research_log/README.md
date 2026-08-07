@@ -100,3 +100,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7977** / Lev **0.6960**
 - [0024 — dl + classifier groundwork](0024-dl-and-classifier-groundwork.md) — **label:** value dl lines (5↑/0↓); classifier v0 AUC 0.84, safe veto/whitelist tiers identified
 - [0025 — Model tier](0025-model-tier.md) — exported 60-tree GBM, veto+whitelist tiers in the walk: dev +0.0015 (7↑/0↓); first model-in-loop cycle; ~10% markdown-only speed cost logged
 - [0026 — Fence langs + UI labels](0026-fence-lang-ui-labels.md) — residual audit → curated chrome-line filter: 109↑/15↓ dev; fence ```lang hints
+- [0027 — Model v2 scaling (NEGATIVE)](0027-model-v2-scaling-negative.md) — 10× data → AUC +0.001, live wash; features are the frontier, not rows
