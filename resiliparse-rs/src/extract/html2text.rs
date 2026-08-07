@@ -1369,7 +1369,7 @@ const BLACKLIST_ARIA_ROLES: &[&[u8]] = &[
 /// included (the classic `post-share-buttons` escape).
 static MD_CHROME_CLS: LazyLock<Regex> = LazyLock::new(|| {
     RegexBuilder::new(
-        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links)|read-?next|around-?the-?web|you-?may-?(?:also-?)?like|outbrain|taboola|sponsored-?(?:links|content)|respond|comment-?respond|comment-?form|commentform)(?:$|[\s_-])",
+        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links)|read-?next|around-?the-?web|you-?may-?(?:also-?)?like|outbrain|taboola|sponsored-?(?:links|content)|respond|comment-?respond|comment-?form|commentform|author-?(?:bio|box)|about-?(?:the-?)?author|bio-?box)(?:$|[\s_-])",
     )
     .case_insensitive(true)
     .unicode(false)
@@ -1412,9 +1412,28 @@ fn glue_negations(hay: &mut Vec<u8>) {
 }
 
 /// Chrome widgets are small; wrapper divs named after a widget they merely
-/// contain (`place-login-pop` wrapping 45KB of page) must never be vetoed.
+/// contain (`place-login-pop` wrapping 45KB of page) must never be vetoed —
+/// and neither may a container holding most of a small page (author PAGES
+/// where the bio IS the content: oreilly /pub/au −0.70, cycle 0033).
 unsafe fn is_small_chrome_sized(node: *mut lxb_dom_node_t) -> bool {
-    unsafe { get_collapsed_string(&get_node_text(node)).len() <= 1500 }
+    unsafe {
+        let n = get_collapsed_string(&get_node_text(node)).len();
+        if n > 1500 {
+            return false;
+        }
+        // lxb_html_document_t embeds lxb_dom_document_t as its first field
+        let html_doc = (*node).owner_document as *mut lxb_html_document_t;
+        if !html_doc.is_null() {
+            let body: *mut lxb_dom_node_t = (*html_doc).body.cast();
+            if !body.is_null() {
+                let page = get_collapsed_string(&get_node_text(body)).len();
+                if page > 0 && n * 5 > page * 2 {
+                    return false; // >40% of the page is not chrome
+                }
+            }
+        }
+        true
+    }
 }
 
 static BYLINE_CLS: LazyLock<Regex> = LazyLock::new(|| {
