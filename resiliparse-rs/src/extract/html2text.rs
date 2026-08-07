@@ -1952,15 +1952,17 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
 
         let mut page_has_card_grid = false;
         let mut model_whitelist: HashSet<*mut lxb_dom_node_t> = HashSet::new();
+        let mut model_veto_nodes: Vec<*mut lxb_dom_node_t> = Vec::new();
         let tpl_set: Option<HashSet<*mut lxb_dom_node_t>> =
             if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
                 let body: *mut lxb_dom_node_t = (*doc).body.cast();
                 if body.is_null() {
                     None
                 } else {
-                    let (v, grid, wl) = tpl_vetoes(body);
+                    let (v, grid, wl, mv) = tpl_vetoes(body);
                     page_has_card_grid = grid;
                     model_whitelist = wl;
+                    model_veto_nodes = mv;
                     Some(v)
                 }
             } else {
@@ -2047,7 +2049,28 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 // stays counted so plain-mode gate behavior is unchanged
                 t.bytes().filter(|b| !matches!(b, b'|' | b'#' | b'*' | b'-')).count()
             }
-            let result_content_len = content_len(&result);
+            let mut result_content_len = content_len(&result);
+
+            // Tier 0 (0046): model-veto rollback. Raising the model's veto
+            // authority pays in aggregate but its false negatives can wipe
+            // a whole page (quotes pages, tiny sites); a near-empty result
+            // with model vetoes in effect retries without them and keeps
+            // the retry when it doubles the content.
+            if !model_veto_nodes.is_empty()
+                && result_content_len < RESCUE_NEAR_EMPTY_ABS
+            {
+                let mut set3 = effective_tpl.clone().unwrap_or_default();
+                for v in &model_veto_nodes {
+                    set3.remove(v);
+                }
+                let (r3, d3) = extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), Some(&set3), wl_ref);
+                if content_len(&r3) > 2 * result_content_len.max(1) {
+                    result = r3;
+                    dropped_nodes = d3;
+                    effective_tpl = Some(set3);
+                    result_content_len = content_len(&result);
+                }
+            }
 
             // Error/stub pages ("We're sorry", "page not found", "out of
             // stock") legitimately extract to a tiny message inside a huge
@@ -2687,17 +2710,22 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 /// Model-veto threshold (cycle 0025): blocks scoring below this predicted
 /// gold-containment join the skip set. Chosen from held-out tier analysis
 /// (veto@0.10 ≈ 2% coverage at <1% false-veto on the n60d5 GBM).
-const MODEL_VETO_THRESHOLD: f64 = 0.10;
+const MODEL_VETO_THRESHOLD: f64 = 0.25;
 const MODEL_VETO_ENABLED: bool = true;
 /// Whitelist tier: blocks scoring above this override rule/template vetoes.
-const MODEL_KEEP_THRESHOLD: f64 = 0.90;
+const MODEL_KEEP_THRESHOLD: f64 = 0.85;
 
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
 /// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
 unsafe fn tpl_vetoes(
     body: *mut lxb_dom_node_t,
-) -> (HashSet<*mut lxb_dom_node_t>, bool, HashSet<*mut lxb_dom_node_t>) {
+) -> (
+    HashSet<*mut lxb_dom_node_t>,
+    bool,
+    HashSet<*mut lxb_dom_node_t>,
+    Vec<*mut lxb_dom_node_t>,
+) {
     unsafe {
         let mut vetoes = HashSet::new();
         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
@@ -2748,7 +2776,7 @@ unsafe fn tpl_vetoes(
             for w in &whitelist {
                 vetoes.remove(w);
             }
-            return (vetoes, large_repeated, whitelist);
+            return (vetoes, large_repeated, whitelist, model_veto);
         }
         // container-fraction guard, applied now that body totals are known
         for (n, tl) in candidates {
@@ -2762,7 +2790,7 @@ unsafe fn tpl_vetoes(
         for w in &whitelist {
             vetoes.remove(w);
         }
-        (vetoes, large_repeated, whitelist)
+        (vetoes, large_repeated, whitelist, model_veto)
     }
 }
 

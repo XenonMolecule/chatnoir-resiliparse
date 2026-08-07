@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7118** (0045) · train 0.7988/0.6965. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8120** / Lev **0.7153** (0046) · train 0.8026/0.7010. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -119,3 +119,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8090** / Lev **0.7118**
 - [0043 — XenForo handler](0043-xenforo-handler.md) — XF1+XF2, title-attr times, quote-strip per gold majority: +0.0003 F1 / +0.0006 Lev dev
 - [0044 — MovableType rebuild](0044-movabletype-rebuild.md) — commentText + "Posted by: X | date" pairs: one dev doc +0.014 F1 / +0.027 Lev
 - [0045 — Tab normalization](0045-tab-normalization.md) — gold is 99.6% tab-free: interior-run collapse with code-listing/fence/indent guards: +0.0002 Lev, 57 dev docs up
+- [0046 — Model threshold re-sweep](0046-model-threshold-resweep.md) — veto 0.10→0.25 + rollback tier: **+0.0030 F1 / +0.0035 Lev dev**, largest single cycle; M1 F1 target crossed
