@@ -123,3 +123,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8120** / Lev **0.7153**
 - [0047 — NEGATIVE: table bold-strip](0047-NEGATIVE-table-bold-strip.md) — 97% gold convention, flat aggregate + keep-test flip crater; reverted
 - [0048 — Post-pass ordering](0048-postpass-ordering.md) — tabs-before-strip fixes "Author\tMessage" evasion; handler exits post-passed: 58 docs up, zero down
 - [0049 — UI-line strip batch 3](0049-ui-line-strip-batch3.md) — vB footer band + WP likes: 109 docs up, 7 down
+- [0050 — NEGATIVE: phpBB2 pairing](0050-NEGATIVE-phpbb2-pairing.md) — doc-order pairing mispairs column-layout skins; anti-pattern confirmed twice
