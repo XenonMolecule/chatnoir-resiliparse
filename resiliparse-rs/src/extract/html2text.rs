@@ -21,6 +21,7 @@
 
 use crate::third_party::lexbor::lxb_dom_node_type_t::*;
 use crate::third_party::lexbor::*;
+use crate::extract::block_model;
 use regex::bytes::{Regex, RegexBuilder};
 use std::collections::{BTreeSet, HashSet};
 use std::ptr;
@@ -1847,8 +1848,13 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 if body.is_null() {
                     None
                 } else {
-                    let (v, grid) = tpl_vetoes(body);
+                    let (mut v, grid) = tpl_vetoes(body);
                     page_has_card_grid = grid;
+                    if MODEL_VETO_ENABLED {
+                        for m in model_vetoes(body) {
+                            v.insert(m);
+                        }
+                    }
                     Some(v)
                 }
             } else {
@@ -2137,96 +2143,70 @@ pub fn collect_block_features(html: &str) -> String {
             lxb_html_document_destroy(doc);
             return String::new();
         }
-        // per-node repetition stats via the tpl machinery
         let mut vetoes = HashSet::new();
         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
-        let totals = tpl_scan(body, false, &mut vetoes, &mut candidates);
+        let mut blocks: Vec<RawBlock> = Vec::new();
+        let mut coll = Some(&mut blocks);
+        let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut coll);
         let page_text = totals.text_len.max(1);
-        let page_link_density = totals.link_len as f64 / page_text as f64;
-
+        let page_ld = totals.link_len as f64 / page_text as f64;
         let mut out = String::new();
-        let mut node = body;
-        let mut depth = 0usize;
-        let mut end_tag = false;
-        let mut idx = 0usize;
-        while !node.is_null() {
-            if !end_tag
-                && (*node).type_ == LXB_DOM_NODE_TYPE_ELEMENT
-                && depth > 1
-                && (is_block_element((*node).local_name) || (*node).local_name == LXB_TAG_TD)
-            {
-                let cls = get_node_attr(node, b"class");
-                let id = get_node_attr(node, b"id");
-                if !cls.is_empty() || !id.is_empty() {
-                    let text = get_collapsed_string(&get_node_text(node));
-                    if !text.is_empty() {
-                        let mut combo = cls.to_vec();
-                        combo.push(b' ');
-                        combo.extend_from_slice(id);
-                        let mut link_len = 0usize;
-                        let coll = lxb_dom_collection_make_noi((*node).owner_document, 8);
-                        lxb_dom_elements_by_tag_name(node.cast(), coll, b"a".as_ptr(), 1);
-                        let n_links = lxb_dom_collection_length_noi(coll);
-                        for i in 0..n_links {
-                            link_len += get_collapsed_string(&get_node_text(lxb_dom_collection_node_noi(coll, i))).len();
-                        }
-                        lxb_dom_collection_destroy(coll, true);
-                        let regex_hits: Vec<(&str, bool)> = vec![
-                            ("nav", regex_search_not_empty(&combo, &NAV_CLS)),
-                            ("footer", regex_search_not_empty(&combo, &FOOTER_CLS)),
-                            ("header", regex_search_not_empty(&combo, &HEADER_CLS)),
-                            ("sidebar", regex_search_not_empty(&combo, &SIDEBAR_CLS)),
-                            ("social", regex_search_not_empty(&combo, &SOCIAL_CLS)),
-                            ("article", regex_search_not_empty(&combo, &ARTICLE_CLS)),
-                            ("chrome", regex_search_not_empty(&combo, &MD_CHROME_CLS)),
-                            ("byline", regex_search_not_empty(&combo, &BYLINE_CLS)),
-                            ("widget", regex_search_not_empty(&combo, &WIDGETISH_CLS)),
-                            ("recommended", regex_search_not_empty(&combo, &RECOMMENDED_CLS)),
-                            ("comments", regex_search_not_empty(&combo, &COMMENTS_CLS)),
-                        ];
-                        // text-shape features (prose vs chrome discriminators)
-                        let n_bytes = text.len().max(1);
-                        let punct = text.iter().filter(|b| matches!(b, b'.' | b',' | b'!' | b'?' | b';')).count();
-                        let digits = text.iter().filter(|b| b.is_ascii_digit()).count();
-                        let upper = text.iter().filter(|b| b.is_ascii_uppercase()).count();
-                        let words = text.split(|b| *b == b' ').filter(|w| !w.is_empty()).count().max(1);
-                        let avg_word = n_bytes as f64 / words as f64;
-                        let text_snip: String = String::from_utf8_lossy(&text)
-                            .chars()
-                            .take(600)
-                            .collect::<String>()
-                            .replace('\t', " ")
-                            .replace('\n', " ");
-                        let hits: String = regex_hits
-                            .iter()
-                            .map(|(n, b)| format!("\"{}\":{}", n, if *b { 1 } else { 0 }))
-                            .collect::<Vec<_>>()
-                            .join(",");
-                        out.push_str(&format!(
-                            "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.3},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.2},{},\"text\":{}}}\n",
-                            idx,
-                            (*node).local_name,
-                            depth,
-                            text.len(),
-                            link_len,
-                            n_links,
-                            page_text,
-                            page_link_density,
-                            punct as f64 / n_bytes as f64,
-                            digits as f64 / n_bytes as f64,
-                            upper as f64 / n_bytes as f64,
-                            avg_word,
-                            hits,
-                            serde_escape(&text_snip),
-                        ));
-                        idx += 1;
-                    }
-                }
-            }
-            node = next_node(body, node, &mut depth, &mut end_tag);
+        for (idx, b) in blocks.iter().enumerate() {
+            let f = build_block_features(b, page_text, page_ld);
+            let text = get_collapsed_string(&get_node_text(b.ptr));
+            let text_snip: String = String::from_utf8_lossy(&text)
+                .chars()
+                .take(600)
+                .collect::<String>()
+                .replace('\t', " ")
+                .replace('\n', " ");
+            out.push_str(&format!(
+                "{{\"i\":{},\"tag\":{},\"depth\":{},\"text_len\":{},\"link_len\":{},\"n_links\":{},\"page_text\":{},\"page_ld\":{:.4},\"punct\":{:.4},\"digit\":{:.4},\"upper\":{:.4},\"avgw\":{:.3},\"nav\":{},\"footer\":{},\"header\":{},\"sidebar\":{},\"social\":{},\"article\":{},\"chrome\":{},\"byline\":{},\"widget\":{},\"recommended\":{},\"comments\":{},\"text\":{}}}\n",
+                idx, b.tag, b.depth, b.text_len, b.link_len, b.n_a, page_text, page_ld,
+                f.punct, f.digit, f.upper, f.avgw,
+                f.nav as u8, f.footer as u8, f.header as u8, f.sidebar as u8, f.social as u8,
+                f.article as u8, f.chrome as u8, f.byline as u8, f.widget as u8,
+                f.recommended as u8, f.comments as u8,
+                serde_escape(&text_snip),
+            ));
         }
         lxb_html_document_destroy(doc);
         out
+    }
+}
+
+unsafe fn build_block_features(b: &RawBlock, page_text: usize, page_ld: f64) -> block_model::BlockFeatures {
+    unsafe {
+        let cls = get_node_attr(b.ptr, b"class");
+        let id = get_node_attr(b.ptr, b"id");
+        let mut combo = cls.to_vec();
+        combo.push(b' ');
+        combo.extend_from_slice(id);
+        let tl = b.text_len.max(1);
+        block_model::BlockFeatures {
+            tag: b.tag as f64,
+            depth: b.depth as f64,
+            log_text_len: ((b.text_len + 1) as f64).ln(),
+            link_density: b.link_len as f64 / tl as f64,
+            n_links: b.n_a as f64,
+            page_ld,
+            frac_page: b.text_len as f64 / page_text.max(1) as f64,
+            punct: b.punct as f64 / tl as f64,
+            digit: b.digits as f64 / tl as f64,
+            upper: b.upper as f64 / tl as f64,
+            avgw: b.text_len as f64 / b.words.max(1) as f64,
+            nav: regex_search_not_empty(&combo, &NAV_CLS) as u8 as f64,
+            footer: regex_search_not_empty(&combo, &FOOTER_CLS) as u8 as f64,
+            header: regex_search_not_empty(&combo, &HEADER_CLS) as u8 as f64,
+            sidebar: regex_search_not_empty(&combo, &SIDEBAR_CLS) as u8 as f64,
+            social: regex_search_not_empty(&combo, &SOCIAL_CLS) as u8 as f64,
+            article: regex_search_not_empty(&combo, &ARTICLE_CLS) as u8 as f64,
+            chrome: regex_search_not_empty(&combo, &MD_CHROME_CLS) as u8 as f64,
+            byline: regex_search_not_empty(&combo, &BYLINE_CLS) as u8 as f64,
+            widget: regex_search_not_empty(&combo, &WIDGETISH_CLS) as u8 as f64,
+            recommended: regex_search_not_empty(&combo, &RECOMMENDED_CLS) as u8 as f64,
+            comments: regex_search_not_empty(&combo, &COMMENTS_CLS) as u8 as f64,
+        }
     }
 }
 
@@ -2273,6 +2253,11 @@ struct TplNode {
     text_len: usize,
     link_len: usize,
     n_imgs: usize,
+    n_a: usize,
+    punct: usize,
+    digits: usize,
+    upper: usize,
+    words: usize,
     sig1: u64,
     sig2: u64,
 }
@@ -2306,11 +2291,26 @@ fn tpl_base_sig(tag: lxb_tag_id_t, cls: &[u8]) -> u64 {
 
 /// Bottom-up scan: computes per-element structural signatures and marks
 /// repeated∧link-dense containers in `vetoes`. Returns (text_len, link_len).
+struct RawBlock {
+    ptr: *mut lxb_dom_node_t,
+    tag: lxb_tag_id_t,
+    depth: usize,
+    text_len: usize,
+    link_len: usize,
+    n_a: usize,
+    punct: usize,
+    digits: usize,
+    upper: usize,
+    words: usize,
+}
+
 unsafe fn tpl_scan(
     node: *mut lxb_dom_node_t,
     in_link: bool,
+    depth: usize,
     vetoes: &mut HashSet<*mut lxb_dom_node_t>,
     candidates: &mut Vec<(*mut lxb_dom_node_t, usize)>,
+    feats: &mut Option<&mut Vec<RawBlock>>,
 ) -> TplNode {
     unsafe {
         let tag = (*node).local_name;
@@ -2318,6 +2318,11 @@ unsafe fn tpl_scan(
         let mut text_len = 0usize;
         let mut link_len = 0usize;
         let mut n_imgs = if tag == LXB_TAG_IMG { 1 } else { 0 };
+        let mut n_a = if tag == LXB_TAG_A { 1 } else { 0 };
+        let mut punct = 0usize;
+        let mut digits = 0usize;
+        let mut upper = 0usize;
+        let mut words = 0usize;
         let mut child_sig1: Vec<u64> = Vec::new();
         let mut child_sig2: Vec<u64> = Vec::new();
         let mut n_children = 0usize;
@@ -2332,6 +2337,18 @@ unsafe fn tpl_scan(
                     if is_link {
                         link_len += n;
                     }
+                    punct += t.iter().filter(|b| matches!(b, b'.' | b',' | b'!' | b'?' | b';')).count();
+                    digits += t.iter().filter(|b| b.is_ascii_digit()).count();
+                    upper += t.iter().filter(|b| b.is_ascii_uppercase()).count();
+                    let mut in_word = false;
+                    for &b in t {
+                        if c_isspace(b) {
+                            in_word = false;
+                        } else if !in_word {
+                            words += 1;
+                            in_word = true;
+                        }
+                    }
                 }
                 LXB_DOM_NODE_TYPE_ELEMENT => {
                     // script/style/etc are excluded from the walk by the
@@ -2340,10 +2357,15 @@ unsafe fn tpl_scan(
                         std::str::from_utf8(get_qualified_name(child)).unwrap_or(""),
                         "script" | "style" | "noscript" | "template" | "svg" | "iframe"
                     ) {
-                        let c = tpl_scan(child, is_link, vetoes, candidates);
+                        let c = tpl_scan(child, is_link, depth + 1, vetoes, candidates, feats);
                         text_len += c.text_len;
                         link_len += c.link_len;
                         n_imgs += c.n_imgs;
+                        n_a += c.n_a;
+                        punct += c.punct;
+                        digits += c.digits;
+                        upper += c.upper;
+                        words += c.words;
                         child_sig1.push(c.sig1);
                         child_sig2.push(c.sig2);
                         n_children += 1;
@@ -2354,6 +2376,26 @@ unsafe fn tpl_scan(
             child = (*child).next;
         }
         let cls = get_node_attr(node, b"class");
+        if let Some(collector) = feats.as_deref_mut() {
+            if depth > 1
+                && (is_block_element(tag) || tag == LXB_TAG_TD)
+                && text_len > 0
+                && (!cls.is_empty() || !get_node_attr(node, b"id").is_empty())
+            {
+                collector.push(RawBlock {
+                    ptr: node,
+                    tag,
+                    depth,
+                    text_len,
+                    link_len,
+                    n_a,
+                    punct,
+                    digits,
+                    upper,
+                    words,
+                });
+            }
+        }
         let sig0 = tpl_base_sig(tag, cls);
         let sig1 = tpl_hash(sig0, &child_sig1);
         let sig2 = tpl_hash(sig0, &child_sig2);
@@ -2375,7 +2417,7 @@ unsafe fn tpl_scan(
                 candidates.push((node, text_len));
             }
         }
-        TplNode { ptr: node, text_len, link_len, n_imgs, sig1, sig2 }
+        TplNode { ptr: node, text_len, link_len, n_imgs, n_a, punct, digits, upper, words, sig1, sig2 }
     }
 }
 
@@ -2388,6 +2430,34 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 }
 
 /// Compute the template-subtraction veto set for a document body.
+/// Model-veto threshold (cycle 0025): blocks scoring below this predicted
+/// gold-containment join the skip set. Chosen from held-out tier analysis
+/// (veto@0.10 ≈ 2% coverage at <1% false-veto on the n60d5 GBM).
+const MODEL_VETO_THRESHOLD: f64 = 0.10;
+const MODEL_VETO_ENABLED: bool = false; // flipped on when the exported model lands
+
+/// Learned block vetoes (markdown config): score every classifier decision
+/// point with the exported GBM; confident-junk blocks are skipped.
+unsafe fn model_vetoes(body: *mut lxb_dom_node_t) -> HashSet<*mut lxb_dom_node_t> {
+    unsafe {
+        let mut dummy_v = HashSet::new();
+        let mut dummy_c: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+        let mut blocks: Vec<RawBlock> = Vec::new();
+        let mut coll = Some(&mut blocks);
+        let totals = tpl_scan(body, false, 0, &mut dummy_v, &mut dummy_c, &mut coll);
+        let page_text = totals.text_len.max(1);
+        let page_ld = totals.link_len as f64 / page_text as f64;
+        let mut out = HashSet::new();
+        for b in &blocks {
+            let f = build_block_features(b, page_text, page_ld);
+            if block_model::score_block(&f) < MODEL_VETO_THRESHOLD {
+                out.insert(b.ptr);
+            }
+        }
+        out
+    }
+}
+
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
 /// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
@@ -2395,7 +2465,7 @@ unsafe fn tpl_vetoes(body: *mut lxb_dom_node_t) -> (HashSet<*mut lxb_dom_node_t>
     unsafe {
         let mut vetoes = HashSet::new();
         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
-        let totals = tpl_scan(body, false, &mut vetoes, &mut candidates);
+        let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut None);
         let large_repeated = candidates.iter().any(|&(_, tl)| tl >= 3000)
             || (totals.text_len > 0
                 && totals.link_len as f64 / totals.text_len as f64 > TPL_PAGE_LINK_DENSITY_MAX);

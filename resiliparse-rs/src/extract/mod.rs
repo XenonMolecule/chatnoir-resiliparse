@@ -14,4 +14,5 @@
 
 //! Content extraction tools.
 
+pub mod block_model;
 pub mod html2text;
