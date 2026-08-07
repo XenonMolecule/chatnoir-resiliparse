@@ -4268,6 +4268,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
         let mut text = decode_utf8_ignore(output);
         if opts.preserve_formatting == FormattingOpts::Markdown {
             text = strip_ui_label_lines(text);
+            text = promote_heading_levels(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
             // gold keeps repeats on some templates; disabled pending
             // containment-aware port of the jusText version.
@@ -4308,6 +4309,50 @@ fn dedup_paragraphs(text: String) -> String {
         out.push(para);
     }
     if removed { out.join("\n\n") } else { text }
+}
+
+/// Heading-level promotion (cycle 0034): the gold re-levels each page so its
+/// top heading is `#` (98% of heading-bearing golds); pages that start at
+/// h2/h3 shift every heading up accordingly. Fenced code is untouched.
+fn promote_heading_levels(text: String) -> String {
+    let mut min_level = usize::MAX;
+    let mut in_fence = false;
+    for line in text.lines() {
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        let hashes = line.bytes().take_while(|b| *b == b'#').count();
+        if (1..=6).contains(&hashes) && line.as_bytes().get(hashes) == Some(&b' ') {
+            min_level = min_level.min(hashes);
+        }
+    }
+    if min_level == usize::MAX || min_level <= 1 {
+        return text;
+    }
+    let shift = min_level - 1;
+    let mut out = String::with_capacity(text.len());
+    let mut in_fence = false;
+    for (i, line) in text.lines().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            out.push_str(line);
+            continue;
+        }
+        let hashes = line.bytes().take_while(|b| *b == b'#').count();
+        if !in_fence && (1..=6).contains(&hashes) && line.as_bytes().get(hashes) == Some(&b' ') {
+            out.push_str(&line[shift.min(hashes - 1)..]);
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
 }
 
 /// Dangling UI-label lines (jusText-0084 family, cycle 0026): a line that is
