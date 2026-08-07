@@ -51,6 +51,8 @@ pub mod _extract_rs {
                 if let Ok(s) = v.extract::<&str>() {
                     if s == "minimal_html" {
                         impl_::FormattingOpts::MinimalHtml
+                    } else if s == "markdown" {
+                        impl_::FormattingOpts::Markdown
                     } else if v.is_truthy()? {
                         impl_::FormattingOpts::Basic
                     } else {

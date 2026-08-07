@@ -19,3 +19,6 @@ delete it when a cycle rules it out (and link the cycle).
   `wsite-not-footer` literally matches the footer regex.
 - **Forum over-extraction track** (from 0003): 131 OVER docs — reply forms,
   whole-thread dumps where gold keeps one post, tag/archive pages.
+- **Markdown v2** (from 0009): pipe tables (72 gold docs), code fences (30),
+  links-as-markdown `[text](href)`. Bold-coverage heuristics for label-styled
+  spans (`**Name:**` from dt/th/label) — verify gold consistency first.

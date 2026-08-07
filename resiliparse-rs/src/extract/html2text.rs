@@ -33,6 +33,10 @@ pub enum FormattingOpts {
     #[default]
     Basic = 1,
     MinimalHtml = 2,
+    /// Markdown-flavored output (cycle 0009): `#` headings, `**bold**`,
+    /// `*italic*`, `- ` bullets. Ordered above MinimalHtml, so comparisons
+    /// that mean "minimal HTML specifically" must use `==`, not `>=`.
+    Markdown = 3,
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +144,36 @@ fn escape_html(data: &[u8]) -> Vec<u8> {
 
 const LIST_BULLET: &[u8] = "\u{2022}".as_bytes();
 
+/// Close a markdown emphasis span: place the closing marker before any
+/// trailing whitespace (`**bold **` is invalid markdown), and collapse empty
+/// spans (`**` immediately followed by the closer) by removing the opener.
+fn close_inline_marker(tc: &mut Vec<u8>, marker: &[u8]) {
+    let mut end = tc.len();
+    while end > 0 && c_isspace(tc[end - 1]) {
+        end -= 1;
+    }
+    if tc[..end].ends_with(marker) {
+        tc.drain(end - marker.len()..end);
+        return;
+    }
+    // `<b> word</b>` would render as `** word**` (invalid): if the span's
+    // opener is directly followed by whitespace, move it past that whitespace.
+    if let Some(pos) = tc[..end]
+        .windows(marker.len())
+        .rposition(|w| w == marker)
+    {
+        let after = pos + marker.len();
+        let ws_end = (after..end).take_while(|&i| c_isspace(tc[i])).count() + after;
+        if ws_end > after && !tc[after.saturating_sub(2 * marker.len())..pos].ends_with(marker) {
+            // rotate: [marker][ws] -> [ws][marker]
+            tc[pos..ws_end].rotate_left(marker.len());
+        }
+    }
+    let tail: Vec<u8> = tc.split_off(end);
+    tc.extend_from_slice(marker);
+    tc.extend_from_slice(&tail);
+}
+
 // lxb_dom_node_t.local_name is a plain `usize`; re-declare the tag constants
 // we need at that type so comparisons stay cast-free.
 macro_rules! tag_consts {
@@ -154,6 +188,9 @@ tag_consts!(
     LXB_TAG_ADDRESS,
     LXB_TAG_AREA,
     LXB_TAG_ARTICLE,
+    LXB_TAG_B,
+    LXB_TAG_EM,
+    LXB_TAG_STRONG,
     LXB_TAG_ASIDE,
     LXB_TAG_AUDIO,
     LXB_TAG_BLOCKQUOTE,
@@ -180,6 +217,7 @@ tag_consts!(
     LXB_TAG_HEADER,
     LXB_TAG_HGROUP,
     LXB_TAG_HR,
+    LXB_TAG_I,
     LXB_TAG_IMG,
     LXB_TAG_INPUT,
     LXB_TAG_LI,
@@ -455,7 +493,7 @@ unsafe fn extract_cb(extract_nodes: &mut Vec<ExtractNode>, ctx: &mut ExtractCont
             let mut element_text =
                 slice::from_raw_parts((*char_data).data.data, (*char_data).data.length).to_vec();
 
-            if current_tag_id == LXB_TAG_A && ctx.opts.preserve_formatting >= FormattingOpts::MinimalHtml {
+            if current_tag_id == LXB_TAG_A && ctx.opts.preserve_formatting == FormattingOpts::MinimalHtml {
                 // Escape <a> inner text
                 element_text = escape_html(&element_text);
             }
@@ -471,9 +509,30 @@ unsafe fn extract_cb(extract_nodes: &mut Vec<ExtractNode>, ctx: &mut ExtractCont
             }
         } else if (*node).type_ != LXB_DOM_NODE_TYPE_ELEMENT {
             // Nothing to do for other node types.
-        } else if local_name == LXB_TAG_BR && ctx.opts.preserve_formatting == FormattingOpts::Basic {
+        } else if local_name == LXB_TAG_BR
+            && matches!(ctx.opts.preserve_formatting, FormattingOpts::Basic | FormattingOpts::Markdown)
+        {
             ensure_text_contents(extract_nodes);
             extract_nodes.last_mut().unwrap().collapse_margins = false;
+        } else if ctx.opts.preserve_formatting == FormattingOpts::Markdown
+            && matches!(local_name, LXB_TAG_B | LXB_TAG_STRONG | LXB_TAG_I | LXB_TAG_EM)
+            && !(*node).first_child.is_null()
+        {
+            // Markdown inline emphasis. Childless elements get no end-tag
+            // event from the traversal, hence the first_child guard (keeps
+            // markers balanced).
+            ensure_text_contents(extract_nodes);
+            let marker: &[u8] = if matches!(local_name, LXB_TAG_B | LXB_TAG_STRONG) {
+                b"**"
+            } else {
+                b"*"
+            };
+            let tc = extract_nodes.last_mut().unwrap().text_contents.as_mut().unwrap();
+            if !is_end_tag {
+                tc.extend_from_slice(marker);
+            } else {
+                close_inline_marker(tc, marker);
+            }
         } else if ctx.opts.links && local_name == LXB_TAG_A {
             let href = strip(get_node_attr(node, b"href"));
             ensure_text_contents(extract_nodes);
@@ -557,8 +616,15 @@ fn make_indent(output: &mut Vec<u8>, list_depth: usize, opts: &ExtractOptsC) {
 }
 
 #[inline]
-fn make_margin(output: &mut Vec<u8>, margin_size: &mut usize, pre_depth: usize, opts: &ExtractOptsC) {
+fn make_margin(
+    output: &mut Vec<u8>,
+    margin_size: &mut usize,
+    margin_is_br: &mut bool,
+    pre_depth: usize,
+    opts: &ExtractOptsC,
+) {
     if *margin_size == 0 {
+        *margin_is_br = false;
         return;
     }
     if pre_depth == 0 || opts.preserve_formatting == FormattingOpts::Off {
@@ -567,9 +633,16 @@ fn make_margin(output: &mut Vec<u8>, margin_size: &mut usize, pre_depth: usize, 
     if opts.preserve_formatting == FormattingOpts::Off && !output.is_empty() {
         output.push(b' ');
     } else if opts.preserve_formatting >= FormattingOpts::Basic && !output.is_empty() {
-        output.extend(std::iter::repeat_n(b'\n', *margin_size));
+        if opts.preserve_formatting == FormattingOpts::Markdown && *margin_size == 1 && *margin_is_br {
+            // A <br>-generated line break inside a block: markdown's
+            // two-space hard-break form (the gold uses it systematically).
+            output.extend_from_slice(b"  \n");
+        } else {
+            output.extend(std::iter::repeat_n(b'\n', *margin_size));
+        }
     }
     *margin_size = 0;
+    *margin_is_br = false;
 }
 
 unsafe fn serialize_extract_nodes(
@@ -583,6 +656,7 @@ unsafe fn serialize_extract_nodes(
         let mut bullet_inserted = false;
         let mut list_depth: usize = 0;
         let mut margin_size: usize = 0;
+        let mut margin_is_br = false;
         let mut uncollapsed_margin_count: usize = 0;
         let mut list_numbering: Vec<usize> = Vec::new();
 
@@ -612,10 +686,16 @@ unsafe fn serialize_extract_nodes(
 
                 // List item tags
                 if opts.list_bullets && current_node.tag_id == LXB_TAG_LI {
-                    if opts.preserve_formatting == FormattingOpts::Basic {
+                    if matches!(opts.preserve_formatting, FormattingOpts::Basic | FormattingOpts::Markdown) {
                         if *list_numbering.last().unwrap() == 0 {
-                            element_text_prefix = LIST_BULLET.to_vec();
-                            element_text_prefix.push(b' ');
+                            element_text_prefix = if opts.preserve_formatting == FormattingOpts::Markdown {
+                                b"- ".to_vec()
+                            } else {
+                                LIST_BULLET.to_vec()
+                            };
+                            if opts.preserve_formatting != FormattingOpts::Markdown {
+                                element_text_prefix.push(b' ');
+                            }
                         } else {
                             element_text_prefix = list_numbering.last().unwrap().to_string().into_bytes();
                             element_text_prefix.extend_from_slice(b". ");
@@ -625,7 +705,7 @@ unsafe fn serialize_extract_nodes(
                         }
                         bullet_inserted = !current_node.is_end_tag;
                     } else if opts.list_bullets && opts.preserve_formatting == FormattingOpts::MinimalHtml {
-                        make_margin(&mut output, &mut margin_size, current_node.pre_depth, opts);
+                        make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
                         if !current_node.is_end_tag {
                             output.extend(std::iter::repeat_n(b' ', 2 * list_depth));
                             output.extend_from_slice(b"<li>");
@@ -641,12 +721,35 @@ unsafe fn serialize_extract_nodes(
                 }
             }
 
+            // Markdown heading prefixes (the heading's ExtractNode carries its
+            // own text, so the prefix set here is consumed in this iteration;
+            // an empty heading leaves it stale, hence the end-tag clear).
+            if opts.preserve_formatting == FormattingOpts::Markdown {
+                let level = match current_node.tag_id {
+                    t if t == LXB_TAG_H1 => 1,
+                    t if t == LXB_TAG_H2 => 2,
+                    t if t == LXB_TAG_H3 => 3,
+                    t if t == LXB_TAG_H4 => 4,
+                    t if t == LXB_TAG_H5 => 5,
+                    t if t == LXB_TAG_H6 => 6,
+                    _ => 0,
+                };
+                if level > 0 {
+                    if !current_node.is_end_tag {
+                        element_text_prefix = vec![b'#'; level];
+                        element_text_prefix.push(b' ');
+                    } else if element_text_prefix.first() == Some(&b'#') {
+                        element_text_prefix.clear();
+                    }
+                }
+            }
+
             // Minimal HTML formatting only
             if opts.preserve_formatting == FormattingOpts::MinimalHtml {
                 // Add <pre> tags immediately with newlines and skip usual block logic for opening tags
                 if current_node.tag_id == LXB_TAG_PRE {
                     if !current_node.is_end_tag {
-                        make_margin(&mut output, &mut margin_size, current_node.pre_depth, opts);
+                        make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
                     }
                     output.extend_from_slice(if current_node.is_end_tag { b"</pre>".as_slice() } else { b"<pre>".as_slice() });
                     margin_size = 0;
@@ -678,7 +781,7 @@ unsafe fn serialize_extract_nodes(
                         } else {
                             margin_size += current_node.make_block as usize + current_node.make_big_block as usize;
                         }
-                        make_margin(&mut output, &mut margin_size, current_node.pre_depth, opts);
+                        make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
                         current_node.make_block = false;
                         uncollapsed_margin_count = 0;
                     }
@@ -726,6 +829,7 @@ unsafe fn serialize_extract_nodes(
                 } else {
                     margin_size += if current_node.make_big_block { 2 } else { 1 };
                 }
+                margin_is_br = current_node.tag_id == LXB_TAG_BR && margin_size == 1;
             }
 
             // From here on process only text nodes
@@ -751,16 +855,21 @@ unsafe fn serialize_extract_nodes(
             }
 
             // Make margins and indents
-            make_margin(&mut output, &mut margin_size, current_node.pre_depth, opts);
+            make_margin(&mut output, &mut margin_size, &mut margin_is_br, current_node.pre_depth, opts);
             uncollapsed_margin_count = 0;
 
             // Indent list items if basic formatting is used (follow-up lines without bullets are indented more)
-            if list_depth != 0 && opts.preserve_formatting == FormattingOpts::Basic {
-                make_indent(
-                    &mut output,
-                    list_depth + (opts.list_bullets && !bullet_inserted) as usize,
-                    opts,
-                );
+            if list_depth != 0
+                && matches!(opts.preserve_formatting, FormattingOpts::Basic | FormattingOpts::Markdown)
+            {
+                let indent_depth = if opts.preserve_formatting == FormattingOpts::Markdown {
+                    // Gold-style markdown: top-level bullets start in column 0;
+                    // continuation lines align with the item text.
+                    list_depth - 1 + (opts.list_bullets && !bullet_inserted) as usize
+                } else {
+                    list_depth + (opts.list_bullets && !bullet_inserted) as usize
+                };
+                make_indent(&mut output, indent_depth, opts);
                 bullet_inserted = false;
             }
 

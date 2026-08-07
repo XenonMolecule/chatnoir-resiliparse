@@ -253,7 +253,7 @@ def main():
     # extraction options (mirror extract_plain_text keyword args)
     parser.add_argument("--no-main-content", dest="main_content", action="store_false",
                         help="disable main content extraction (default: enabled)")
-    parser.add_argument("--preserve-formatting", choices=["true", "false", "minimal_html"],
+    parser.add_argument("--preserve-formatting", choices=["true", "false", "minimal_html", "markdown"],
                         default="true",
                         help="basic block formatting: true | false | minimal_html")
     for opt, default_on in (("list_bullets", True), ("alt_texts", True), ("links", False),
@@ -271,8 +271,8 @@ def main():
                  "Pass --allow-test only for a deliberate, final baseline/test run.")
 
     extract_kwargs = {"main_content": args.main_content,
-                      "preserve_formatting": {"true": True, "false": False,
-                                              "minimal_html": "minimal_html"}[args.preserve_formatting]}
+                      "preserve_formatting": {"true": True, "false": False, "minimal_html": "minimal_html",
+                                              "markdown": "markdown"}[args.preserve_formatting]}
     for opt in ("list_bullets", "alt_texts", "links", "form_fields", "noscript",
                 "comments", "post_meta", "hidden_elements"):
         val = getattr(args, opt)
