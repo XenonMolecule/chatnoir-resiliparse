@@ -104,3 +104,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8013** / Lev **0.7010**
 - [0028 — Model v3 features (in progress)](0028-model-v3-features.md) — wordbag+context features: AUC 0.8551 (+0.005); calibration pending, exact next steps logged
 - [0029 — Generic post-stream (NEGATIVE)](0029-generic-poststream-negative.md) — 2 gate rounds, −0.020/−0.002; fifth discriminator-wall confirmation; per-engine gates only
 - [0030 — Respond-form veto](0030-respond-form.md) — residual diagnosis → one-line fix: **+0.0035 F1 / +0.0049 Lev** (101↑/8↓); F1 > 0.80, Lev > 0.70
+- [0031 — Dedup (NEGATIVE)](0031-dedup-negative.md) — naive exact-dup: dev +0.001/train −0.0004; gold keeps template repeats; containment-aware port queued

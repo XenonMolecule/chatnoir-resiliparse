@@ -3645,9 +3645,46 @@ unsafe fn extract_plain_text_from_doc_impl2(
         let mut text = decode_utf8_ignore(output);
         if opts.preserve_formatting == FormattingOpts::Markdown {
             text = strip_ui_label_lines(text);
+            // dedup_paragraphs measured dev-positive/train-negative (0031) —
+            // gold keeps repeats on some templates; disabled pending
+            // containment-aware port of the jusText version.
         }
         (text, dropped_nodes)
     }
+}
+
+/// Repeated-paragraph dedup (jusText 0018/0030 family, cycle 0031):
+/// template widgets and print/mobile duplicates repeat whole paragraphs.
+/// Exact-match on substantial paragraphs (>=60 bytes), whitespace-normalized;
+/// code fences are never deduped (code legitimately repeats).
+#[allow(dead_code)]
+fn dedup_paragraphs(text: String) -> String {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<&str> = Vec::new();
+    let mut in_fence = false;
+    let mut removed = false;
+    for para in text.split("\n\n") {
+        let fence_delims = para.matches("```").count();
+        if in_fence {
+            out.push(para);
+            if fence_delims % 2 == 1 {
+                in_fence = false;
+            }
+            continue;
+        }
+        if fence_delims % 2 == 1 {
+            in_fence = true;
+            out.push(para);
+            continue;
+        }
+        let norm: String = para.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
+        if norm.len() >= 150 && !seen.insert(norm) {
+            removed = true;
+            continue;
+        }
+        out.push(para);
+    }
+    if removed { out.join("\n\n") } else { text }
 }
 
 /// Dangling UI-label lines (jusText-0084 family, cycle 0026): a line that is
