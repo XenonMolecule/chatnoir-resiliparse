@@ -1962,23 +1962,45 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         } else {
             None
         };
-        let tpl_ref = tpl_set.as_ref();
+        // The veto set in effect for ALL extraction passes, including the
+        // rescue-ladder retries below. Comment rebuilds extend it — retries
+        // running with the pre-rebuild set would resurrect the vetoed
+        // native comment rendering next to the rebuilt block (0039 bug,
+        // latent in the WP rebuild since 0020).
+        let mut effective_tpl: Option<HashSet<*mut lxb_dom_node_t>> = tpl_set;
         let wl_ref = if model_whitelist.is_empty() { None } else { Some(&model_whitelist) };
         let (mut result, mut dropped_nodes) =
-            extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), tpl_ref, wl_ref);
+            extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), effective_tpl.as_ref(), wl_ref);
         // Gold mirrors each theme's native comment rendering; rebuild only
         // when the native walk LOSES attribution (>=half the authors absent).
         let mut wp_comments: Option<String> = None;
         if let Some((block, vetoes, authors)) = wp_candidate {
             let missing = authors.iter().filter(|a| !result.contains(a.as_str())).count();
             if missing * 2 >= authors.len() {
-                let mut set2 = tpl_set.clone().unwrap_or_default();
+                let mut set2 = effective_tpl.clone().unwrap_or_default();
                 for v in &vetoes {
                     set2.insert(*v);
                 }
                 let (r2, d2) = extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), Some(&set2), wl_ref);
                 result = r2;
                 dropped_nodes = d2;
+                effective_tpl = Some(set2);
+                wp_comments = Some(block);
+            }
+        }
+        // Blogspot comments (0039): gold rewrites the native rendering
+        // ("NAME said..." + footer timestamp -> `**NAME — TIME**`), so a
+        // successful parse always rebuilds — no native-first check.
+        if wp_comments.is_none() && opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
+            if let Some((block, vetoes, _authors)) = blogspot_comment_rebuild(doc, opts) {
+                let mut set2 = effective_tpl.clone().unwrap_or_default();
+                for v in &vetoes {
+                    set2.insert(*v);
+                }
+                let (r2, d2) = extract_plain_text_from_doc_impl2(doc, None, opts, RelaxFlags::default(), Some(&set2), wl_ref);
+                result = r2;
+                dropped_nodes = d2;
+                effective_tpl = Some(set2);
                 wp_comments = Some(block);
             }
         }
@@ -2050,7 +2072,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     main_content: false,
                     ..opts.clone()
                 };
-                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), tpl_ref, wl_ref);
+                let fallback = extract_plain_text_from_doc(doc, &fallback_opts, RelaxFlags::default(), effective_tpl.as_ref(), wl_ref);
                 // Dual keep test (0037): either raw-length or content-length
                 // clearing the factor accepts the rescue. Each test alone
                 // flips docs at the 20x margin when a few formatting/byline
@@ -2131,7 +2153,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                     } else {
                         UL_RESCUE_KEEP_FACTOR
                     };
-                    let retry = extract_plain_text_from_doc(doc, opts, relax, tpl_ref, wl_ref);
+                    let retry = extract_plain_text_from_doc(doc, opts, relax, effective_tpl.as_ref(), wl_ref);
                     if retry.len() as f64 > keep_factor * result.len().max(1) as f64
                         && !duplicates_existing_content(&result, &retry)
                     {
@@ -3242,6 +3264,145 @@ unsafe fn wp_comment_rebuild(
         // Only rebuilt items are vetoed — a failed rebuild must never cost
         // the walk its native rendering of that comment.
         if attributed >= 2 && attributed * 2 >= items.len() {
+            Some((out, vetoes, authors))
+        } else {
+            None
+        }
+    }
+}
+
+/// Blogspot comment rebuild (cycle 0039): gold rewrites Blogger's native
+/// "NAME said..." + separate timestamp footer as `**NAME — TIMESTAMP**`
+/// followed by the body (em-dash joiner dominates the gold 5.5:1). Unlike
+/// the WP rebuild this is NOT native-first — the native walk keeps the
+/// author but in the wrong shape, so a successful parse always rebuilds.
+/// Handles the classic dl template (dt.comment-author / dd.comment-body /
+/// dd.comment-footer) and the threaded div.comment-block template.
+unsafe fn blogspot_comment_rebuild(
+    doc: *mut lxb_html_document_t,
+    opts: &ExtractOpts,
+) -> Option<(String, Vec<*mut lxb_dom_node_t>, Vec<String>)> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let mut out = String::new();
+        let mut vetoes: Vec<*mut lxb_dom_node_t> = Vec::new();
+        let mut authors: Vec<String> = Vec::new();
+        let mut attributed = 0usize;
+        let mut items = 0usize;
+
+        fn clean_author(mut a: String) -> String {
+            let t = a.trim_end();
+            for suf in ["said...", "said…", "said\u{2026}", "said..."] {
+                if let Some(stripped) = t.strip_suffix(suf) {
+                    a = stripped.trim_end().to_string();
+                    break;
+                }
+            }
+            let a = a.trim();
+            // script/style text inside the author node (jusText-0064 class
+            // of bug) or a missing author must abort this comment, not
+            // emit junk attribution
+            if a.len() > 48 || a.contains(';') || a.contains("document.") {
+                return String::new();
+            }
+            a.to_string()
+        }
+        let mut push_comment =
+            |out: &mut String, author: String, date: String, text: String| {
+                if !out.is_empty() {
+                    out.push_str("\n\n");
+                }
+                if date.is_empty() {
+                    out.push_str(&format!("**{author}**"));
+                } else {
+                    out.push_str(&format!("**{author} \u{2014} {date}**"));
+                }
+                out.push_str("  \n");
+                out.push_str(text.trim_end());
+            };
+
+        let dts = query_selector_all_raw(doc, body, b"dt.comment-author");
+        let bodies = query_selector_all_raw(doc, body, b"dd.comment-body");
+        if dts.len() >= 2 && dts.len() == bodies.len() {
+            // classic template — strict document-order triples
+            let stamps = query_selector_all_raw(doc, body, b"dd.comment-footer .comment-timestamp");
+            items = dts.len();
+            for (i, (&dt, &bd)) in dts.iter().zip(bodies.iter()).enumerate() {
+                let author = clean_author(collapsed_text(dt));
+                let text = extract_plain_text_from_node(doc, bd, opts);
+                if author.is_empty() || text.trim().is_empty() {
+                    continue;
+                }
+                let mut date = if stamps.len() == dts.len() {
+                    collapsed_text(stamps[i])
+                } else {
+                    String::new()
+                };
+                if date.len() > 48 {
+                    date.truncate(0);
+                }
+                attributed += 1;
+                authors.push(author.clone());
+                vetoes.push(dt);
+                vetoes.push(bd);
+                if stamps.len() == dts.len() {
+                    vetoes.push(stamps[i]);
+                }
+                push_comment(&mut out, author, date, text);
+            }
+        } else {
+            // threaded template
+            let blocks = query_selector_all_raw(doc, body, b"div.comment-block");
+            if blocks.len() < 2 {
+                return None;
+            }
+            items = blocks.len();
+            for &c in &blocks {
+                let author = query_selector_all_raw(doc, c, b"cite.user, cite")
+                    .first()
+                    .map(|&n| clean_author(collapsed_text(n)))
+                    .unwrap_or_default();
+                let mut date = query_selector_all_raw(doc, c, b".comment-timestamp, .datetime")
+                    .first()
+                    .map(|&n| collapsed_text(n))
+                    .unwrap_or_default();
+                if date.len() > 48 {
+                    date.truncate(0);
+                }
+                let Some(&bn) = query_selector_all_raw(doc, c, b"p.comment-content, .comment-content")
+                    .first()
+                else {
+                    continue;
+                };
+                let text = extract_plain_text_from_node(doc, bn, opts);
+                if author.is_empty() || text.trim().is_empty() {
+                    continue;
+                }
+                attributed += 1;
+                authors.push(author.clone());
+                vetoes.push(c);
+                push_comment(&mut out, author, date, text);
+            }
+        }
+        if attributed >= 2 && attributed * 2 >= items.max(1) {
+            // Blogger renders comments through BOTH templates on some blogs
+            // (classic dl + threaded div.comment-block); veto the mirror
+            // rendering too or the walk keeps a native duplicate of every
+            // rebuilt comment.
+            for &n in query_selector_all_raw(
+                doc,
+                body,
+                b"dt.comment-author, dd.comment-body, dd.comment-footer, div.comment-block",
+            )
+            .iter()
+            {
+                if !vetoes.contains(&n) {
+                    vetoes.push(n);
+                }
+            }
             Some((out, vetoes, authors))
         } else {
             None

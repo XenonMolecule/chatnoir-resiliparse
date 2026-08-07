@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8063** / Lev **0.7076** (0038) · train 0.7968/0.6936. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8077** / Lev **0.7094** (0039) · train 0.7983/0.6954. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -112,3 +112,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8063** / Lev **0.7076**
 - [0036 — Table separator convention](0036-table-separator-convention.md) — tight `|---|` + cell-space collapse + rescue gate hardening (dash exclusion, content-table veto): +0.0002 Lev both splits, two crater classes closed
 - [0037 — Byline microdata recovery](0037-byline-microdata-recovery.md) — "Posted by at" was a degenerate byline, not chrome: itemprop author/date exemption + dual keep-test: +0.0003 F1 both splits
 - [0038 — UI-line strip batch 2](0038-ui-line-strip-batch2.md) — 13 fragment-checked chrome lines: +0.0002 F1 / +0.0004 Lev dev; Blogspot comment-byline rebuild family discovered & queued
+- [0039 — Blogspot comment rebuild](0039-blogspot-comment-rebuild.md) — gold rewrites "NAME said..." as `**NAME — TIME**`: +0.0014 F1 / +0.0018 Lev dev; fixed latent effective-veto-set bug in rescue retries
