@@ -563,6 +563,10 @@ unsafe fn extract_cb(extract_nodes: &mut Vec<ExtractNode>, ctx: &mut ExtractCont
             ensure_text_contents(extract_nodes);
             let alt = get_node_attr(node, b"alt");
             if !alt.is_empty() {
+                // NB: markdown `![alt](src)` emission was tried and reverted
+                // in cycle 0011 — no DOM-rule gate reached usable precision
+                // (gold keeps 3.4% of attributed images; best joint rule
+                // still net-negative). Revisit with learned selection.
                 extract_nodes
                     .last_mut()
                     .unwrap()

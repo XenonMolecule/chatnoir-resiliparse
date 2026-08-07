@@ -85,3 +85,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.7811** / Lev **0.6705**
 - [0008 — Selection ceiling](0008-selection-ceiling.md) — block-oracle 0.77 (< current!), line-oracle 0.86; transformation is load-bearing for the 0.90 goal; GOALS.md set
 - [0009 — Markdown mode v1](0009-markdown-mode-v1.md) — headings/bold/bullets/hard-breaks: Lev +0.0024, F1 flat, +0.4% cost; markdown is now the lpv11 config; label-bold + md-links queued
 - [0010 — Blogger chrome handler](0010-blogger-chrome.md) — meta-generator-gated skip of share/labels/pager chrome: 110 docs improved across dev sets, 0 meaningful reg; gold-consistency check kept "Posted by" untouched (28/62 wall)
+- [0011 — Markdown images (NEGATIVE)](0011-markdown-images-negative.md) — `![alt](src)` reverted: gold keeps 3.4% of images, no DOM rule reaches viable precision (−0.022 ungated → −0.001 best gate); needs learned selection

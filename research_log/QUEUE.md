@@ -20,8 +20,8 @@ delete it when a cycle rules it out (and link the cycle).
 - **Markdown v2** (from 0009): pipe tables (72 gold docs), code fences (30),
   links-as-markdown `[text](href)`. Bold-coverage heuristics for label-styled
   spans (`**Name:**` from dt/th/label) — verify gold consistency first.
-- **Markdown v2 images** (from 0010): gold renders images as `![alt](src)` —
-  our alt_texts emit bare alt text; image URLs carry many tokens (F1+Lev
-  upside on image-heavy pages).
+- **Learned image selector** (from 0011): `![alt](src)` emission is right in
+  form but needs learned keep/drop (3.4% base rate, best rule ~40% precision,
+  net-negative). Features measured in 0011; revisit in the classifier era.
 - **Rescue-shape veto** (from 0010): tier-1 rescue swaps shells onto tiny
   image-blog pages whose heading+image output was already gold-shaped.
