@@ -1953,16 +1953,20 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         let mut page_has_card_grid = false;
         let mut model_whitelist: HashSet<*mut lxb_dom_node_t> = HashSet::new();
         let mut model_veto_nodes: Vec<*mut lxb_dom_node_t> = Vec::new();
+        let mut model_veto_mass = 0usize;
+        let mut page_link_density = 0.0f64;
         let tpl_set: Option<HashSet<*mut lxb_dom_node_t>> =
             if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
                 let body: *mut lxb_dom_node_t = (*doc).body.cast();
                 if body.is_null() {
                     None
                 } else {
-                    let (v, grid, wl, mv) = tpl_vetoes(body);
+                    let (v, grid, wl, mv, mvm, pld) = tpl_vetoes(body);
                     page_has_card_grid = grid;
                     model_whitelist = wl;
                     model_veto_nodes = mv;
+                    model_veto_mass = mvm;
+                    page_link_density = pld;
                     Some(v)
                 }
             } else {
@@ -2056,8 +2060,13 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // a whole page (quotes pages, tiny sites); a near-empty result
             // with model vetoes in effect retries without them and keeps
             // the retry when it doubles the content.
+            // Relative gate (0051): the model removed most of the page on a
+            // low-link-density (article-like) page — a listing page (high
+            // ld) keeps its vetoes; gold keeps little there.
+            let model_gutted = model_veto_mass > 2 * result_content_len.max(1)
+                && page_link_density < 0.30;
             if !model_veto_nodes.is_empty()
-                && result_content_len < RESCUE_NEAR_EMPTY_ABS
+                && (result_content_len < RESCUE_NEAR_EMPTY_ABS || model_gutted)
             {
                 let mut set3 = effective_tpl.clone().unwrap_or_default();
                 for v in &model_veto_nodes {
@@ -2710,10 +2719,11 @@ unsafe fn get_qualified_name(node: *mut lxb_dom_node_t) -> &'static [u8] {
 /// Model-veto threshold (cycle 0025): blocks scoring below this predicted
 /// gold-containment join the skip set. Chosen from held-out tier analysis
 /// (veto@0.10 ≈ 2% coverage at <1% false-veto on the n60d5 GBM).
-const MODEL_VETO_THRESHOLD: f64 = 0.25;
+const MODEL_VETO_THRESHOLD: f64 = 0.35;
 const MODEL_VETO_ENABLED: bool = true;
 /// Whitelist tier: blocks scoring above this override rule/template vetoes.
-const MODEL_KEEP_THRESHOLD: f64 = 0.85;
+const MODEL_VETO_BIG_THRESHOLD: f64 = 0.10;
+const MODEL_KEEP_THRESHOLD: f64 = 0.70;
 
 /// Returns the veto set plus whether the page carries a LARGE repeated-
 /// structure container (>=3000B) — the positive signal that this is a
@@ -2725,6 +2735,8 @@ unsafe fn tpl_vetoes(
     bool,
     HashSet<*mut lxb_dom_node_t>,
     Vec<*mut lxb_dom_node_t>,
+    usize,
+    f64,
 ) {
     unsafe {
         let mut vetoes = HashSet::new();
@@ -2738,6 +2750,7 @@ unsafe fn tpl_vetoes(
         // regex features dominate the cost.
         let mut whitelist = HashSet::new();
         let mut model_veto: Vec<*mut lxb_dom_node_t> = Vec::new();
+        let mut model_veto_mass = 0usize;
         if MODEL_VETO_ENABLED {
             let page_text = totals.text_len.max(1);
             let pld = totals.link_len as f64 / page_text as f64;
@@ -2754,8 +2767,19 @@ unsafe fn tpl_vetoes(
                     totals.n_headings,
                 );
                 let score = block_model::score_block(&f);
-                if score < MODEL_VETO_THRESHOLD {
+                // Size-tiered veto authority (0051): the aggressive
+                // threshold only fires on small blocks; a large block is
+                // an article-body candidate and needs near-certainty
+                // (crater profile at wide thresholds was whole-article
+                // false vetoes).
+                let veto_thresh = if b.text_len <= 1500 {
+                    MODEL_VETO_THRESHOLD
+                } else {
+                    MODEL_VETO_BIG_THRESHOLD
+                };
+                if score < veto_thresh {
                     model_veto.push(b.ptr);
+                    model_veto_mass += b.text_len;
                 } else if score > MODEL_KEEP_THRESHOLD {
                     whitelist.insert(b.ptr);
                 }
@@ -2776,7 +2800,8 @@ unsafe fn tpl_vetoes(
             for w in &whitelist {
                 vetoes.remove(w);
             }
-            return (vetoes, large_repeated, whitelist, model_veto);
+            let pld = totals.link_len as f64 / totals.text_len.max(1) as f64;
+            return (vetoes, large_repeated, whitelist, model_veto, model_veto_mass, pld);
         }
         // container-fraction guard, applied now that body totals are known
         for (n, tl) in candidates {
@@ -2790,7 +2815,8 @@ unsafe fn tpl_vetoes(
         for w in &whitelist {
             vetoes.remove(w);
         }
-        (vetoes, large_repeated, whitelist, model_veto)
+        let pld = totals.link_len as f64 / totals.text_len.max(1) as f64;
+        (vetoes, large_repeated, whitelist, model_veto, model_veto_mass, pld)
     }
 }
 
