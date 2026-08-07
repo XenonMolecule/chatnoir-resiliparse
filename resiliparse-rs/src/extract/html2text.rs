@@ -1770,8 +1770,30 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             } else {
                 None
             };
+        let wp_candidate = if opts.main_content && opts.preserve_formatting == FormattingOpts::Markdown {
+            wp_comment_rebuild(doc, opts)
+        } else {
+            None
+        };
         let tpl_ref = tpl_set.as_ref();
-        let (mut result, dropped_nodes) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), tpl_ref);
+        let (mut result, mut dropped_nodes) =
+            extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), tpl_ref);
+        // Gold mirrors each theme's native comment rendering; rebuild only
+        // when the native walk LOSES attribution (>=half the authors absent).
+        let mut wp_comments: Option<String> = None;
+        if let Some((block, vetoes, authors)) = wp_candidate {
+            let missing = authors.iter().filter(|a| !result.contains(a.as_str())).count();
+            if missing * 2 >= authors.len() {
+                let mut set2 = tpl_set.clone().unwrap_or_default();
+                for v in &vetoes {
+                    set2.insert(*v);
+                }
+                let (r2, d2) = extract_plain_text_from_doc_impl(doc, opts, RelaxFlags::default(), Some(&set2));
+                result = r2;
+                dropped_nodes = d2;
+                wp_comments = Some(block);
+            }
+        }
 
         // Self-correcting rescues (cycles 0004/0005). Gated on the extraction
         // having lost most of the page's text, so they cannot fire on (and
@@ -1887,6 +1909,19 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                         result = retry;
                     }
                 }
+            }
+        }
+
+        // Append rebuilt, attributed comments (cycle 0020) unless a rescue
+        // already swapped in an unfiltered extraction containing them.
+        if let Some(block) = wp_comments {
+            let dup_probe: Option<&str> = block.lines().rev().find(|l| l.len() >= 40);
+            let already = dup_probe.map(|p| result.contains(p)).unwrap_or(false);
+            if !block.is_empty() && !already {
+                if !result.is_empty() {
+                    result.push_str("\n\n");
+                }
+                result.push_str(&block);
             }
         }
 
@@ -2569,6 +2604,102 @@ unsafe fn extract_smf(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Opti
         }
         if posts >= 2 && authored >= 2 { Some(out) } else { None }
     }
+}
+
+/// WordPress-style blog comment rebuild (cycle 0020): the gold attributes
+/// comments as `**author — date**` then the body; the generic walk keeps
+/// bodies but loses attribution (or keeps raw meta lines). Returns the
+/// rebuilt comment block and the comment containers to veto from the walk.
+unsafe fn wp_comment_rebuild(
+    doc: *mut lxb_html_document_t,
+    opts: &ExtractOpts,
+) -> Option<(String, Vec<*mut lxb_dom_node_t>, Vec<String>)> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let items = query_selector_all_raw(doc, body, b"li.comment, div.comment[id^=\"comment\"]");
+        if items.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        let mut vetoes: Vec<*mut lxb_dom_node_t> = Vec::new();
+        let mut authors: Vec<String> = Vec::new();
+        let mut attributed = 0;
+        for c in &items {
+            let c = *c;
+            let author = query_selector_all_raw(
+                doc,
+                c,
+                b".comment-author .fn, cite.fn, .comment-author cite, .c-head a.url, .comment-author b, .comment-author a",
+            )
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+            let mut date = query_selector_all_raw(
+                doc,
+                c,
+                b".comment-metadata, .comment-meta, .commentmetadata, .c-head span, time",
+            )
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+            date = date
+                .trim_start_matches(|ch: char| ch == '/' || ch.is_whitespace())
+                .trim_start_matches("on ")
+                .trim()
+                .to_string();
+            if date.len() > 48 {
+                date.truncate(0);
+            }
+            let Some(&bn) = query_selector_all_raw(
+                doc,
+                c,
+                b".comment-content, .c-body, .commenttext, .comment-text, .comment-body",
+            )
+            .first() else {
+                continue;
+            };
+            // direct-child comments only produce text here; nested replies are
+            // separate `li.comment` matches (query order = document order)
+            let mut sub = ExtractOpts { main_content: false, ..opts.clone() };
+            sub.skip_elements.push("ul.children".to_string());
+            sub.skip_elements.push("ol.children".to_string());
+            let text = extract_plain_text_from_node_opts(doc, bn, &sub);
+            if text.trim().is_empty() || author.is_empty() {
+                continue;
+            }
+            attributed += 1;
+            authors.push(author.clone());
+            vetoes.push(c);
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("  \n");
+            out.push_str(text.trim_end());
+        }
+        // Only rebuilt items are vetoed — a failed rebuild must never cost
+        // the walk its native rendering of that comment.
+        if attributed >= 2 && attributed * 2 >= items.len() {
+            Some((out, vetoes, authors))
+        } else {
+            None
+        }
+    }
+}
+
+unsafe fn extract_plain_text_from_node_opts(
+    doc: *mut lxb_html_document_t,
+    root: *mut lxb_dom_node_t,
+    opts: &ExtractOpts,
+) -> String {
+    unsafe { extract_plain_text_from_doc_impl2(doc, Some(root), opts, RelaxFlags::default(), None).0 }
 }
 
 /// Whether the document declares `<meta name="generator" content="blogger">`
