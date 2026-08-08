@@ -5,6 +5,11 @@ SPECS = 'research_log/dev_golden_specs.jsonl'
 SRC = 'benchmark/datasets_rawhtml/lpv11/dev.jsonl.gz'
 DST = 'benchmark/datasets_rawhtml/lpv11/dev_golden.jsonl.gz'
 specs = {json.loads(l)['warc_record_id']: json.loads(l) for l in open(SPECS) if l.strip()}
+REPAIRS = 'research_log/gold_repairs.jsonl'
+import os
+repairs = {}
+if os.path.exists(REPAIRS):
+    repairs = {json.loads(l)['warc_record_id']: json.loads(l)['repaired_gold'] for l in open(REPAIRS) if l.strip()}
 def apply_spec(gold, spec):
     lines = gold.split('\n'); drop = set()
     sp = spec.get('spec') or {}
@@ -24,7 +29,9 @@ n = 0
 with gzip.open(SRC,'rt') as fin, gzip.open(DST,'wt') as fout:
     for line in fin:
         d = json.loads(line); k = d['warc_record_id']
-        if k in specs:
+        if k in repairs:
+            d['final_output'] = repairs[k]; d['gold_edited'] = True; d['gold_repaired'] = True; n += 1
+        elif k in specs:
             ng = apply_spec(d['final_output'], specs[k])
             if 0 < len(ng) < len(d['final_output']):
                 d['final_output'] = ng; d['gold_edited'] = True; n += 1
