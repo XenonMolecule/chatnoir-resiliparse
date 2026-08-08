@@ -3769,7 +3769,7 @@ unsafe fn extract_phpbb_subsilver2(doc: *mut lxb_html_document_t, opts: &Extract
             .iter()
             .filter(|&&n| (*n).local_name == LXB_TAG_B)
             .count();
-        if n_auth < 2 {
+        if n_auth < 1 {
             return None;
         }
         let mut out = String::new();
@@ -3829,8 +3829,10 @@ unsafe fn extract_phpbb_subsilver2(doc: *mut lxb_html_document_t, opts: &Extract
             posts += 1;
         }
         // coverage guard (0021 pattern): the rebuilt thread must be a
-        // substantial share of the page or the generic walk knows better
-        if posts >= 2 && total * 4 >= page_text_len {
+        // substantial share of the page or the generic walk knows better;
+        // dated single-post threads are exempt (0065)
+        let dated_single = posts == 1 && out.contains('\u{2014}');
+        if (posts >= 2 && total * 4 >= page_text_len) || dated_single {
             Some(out)
         } else {
             None
@@ -3851,10 +3853,16 @@ unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> O
         }
         let names = query_selector_all_raw(doc, body, b"span.name");
         let bodies = query_selector_all_raw(doc, body, b"span.postbody");
-        if names.len() < 2 || bodies.len() < 2 || names.len() != bodies.len() {
+        // single-post threads qualify (0065): gold keeps the lone post;
+        // the date requirement below guards against non-thread pages
+        if names.is_empty() || bodies.is_empty() || names.len() != bodies.len() {
             return None;
         }
-        let details = query_selector_all_raw(doc, body, b"span.postdetails");
+        let details: Vec<*mut lxb_dom_node_t> =
+            query_selector_all_raw(doc, body, b"span.postdetails")
+                .into_iter()
+                .filter(|&n| collapsed_text(n).contains("Posted:"))
+                .collect();
         let mut out = String::new();
         let mut posts = 0;
         for (i, (&n, &b)) in names.iter().zip(bodies.iter()).enumerate() {
@@ -3864,7 +3872,7 @@ unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> O
                 continue;
             }
             let mut date = String::new();
-            if let Some(&d) = details.get(i * details.len() / names.len().max(1)) {
+            if let Some(&d) = details.get(i) {
                 let t = collapsed_text(d);
                 if let Some(pos) = t.find("Posted:") {
                     let rest = &t[pos + 7..];
@@ -3889,14 +3897,17 @@ unsafe fn extract_phpbb2(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> O
             out.push_str(text.trim_end());
             posts += 1;
         }
-        if posts < 2 {
+        // single post: only with a parsed date (else non-thread false fires)
+        if posts == 0 || (posts == 1 && !out.contains('\u{2013}')) {
             return None;
         }
         // Coverage guard: on odd skins (PNphpBB2) span.postbody matches
         // signatures, not bodies — the rebuild must carry a meaningful share
-        // of the page text or the generic walk is better.
+        // of the page text or the generic walk is better. Dated single-post
+        // threads on nav-heavy pages are exempt (0065; zip pairing intact,
+        // unlike the reverted 0050 doc-order variant).
         let body_total = get_collapsed_string(&get_node_text(body)).len();
-        if out.len() * 4 < body_total {
+        if out.len() * 4 < body_total && posts >= 2 {
             return None;
         }
         Some(out)
