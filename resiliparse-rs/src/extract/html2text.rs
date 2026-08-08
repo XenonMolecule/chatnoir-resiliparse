@@ -1399,7 +1399,7 @@ const BLACKLIST_ARIA_ROLES: &[&[u8]] = &[
 /// included (the classic `post-share-buttons` escape).
 static MD_CHROME_CLS: LazyLock<Regex> = LazyLock::new(|| {
     RegexBuilder::new(
-        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links)|read-?next|around-?the-?web|you-?may-?(?:also-?)?like|outbrain|taboola|sponsored-?(?:links|content)|respond|comment-?respond|comment-?form|commentform|author-?(?:bio|box)|about-?(?:the-?)?author|bio-?box)(?:$|[\s_-])",
+        r"(?:^|[\s_-])(?:cookie(?:-?(?:bar|banner|notice|consent))?|consent|gdpr|breadcrumbs?|share-?(?:this|bar|buttons?|links?|post)?|sharing|addthis|sharedaddy|sociable|log-?in|sign-?in|sign-?up|subscribe|newsletter|search-?(?:form|box|bar)|site-?footer|tag-?(?:cloud|list|links)|post-?tags|cat-?links|meta-?(?:nav|links)|read-?next|around-?the-?web|you-?may-?(?:also-?)?like|outbrain|taboola|sponsored-?(?:links|content)|respond|comment-?respond|comment-?form|commentform|author-?(?:bio|box)|about-?(?:the-?)?author|bio-?box|related-posts|highwire-extract-pdf-wrapper)(?:$|[\s_-])",
     )
     .case_insensitive(true)
     .unicode(false)
