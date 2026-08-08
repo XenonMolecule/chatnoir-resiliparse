@@ -1,0 +1,582 @@
+{
+  "summary": "Classify failure modes of the 54 catastrophic-tail dev_golden docs on 0104-v3",
+  "agentCount": 6,
+  "logs": [],
+  "result": {
+    "total": 54,
+    "byMode": {
+      "near_empty_output": 2,
+      "under_missed_content": 17,
+      "engine_missing": 1,
+      "over_chrome": 22,
+      "gold_noise": 7,
+      "hidden_content_extracted": 3,
+      "content_behind_css_hidden": 1,
+      "gold_snapshot_mismatch": 1
+    },
+    "rendering_related": 5,
+    "docs": [
+      {
+        "warc_record_id": "9beb2616-561a-46ef-a169-5dd1f47fac75",
+        "failure_mode": "near_empty_output",
+        "evidence": "Prediction is 0 bytes. Gold (1571B) is the visible .entry-content of the page: h1 'Membership Benefits', h2 'Look to Glendale Area Schools Credit Union for:', and a 16-item <ul> where nearly every <li> is a link (e.g. <li><a href=\"/products-services/checking/\">FREE checking</a></li>). Nothing is CSS-hidden; the classifier vetoed the entire link-dense benefit list as nav and emitted nothing.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Exempt link-heavy lists from the nav veto when they sit inside the sole article/.entry-content container and list items carry non-anchor prose (e.g. 'ATM Access to more than 28,000 ATMs...'), or trigger the near-empty rescue when output is empty but entry-content has substantial text.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "9f507d28-afe8-44c7-9bd5-c5e051989c32",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred kept only byline/legal chrome ('The Nevada Appeal Updated Jul 17... Copyright 2013... may not be published, broadcast, rewritten or redistributed') and dropped the headline and the entire story body, which sits plainly visible at html line 709: <div id=\"article-text\"><p class=\"STND-STND BodyText\">There was no new word Wednesday on the condition of a motorcyclist...</p>. No hidden container involved.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Stop dropping short single-paragraph article bodies inside an #article-text container (short-article false negative) and prefer body text over dateline/copyright boilerplate.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "821833fc-4d17-4257-88e6-c71d91467087",
+        "failure_mode": "engine_missing",
+        "evidence": "P=1.0, R=0.139: everything we emitted is right but we emitted almost nothing. Gold renders the Gravity Forms registration form — labels ('Child's Name', 'Gender', 'School'...), select options ('Fall Cycle: Sept 25-Dec 6, Mon and Wed, 3:10-4:30'), and blanks — from <li class='gfield'><label class='gfield_label'> / <select> markup (html lines 773-820); the extractor emits only the two gfield_description divs and skips all labels/inputs/options. Visible sidebar widgets gold kept ('Contact', 'Our Mission' at line 942) were also dropped.",
+        "fixable_by": "new_engine_handler",
+        "fix_sketch": "Add form rendering: emit <label> text, selected/available <option> values, and placeholder blanks for text inputs instead of discarding form controls; stop vetoing text widgets in the sidebar.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "e8b30d8a-cca2-4777-8387-4236ce0fe947",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.209: pred kept the entire 'Similar Tracks' related-teaser table (charter noise) with its 'Add to Basket / Download / View Details' widget labels repeated per track. Simultaneously it dropped visible content gold kept: the 'Other Submixes' list (div#submixes, track links like 'Submix - Milt And Miles no melody' inside <small class='smtext'>) and the <aside> 'Styles and Moods' link lists (Ballad, Drama, ... Keywords: Benny Goodman...), which were vetoed as link-heavy. Neither section is CSS-hidden.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto 'Similar Tracks' related-item blocks and per-row commerce button labels, and exempt on-topic link lists (styles/moods/keywords aside, submix list) tied to the current item.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "19d74adf-68e5-41a2-a2a4-3f3091ba8200",
+        "failure_mode": "over_chrome",
+        "evidence": "R=0.97, P=0.195: gold (the photo-gallery caption block) is fully recovered, but pred adds a large 'Gallery Links' section — the #galleryRecent sidebar of 12 recent-gallery teasers ('NFA vs. East Lyme | September 17. 2014 | 7 photos', etc., html line ~570), plus the house-ad image alt 'Buy or give as a gift a Day photograph' (line 462) and the '[Buy Photo]' button. All visible sidebar/ad chrome, not CSS-hidden; classic related-teaser noise per charter.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto recent/related-gallery teaser lists (repeating title|date|N-photos pattern with thumbnails) and ad-image alt text outside the main gallery container.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "3f6c5cd4-dd3a-41eb-a864-aec777b13af6",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold content is fully present in pred, but pred adds sitewide chrome: the header blurb 'Download 100s of FREE printable flash cards!... 2904 total flashcards' (colspan header cell, line 49), the 'Related Flashcards' teaser fieldset (line 199, charter noise), the 'Hi Teacher' donation pitch sidebar ('If you'd like to buy me a drink...', line 257), and 'Advertise on ESLFlashcards.com Starting at $25'. All visible; nothing hidden. Pred also flattened gold's Download table but the score damage is the chrome.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto sitewide header intro blurbs, related-item teaser fieldsets, and donation/ad sidebar panels that repeat across the site; keep the article table.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "741536fc-6758-420a-9b3b-b61d4fb4c3af",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold repeats the block 'Sorry, your search returned no recipes or people. / You searched for: grill tomato herb lemon...' THREE times verbatim, but the html contains it exactly once (grep -c 'your search returned no recipes' = 1, line 376); even a perfect extraction caps recall near 1/3. Pred's extra junk is the logged-in hover dropdown menus ('Settings/Log out/Add friends/Originals/Lists...' in ul.menu._menu-list, lines 149-206), which are hidden only by external grp-common.css, not by anything in the page. Domain foodily.com is site-rule burned.",
+        "fixable_by": "gold_edit_proposal",
+        "fix_sketch": "Propose deduplicating the triplicated no-results block in gold to a single occurrence; separately the classifier could veto hover-menu ul.menu lists in the toolbar.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "935ba382-a56c-4fb7-9892-ccd7cdc9eee0",
+        "failure_mode": "hidden_content_extracted",
+        "evidence": "Pred contains the raw JS pop-up payload '<div id=\"pupd327\" class=\"pupdata\">Jennie E. Lyon|b. 1892|p327.htm|Chester Lyon|b. 27 Dec 1858\\nd. 26 Oct 1938|p316.htm|...' (html line 42) — a pipe-delimited data blob for the adjacent 'Pop-up Pedigree' button, hidden by Second Site's external site.css (.pupdata is display:none in a rendered page); the page's inline <style> blocks only define div.narr, so our inline-only check can't see it. Pred also dropped the visible footer gold kept per charter ('All original material ©1995-2008 by DeAnna Burghart... Page created by John Cardinal's Second Site').",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto machine-formatted payload divs (high pipe/backslash-n density, sibling of a button input) even without CSS, and stop dropping the visible copyright footer; full external-CSS awareness would also hide .pupdata.",
+        "rendering_related": true
+      },
+      {
+        "warc_record_id": "7351bfe8-e88f-4f48-9d51-551995df8e85",
+        "failure_mode": "hidden_content_extracted",
+        "evidence": "Pred extracted the login modal that lives inside <div style=\"display:none;\"><div id=\"hidden_login_action\">: 'Please log in. Don't have an account? Sign up here. / or login below / Forgot your password?' (lines 741-760), and action-button labels 'Vote. 260 voted' / 'Comment. 3 comments' from #action_buttons_929070 which has inline style display:none (line 636), plus share-icon alts (Mail-iconrectangle, Facebook, Twitter, Googleplus, Tumblr — charter share-UI noise). It also missed the visible photo teaser overlay gold kept (.info_overlay with inline style=\"display:block;\": 'GOT THE BLUES FOR YOU', 'By VayiaKala | 260 votes | 3 comments').",
+        "fixable_by": "css_hidden_veto",
+        "fix_sketch": "Honor inline display:none on ancestors to drop the login modal and action-button labels; separately rescue the inline display:block info_overlay the classifier vetoed.",
+        "rendering_related": true
+      },
+      {
+        "warc_record_id": "9c0edc63-643b-4b86-99f5-18483b2b20e3",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold is only '**Thread:** Portugal F4 [11 March/ Guimaraes/Hard] Winner: Jules Marie / **Reply to Thread**' duplicated 3x with '---' separators (298B), while the page visibly renders a 'Topic Review (Newest First)' section with ~15 full forum posts (e.g. '(1)Jules Marie (FRA) d. (WC)Leonardo Tavares (POR) 6-4 3-6 6-4') inside a non-hidden container (<div id=\"collapseobj_threadreview\" style=\"\">, html line 1150). Gold both machine-duplicates the header and omits rendered comments, which the charter defines as content; our prediction includes those posts (plus some form chrome like the registration/password fields), so P=0.024 is an artifact of the broken gold.",
+        "fix_sketch": "Regold: keep thread header once plus the Topic Review posts; drop the reply/registration form fields.",
+        "fixable_by": "gold_edit_proposal",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "57c9a813-5243-45a3-8214-acd047ca2551",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold is 58KB containing 522 '# Title' headings each followed by an identical plain-text line ('# Untangling the Retail Supply Chain with Real-Time Analytics / Untangling the Retail Supply Chain...'), which map to the header mega-menu 'Latest Content' link lists inside #navigation .subnav .storycontainer (html line 1116) — hover-dropdown nav hidden by the site's external stylesheet. The actual page content ('Search Results for: in-store' plus article teasers) appears only at gold's tail (gold line 2087) and matches our prediction almost exactly; charter says nav = noise, so R=0.062 is caused by ~56KB of nav in gold.",
+        "fix_sketch": "Regold: strip the mega-menu title dump and keep the search-results listing that our prediction already produces.",
+        "fixable_by": "gold_edit_proposal",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "e7f64d95-ab6b-4b99-82d8-319246cd3d42",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold keeps title + byline + the single teaser paragraph (248B); our prediction (1.8KB) additionally extracts the visible paywall/subscription wall in <div class=\"signInboxMain\"> (html line 609): 'If you subscribe to the newspaper, you receive FREE access...', 'Renew Current or Past Subscription', account-ID and ZIP-code form tables, and the circulation office-hours footer. The page's only display:none rules hit unused div.c4 and gam ad holders, so none of this junk is CSS-hidden — it is rendered subscription chrome.",
+        "fix_sketch": "Classifier: suppress form-heavy subscription/registration blocks (subscribe/register/account-ID vocabulary plus input fields) trailing a truncated article.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "ccc10146-ccd7-4246-ba82-85f98a574411",
+        "failure_mode": "under_missed_content",
+        "evidence": "The page's core content — the package file tree under 'Files in lisrelToR' (a div.ui.list of anchors like <a href='/cran/lisrelToR/man/readLisrel.html' class='item'>man/readLisrel.Rd</a>, html lines 266-330) — is entirely missing from our prediction (R=0.3): the link-dense list was vetoed as nav even though it sits directly under the page h1 and IS the article. Meanwhile we kept sidebar chrome ('Package index', 'API 16 Browse all...') and a Semantic-UI modal ('Embedding an R snippet on your website ... Close', div.ui.modal.snippetsModal at line 478) that only external CSS hides.",
+        "fix_sketch": "Classifier: rescue link lists that immediately follow the main h1 with short filename-like anchor texts; secondarily veto elements with modal-pattern classes.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "7bc3dc97-be3d-4491-8926-328e59831993",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction contains all of gold (R=1.0) plus ~2KB of chrome: a visible 'Win tickets to see Godsmack' contest teaser (featured-headline div, html line 220), 'Most Popular' related-article teasers, seven Bootstrap-carousel slide fragments ('Main Slide Image 1..7' with schedule text, only one slide is class 'active item'), the paywall meter 'Welcome guest, you have 3 views left', and an ad-targeting string that sits in <span style=\"font-size:10px;display:none\">action:article | category:AGGREGATION | adString:AGGREGATION | zoneID:2</span> (line 466). Only the ad string and non-active carousel slides are CSS-hidden; the bulk (teasers, contest, meter) is visible chrome.",
+        "fix_sketch": "Classifier: suppress related-teaser/promo/carousel blocks around the article; an inline display:none veto would additionally kill the ad-targeting strings.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "65287e0e-89f0-4fde-9032-a4b1fe3b5e73",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold keeps the 9-item Tags list ('bread, dinner rolls, saffron...'), which in HTML is a visible <ul> of tag anchors under <h2>Tags</h2> inside div.post-categories (html line 146) — our link-list veto dropped it (R=0.613 on a 268B doc). We instead emitted chrome gold excludes: the empty-comments prompt ('Things are little quiet around here... Register or log in first'), the 'more good taste...' related-thumbnail number list, and 'Site Information'. Nothing involved is CSS-hidden.",
+        "fix_sketch": "Classifier: exempt short tag lists under a 'Tags' heading from the link-list veto and suppress empty-comment-widget / related-thumbnail blocks.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "bbac7ef6-5a95-4061-a8f5-2e5e1bfc03ef",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold's bullet lines are per-stamp specs from <ul class=\"stampspec\"> lists, e.g. <li id=\"spec212860\"><a href=\"\"> 1/2schilling 1867-4 perfMethod2 Typographed 2colors-printing</a></li> (html line 180); every item is an anchor so the list was vetoed as nav, but the hrefs are empty strings (JS hover targets) and the page contains zero display:none/hidden CSS (grep count 0) — this is the visible catalog body. Our prediction kept only the image captions ('HELIGOLAND STAMP *1/2schilling*'), giving R=0.338.",
+        "fix_sketch": "Classifier: treat anchors with empty href as plain text when scoring link density, rescuing the stampspec lists.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "ca517d02-3614-4602-af75-b4b41fbc7ab2",
+        "failure_mode": "under_missed_content",
+        "evidence": "Our prediction stops after the idea title 'Релиз долгожданной Катапульты'; gold additionally keeps the visible tag chips (tv-tag-label anchors 'catapult/waveanalysis/xem/xembtc', html line 910), the idea stats '4 оценки / 2 комментария', the follower block 'evgenyethgod' (line 1077), the profile-feed empty states ('Пользователь не читает каких-либо авторов' in div.tv-feed__page.following-people, line 1119 — inactive tab pages hidden only by external CSS that gold nevertheless keeps), and the footer copyright '© 2020 TradingView ... Часть данных предоставлена ICE Data Services' (line 1423), which the charter counts as content. R=0.327.",
+        "fix_sketch": "Classifier: widen main-content scope on profile pages to include tag chips, stat counts, feed tab panels, and the copyright footer line.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "3d0dda53-733a-4b77-a1f8-689ed9afe56c",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction contains all of gold (R=1.0) plus ~1.6KB of junk: the photo caption duplicated twice, 'Continue reading in our paid archive', the email-share dialog text ('Email this article ... A link to this page will be included in your message', <div id=\"emailmodalcontent\" class=\"emailcontent firefly modal\"> at html line 1164 — hidden only via the external 'modal' stylesheet, no in-page rule), and visible sidebar/carousel promos ('Archives', 'Welcome to Louisville', 'Subscribe', 'Courier-Journal Datacenter', 'Local Deals', 'FOLLOW US ON TWITTER & FACEBOOK', ody-caroLG blocks near line 1208). The bulk is visible sidebar chrome, so CSS awareness alone would only remove the modal (~20%).",
+        "fix_sketch": "Classifier: suppress bottom-carousel/sidebar promo widgets and dedupe repeated captions; a modal-class veto would also drop the email dialog.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "e736c20c-df30-42b2-9daa-c4125d5b359a",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold's ~6k chars are a top-of-page schedule slider carousel (section#schedule, class 'slider-widget', items like 'Colorado College ... Recap'); its '# Schedule' heading comes from <h1 class=\"hide\"> (CSS-hidden). Meanwhile gold drops the visible main-article FAQ body ('What is a news feed? A news feed (also known as an RSS feed)...') that our prediction correctly extracted from the RSS page content at lines 4729-5050. Gold keeps a site-wide carousel widget (chrome per charter) and cuts rendered article prose.",
+        "fixable_by": "gold_edit_proposal",
+        "fix_sketch": "Propose gold edit: drop the schedule slider carousel and hidden 'Schedule' h1, keep the RSS intro plus the rendered FAQ Q&A body.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "337ec4f4-3859-479b-9b38-85607b2e0733",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold is only '**Where to get this dress?**' (30 chars, R=1.0). Prediction adds visible UI chrome: the tag nav ('dress party dress formal event outfit...'), 'Originally posted 34 months ago by jusglamme', tip CTAs ('Be the first to post a tip. You will help 1 person.', '1 deleted tip', 'Official brand post - comment'), and 'Cancel' from the Pinterest share widget (div.social-widget-pinterest, hidden only by external CSS; page has no in-page <style> block). Inline display:none forms (tip-post, add-garment) were already excluded.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Strengthen chrome classification for tag-link lists, poster/byline widgets, and empty-tip CTA placeholders on look/product pages.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "37f6ee4f-27c9-4f8f-8d68-03b0ce41983f",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold's tokens are mostly 8 gallery image URLs from a wp-block-gallery where each <img> has src set to an inline data:image/svg placeholder and the real URL only in data-src/data-full-url (lazy loading), so prediction emits zero images (R=0.169). Prediction also extracts '{\"email\":\"Email address invalid\",...}' from <div class=\"thrive-theme-comments-error-msg\" style=\"display: none !important;\"> plus 'Previous/Next' nav.",
+        "fixable_by": "new_engine_handler",
+        "fix_sketch": "Resolve lazy-loaded images by falling back to data-src/data-full-url when src is a data:svg placeholder; separately, an inline display:none veto would drop the JSON error blob.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "ccc10146-ccd7-4246-ba82-85f98a574411",
+        "failure_mode": "under_missed_content",
+        "evidence": "Prediction misses the page's main content: the file listing in <div class='ui list'> (MD5, man/readLisrel.Rd, R/zzz.R, ...) — a link-dominant list evidently vetoed as nav even though it sits under the h1 'Files in lisrelToR'. Instead prediction keeps sidebar chrome ('Package index', 'Search the lisrelToR package', 'API 16 Browse all...') and the Semantic-UI snippets modal ('Embedding an R snippet on your website ... Close') from <div class=\"ui modal snippetsModal\">, which is hidden only by external framework CSS (no in-page <style>).",
+        "fixable_by": "classifier",
+        "fix_sketch": "Rescue link-lists directly under the main h1/content column (same family as the ul-rule repair) and add a veto for known modal container classes like 'ui modal'.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "7bc3dc97-be3d-4491-8926-328e59831993",
+        "failure_mode": "over_chrome",
+        "evidence": "Article body matches gold (R=1.0) but prediction adds mostly visible chrome: Godsmack contest teaser, paywall banner 'Welcome guest, you have 3 views left. | Register | Sign In', 'Most Popular' related teasers (three NH Angle stories), and the 'Main Slide Image 1-7' weekend-events carousel. It also extracts '<span style=\"font-size:10px;display:none\">action:article | category:AGGREGATION | adString:...' (lines 466, 684) — inline-hidden ad-targeting strings a CSS-aware renderer would drop, proving inline display:none is not honored.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Classify related-teaser/carousel/contest blocks outside the article container as chrome; add inline display:none veto to kill the adString spans.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "65287e0e-89f0-4fde-9032-a4b1fe3b5e73",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction adds the empty-comments prompt ('Things are little quiet around here... Register or log in first, please.'), the 'more good taste...' related-thumbnail list rendered as bare numeric alt texts ('8 18 28 29 612 619'), and the 'Site Information' footer heading — none CSS-hidden (only a Quantcast 1x1 pixel is display:none). It simultaneously drops gold's Tags list (ul of /tag/ links in div.post-categories), which the charter keeps.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto image-only related lists (li text = numeric img alt) and empty comment-CTA blocks; exempt tag lists under a 'Tags' heading from the link-list nav veto.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "11f03636-3dab-4909-9b07-2d0bc6b7d631",
+        "failure_mode": "over_chrome",
+        "evidence": "Article text matches gold exactly (R=1.0), but prediction appends the visible subscription/paywall block div#regnow embedded at the end of div.news-content: 'If you subscribe to the newspaper, you receive FREE access...', 'Renew Current or Past Subscription', ZIP-code/account-ID form tables, and the circulation office footer. The in-page <style> hides only div.c4 and gam-holder ad divs, not this block, so CSS visibility would not remove it; it is rendered paywall UI that gold cuts. Also keeps the '-A A +A' font-resize widget.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Detect subscription/registration boilerplate blocks (form-heavy, subscribe/register lexicon) appended inside article containers and cut at that boundary.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "51a52bc9-6e1c-4f8b-bfc3-db0ed38940c4",
+        "failure_mode": "content_behind_css_hidden",
+        "evidence": "P=1.0, R=0.308: everything we output is in gold, but gold additionally contains the entire Vet-VIPPS accreditation section ('Valley Vet Pharmacy has earned VETERINARY-VERIFIED...') which lives in <div class=\"modal_vet_verified display_off\" id=\"veterinart_verified\"> — a click-triggered modal hidden via the external 'display_off' CSS class, never visible on page load. Gold keeps invisible modal text; our extraction matches the rendered page.",
+        "fixable_by": "gold_edit_proposal",
+        "fix_sketch": "Propose gold edit removing the never-rendered accreditation modal; alternatively a rescue of full-prose modal blocks would recover it, but that contradicts rendering fidelity.",
+        "rendering_related": true
+      },
+      {
+        "warc_record_id": "a0b55826-a053-498c-a325-b0388e6a09d9",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction covers gold's product details/TOC but appends the whole 'Related products' grid (8 product cards: 'MATHEMATICAL METHODS IN PHYSICS... 155.00 108.00 BUY E-BOOK', 'Add to cart', 'Sale!', 'Placeholder') — related-teaser noise per charter. It also repeatedly extracts 'Browse Wishlist'/'Product added!' from <div class=\"yith-wcwl-wishlistaddedbrowse hide\" style=\"display:none;\"> on every card (inline-hidden, would vanish under a css_hidden_veto). Minor recall bug: category anchor texts dropped, yielding 'Categories: , , , ,' vs gold's 'Categories: B.Sc., ...'.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Cut WooCommerce 'related products' sections as teaser chrome; add inline display:none veto for the wishlist spans; fix rel=tag anchor text loss.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "153c5996-ef65-48ac-b5b5-820a8c8c715e",
+        "failure_mode": "gold_noise",
+        "evidence": "Pred (P=1.0) is the complete rendered article. Gold's extra ~15KB (Jordan/Kobe, Rita Ora, 'The Weekly Drop' articles) comes from an escaped-JSON app-state blob inside a <script> (found at html pos 121746, between the last '<script' at 71015 and no closing tag: '\\\"titleTag\\\":\\\"Michael Jordan Explains Why He Would Take Kobe Bryant Over LeBron James\\\",...\\\"content\\\":\\\"\\\\u003Cp...'). Gold even contains a corrupted duplicate of the main article from this blob ('Dubbeded', 'r!ed/white') that appears nowhere in the rendered DOM. Never-rendered script JSON violates charter noise rule N1.",
+        "fixable_by": "gold_edit_proposal",
+        "rendering_related": false,
+        "fix_sketch": "Strip everything after the first 'Photos via giaydebang' from gold; the remainder is decoded script-state JSON."
+      },
+      {
+        "warc_record_id": "f008f6b9-bf31-4119-bf3d-1846b66d7e8a",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold is the single blog post (552B); pred (3808B) additionally emits the entire visible Blogger sidebar: 'Labels' tag cloud with counts ('10pm Bedtime Club (23) November Challenge (21)...'), full 'Blog Archive' year/month tree, 'About Me', 'Top 3 post this week'/'Top 5 posts ever' popular-post snippets, 'Books Read' list, and share bar ('Email ThisBlogThis!Share to Twitter...'). All charter N4/N5/N6 noise; none of it is CSS-hidden. Domain is on the site-rule blocklist.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Generic Blogger sidebar/widget detection (archive trees, label clouds with counts, popular-post teaser lists) in the block classifier."
+      },
+      {
+        "warc_record_id": "067a995b-e1a6-4331-909a-20d183b40496",
+        "failure_mode": "under_missed_content",
+        "evidence": "P=0.911/R=0.159: pred keeps only stubs ('# Satellite Radar', Green Living blurb) while gold keeps the page's weather modules — the map-preview carousel with radar images ('<div class=\"map-preview first\"><h4>Doppler Radar</h4>...radar0.60.jpg'), the headlines list with summary prose ('<h4><a>Severe Storms Roll Into The Northeast Today</a></h4><p>Much of the Northeast is at risk...'), nearby-location links, and footer copyright. Per the charter's 2026-08-08 weatherbug owner ruling, data/widget modules on a page ABOUT that data are content; these blocks are plain visible HTML we vetoed as link/widget chrome.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Relax widget/list vetoes when the page's own topic matches the module (data-page exemption); note some carousel slides lack the 'show' class, so a CSS-hidden veto would conflict with gold here."
+      },
+      {
+        "warc_record_id": "26d33094-9e1d-498d-978e-0aff6441b26c",
+        "failure_mode": "under_missed_content",
+        "evidence": "P=1.0/R=0.185: pred has the article body but drops the h1 title, 'Ryan Whitwam' byline, and the entire comment thread that dominates the 8.5KB gold. Comments are static visible HTML, not JS-loaded: '<ul id=\"dsq-comments\"><li class=\"comment even...\"><span id=\"dsq-author-user-1191458\">George</span>...<p>if only all the Apple conspiracy dipshits...' at pos 42741, not inside any script, with no display:none/hidden/aria-hidden ancestor. Charter C3 makes comment sections content.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Rescue text-heavy nested comment lists (dsq-comments / .comment li with paragraph bodies) and the post-header h1/byline that the main-content crop discards."
+      },
+      {
+        "warc_record_id": "09f4b575-2a87-467c-8016-934f802727a8",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.259: pred adds package promo chrome ('Kanjirappally Packages', 'Top Tour Packages', 'Customize' x8, 'Call us for Package details +91 7022-034-617', 'People who viewed this page also viewed') plus text a renderer would hide: '<span style=\"display:none\">debug_temp: getin_from : source_city:30:Munnar:City...' and the <head> <title> emitted as body text (a stray <p> inside <head> breaks parsing). Meanwhile gold keeps the 'Trains • Flights • Buses...' row and the route table, both inside display:none containers ('<table class=\"tab\" style=\"...display:none\">', '<tbody id=\"body_route_0\" style=\"display:none\">'), which pred missed.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Veto promo/teaser widgets (repeated CTA buttons, package cards, viewed-also lists); a blanket CSS-hidden veto would fix debug_temp but delete the hidden tab/table content gold keeps, so it must not be applied blindly here."
+      },
+      {
+        "warc_record_id": "bd4c69bc-b2a3-4cc3-b62e-b192395a8530",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.267/R=0.994: beyond the article, pred emits the 'Related medicine news' bare headline-link list (charter N5) and ~3KB of truncated newswire teaser dumps ('(Date:11/21/2014)... Body Well Therapy, a leading provider of ... Spafinder massage gift cards...') that gold excludes. A minority of the junk is CSS-hidden: the leading snippet block comes from '<div class=\"endSummary\" id=\"ends\" style=\"display:none;\">Birth through Caesarean section is becoming an epidemic a leading obs...' and the stray quote artifact from '<font style=\\'display:none\\'>\\'\"/></font>'.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Veto trailing related-news headline lists and ellipsis-truncated teaser blocks after article end; an inline display:none veto additionally removes the endSummary duplicate (~10% of the junk)."
+      },
+      {
+        "warc_record_id": "bbac7ef6-5a95-4061-a8f5-2e5e1bfc03ef",
+        "failure_mode": "under_missed_content",
+        "evidence": "R=0.338: gold's core content is the per-stamp catalog lines ('1/2schilling 1867-4 perfMethod2 Typographed 2colors-printing' etc., 17x 'Typographed'), which live in '<ul class=\"stampspec\"><li id=\"spec212860\"><a href=\"\"> 1/2schilling 1867-4 perfMethod2...</a></li>' — lists whose every item is a single anchor, so our link-list veto dropped them all (the whole 1875 issue block is missing from pred). Pred kept only image alt text 'HELIGOLAND STAMP' + denominations. No <style> blocks exist; the lists are visible catalog data on a catalog page.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Exempt all-anchor lists whose item text is long/data-like (dates, dimensions, multiple tokens) from the nav-list veto — data on a catalog page per the weatherbug ruling."
+      },
+      {
+        "warc_record_id": "ca517d02-3614-4602-af75-b4b41fbc7ab2",
+        "failure_mode": "under_missed_content",
+        "evidence": "P=0.85/R=0.327: pred drops content gold keeps: footer copyright '© 2020 TradingView ... Часть данных предоставлена ICE Data Services' (charter C4 makes footer copyright content), the feed-tab empty states ('<div>Пользователь не читает каких-либо авторов</div>' in visible tv-feed__page divs), '4 оценки / 2 комментария', follower name 'evgenyethgod', and the tag labels which sit in a hidden container ('<div class=\"tv-search-bar__tags js-tags js-tags--chart i-hidden\"><a...>catapult</a>' — i-hidden is TradingView's display:none class, yet gold keeps them).",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Rescue footer copyright lines and short widget/empty-state text on profile pages; note gold keeps i-hidden tag chips, so a class-based hidden veto would move away from gold here."
+      },
+      {
+        "warc_record_id": "3d0dda53-733a-4b77-a1f8-689ed9afe56c",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.325/R=1.0: pred adds the right-rail promo widgets gold excludes ('Archives / Last seven days / 30-day archive', 'Welcome to Louisville', 'Subscribe / Where to buy', 'Courier-Journal Datacenter', 'Local Deals', 'FOLLOW US ON TWITTER & FACEBOOK'), the email-share modal ('<div id=\"emailmodalcontent\" class=\"emailcontent firefly modal...\"><div class=\"ody-title\">Email this article</div>...A link to this page will be included in your message') which duplicates the headline+lede, and the photo caption twice (once from img alt, once from the adjacent <h6>). The page has zero inline 'display:none' and its 2 <style> blocks never hide .modal — the modal is hidden only by external CSS unavailable in the archive.",
+        "fixable_by": "classifier",
+        "rendering_related": false,
+        "fix_sketch": "Veto modal/dialog containers by class heuristics (modal, emailcontent) and promo widget boxes; suppress img-alt emission when an adjacent caption element repeats the same text."
+      },
+      {
+        "warc_record_id": "0bb1415f-e56a-4786-b4fc-d73eeebfe404",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold is entirely Instagram-feed captions ('I'm Baaaaack! After a much needed social media break...', flatbread post) that exist in the HTML only as img alt text and truncated <span class=\"sbi-screenreader\"> spans inside the JS Instagram widget (sbi_photo anchors with placeholder.png images); our engine emits none of it. Prediction instead output sidebar/footer chrome: 'Meet Me' bio, 'Search Food & Wine Chronicles', 'COPYRIGHT ©2022 ... Terms of Use', 'Login/Register', which gold cut. R=0.06 because zero caption text was captured.",
+        "fix_sketch": "Emit img alt text as paragraph content when a content-length alt (>100 chars) appears on placeholder/lazy images inside a feed widget, and veto sidebar bio/search/footer blocks.",
+        "fixable_by": "unclear",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "6c75c17c-4cf2-4689-9d0d-c389be73f593",
+        "failure_mode": "gold_noise",
+        "evidence": "~130 of gold's 153 lines are the census.gov mega-menu rollover panels ('Our population statistics cover age, sex, race...' lives in <div id=\"TopLink1\" style=\"display: none;\">) — pure nav that a renderer would hide, violating the charter. Our prediction extracted the OTHER hidden rollover panels (<div id=\"GeoMain\" style=\"display: none;\">, #TopLink12 'Index A-Z') plus the visible FTD Web News sidebar, so P=0.18 and R=0.304 simultaneously. The actual article (NAICS export table for Madagascar) is correctly extracted by both.",
+        "fix_sketch": "Propose gold edit removing all display:none rollover menu panels; separately honor inline display:none to drop our identical menu junk.",
+        "fixable_by": "gold_edit_proposal",
+        "rendering_related": true
+      },
+      {
+        "warc_record_id": "54b7ce1a-caea-4619-ba77-201d90dd9bee",
+        "failure_mode": "near_empty_output",
+        "evidence": "Prediction is 302 bytes (gold 2159): only the dropcap overview paragraph ('A' + 'fter the Crown Heights riots...') from div.postcontent survived. The vetoed content is visible normal markup: Ratings ('Rating: 5.7 (18 votes)'), the subtitles table row 'Crown Heights (2004)_eng_hi.srt | 23.976 | 2013-10-01', and cast/crew in plain tab-content divs (a href=/actors/liza-balkan.html) with no display:none. P=0.917 confirms what we kept is right; the classifier over-vetoed everything else.",
+        "fix_sketch": "Extend near-empty rescue: when output is <20% of body text and vetoed blocks contain data tables and dense entity lists, restore them.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "260f52e3-5cae-4a29-a0a3-a7ab91422141",
+        "failure_mode": "over_chrome",
+        "evidence": "Tiny attachment page (gold 52 bytes: byline + 'cookie-co'). Prediction added visible attachment chrome: parent-post breadcrumb 'Favorites from LA Magazine's Food Event', 'Full size is 640 × 425 pixels', and 'Bookmark the permalink.' — P=0.2 purely from these three boilerplate fragments; nothing is CSS-hidden. Domain thelosangelesbeat.com is on the site-rule blocklist.",
+        "fix_sketch": "Classifier pattern-veto for WordPress attachment boilerplate ('Full size is N × N pixels', 'Bookmark the permalink').",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "cd8e53c5-0afe-462d-86b0-2e6cecb5f2c4",
+        "failure_mode": "under_missed_content",
+        "evidence": "Prediction kept the 'Other Meridian Hotel Deals' heading but vetoed the visible ul.orange_arrow_list beneath it (Ramada Limited Meridian, Microtel Inn & Suites, etc. — 8 items, most of gold's mass), and instead extracted the pop-up blocker dialog ('ALERT! Your pop-up blocker security setting is too high... Click on Tools') from #BookingBuddySearchBlockedPopUpDivID, which is hidden only via JS .hide() and external stylesheets — no inline style, hidden attr, or in-page <style> rule exists, so in-page CSS awareness would not catch it. Also emitted the #non_js_users noscript line.",
+        "fix_sketch": "Rescue link-lists under a kept heading in the same module; add classifier veto for popup/dialog vocabulary blocks ('pop-up blocker', 'Click on Tools').",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "238f4c35-f827-4482-afce-6501830e6447",
+        "failure_mode": "under_missed_content",
+        "evidence": "Attachment page whose gold is the h1 title plus the full-size image markdown (https://ukdj.imgix.net/3a3c103b...jpg — most of gold's tokens). The image anchor sits directly after the kept h1 in the HTML but prediction dropped it, while keeping visible chrome gold cut: breadcrumb 'Home Typhoon jets intercept Russian military formation over Baltic', 'Facebook Twitter', and the footer '© 2014-2021 UK Defence Journal'. Domain is site-rule blocklisted.",
+        "fix_sketch": "Retain the primary image link adjacent to the kept entry-title on image-attachment pages; veto breadcrumb/share spans.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "dc8c671c-88db-47e4-9053-de2b13afb351",
+        "failure_mode": "under_missed_content",
+        "evidence": "Sedo parking page; P=1.0, R=0.299. Prediction kept only the buyBox blurb ('The owner of filmitown.com is offering it for sale for an asking price of 9999 GBP!') but vetoed the visible <h1>filmitown.com</h1> and the div#footer #disclaimer text gold keeps ('This webpage was generated by the domain owner using Sedo Domain Parking. Disclaimer: Sedo maintains no relationship...'). Charter treats copyright/disclaimer text as content; neither element is CSS-hidden.",
+        "fix_sketch": "On near-empty pages, exempt header h1 and footer disclaimer paragraphs from the header/footer veto.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "998b734e-de07-4566-9322-3bfea783b08c",
+        "failure_mode": "gold_snapshot_mismatch",
+        "evidence": "Gold omits ~7 fully rendered vBulletin posts that are present as ordinary visible markup (td_post_/post_message_ divs) and that our prediction correctly extracted: unlimitedTJrubi's 'I am waiting to see how you incorporate a GI can...', ashland's theft post 'decided to steel all my ****', the 'bikini plus top' post, GRYDE001's 'tinted plexi glass' reply — gold even shows the header 'unlimitedTJrubi – 05-06-2012, 10:23 AM' with an EMPTY body. That drives our P down to 0.371 through no extractor fault; our real misses (R=0.66) are signature blocks ('Registered Nurse Jeep Club Member #1', 'My Specs' list, Join Date/Location) that gold keeps.",
+        "fix_sketch": "Propose gold edit restoring the seven dropped rendered posts (charter: all rendered comments are content); separately relax signature-block veto in forum posts.",
+        "fixable_by": "gold_edit_proposal",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "cf1410ea-22cf-468d-a3e3-51f4f5892432",
+        "failure_mode": "over_chrome",
+        "evidence": "R=0.979 — everything in gold (unit definition, SI unit section) was extracted. P=0.333 because prediction also kept the conversion form widget ('Convert centigram/second to', 'Valid units must be of the mass flow rate type. You can use this form to select from known units', 'I'm feeling lucky, show me some random units') and the 'Sample conversions' related-link list ('centigram/second to gram/hour...'), all visible form-UI/nav that gold cut per charter.",
+        "fix_sketch": "Classifier veto for form-widget sections (select/submit-adjacent text) and same-page cross-link lists under 'Sample conversions'-style headings; convertunits.com is not blocklisted so a site rule is possible but classifier generalizes.",
+        "fixable_by": "classifier",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "35181712-06ea-49c5-98f8-b28edb1a33da",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold is only 'Tuesday, May 31, 2016' (F1 0.087, P 0.045, R 1.0). Prediction adds sidebar widget/form text: 'Account Login | Username | Password', 'Quick Poll What is your favorite color?', 'Breaking News Alerts ... standard messaging rates apply', weather table '64°F Clear | Carrollton, MO', and the password-help form 'Please enter your email and we will send your username and password to you.' All of these live in visible panels (ctl00_PasswordLogin1_Panel1, ctl00_ContentPlaceHolder1_pnlMain); the only display:none elements in the page are #displayAds li and the RadFormDecorator div, neither of which we extracted.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Strengthen the widget/form veto: blocks dominated by input/label/select elements and poll/login/alert-signup cue text should be dropped even when they sit in the main content pane.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "1791cf7b-98be-48d4-8ed9-bf95c3569b75",
+        "failure_mode": "over_chrome",
+        "evidence": "Two-sided failure (P 0.178, R 0.382). Under: gold's core list of 5 font families ('JAF Herb – Just Another Foundry – Upgrade required – Web, Sync') exists as visible div.family-card link cards (span.family-card-name, span.family-card-foundry) but was dropped, likely link-density veto on the card list. Over: we extracted browse-filter UI ('Sort By ... Featured/Newest/Name') and info-bubble tooltip tables full of translation_missing placeholders ('Sans Serif Term | Without Serifs Description'); the .info-bubble divs are hidden only via the external stylesheet (the page's single <style> block contains only globalnav color overrides), so an in-page CSS veto cannot catch them.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Rescue link-card grids that carry per-item non-link text (name + foundry + status spans), and veto blocks whose text is dominated by translation_missing/placeholder-classed spans.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "0bea560c-d3fb-45c9-bc35-dc99c4f9ac4e",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold is the single post ('iandobbin — 08-25-2008 ... defective rear parking sensor'); prediction has it (R 0.944) but adds vBulletin chrome (P 0.163): page title, forum blurb 'Chat relating to the BMW 3-Series ... BMW 335d.', 'LinkBack Thread Tools Display Modes', 'Currently Active Users Viewing This Thread', and a 4-row 'Similar Threads' related-teaser table ('Reverse parking sensor probs | E Hanna | ...'). All of this is visible vBulletin UI, not CSS-hidden.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto related-content tables headed 'Similar Threads' (thread/starter/forum/replies column signature) and forum boilerplate lines (Thread Tools, Currently Active Users, forum-description blurbs) around detected post bodies.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "05ec8c3b-3a44-4b05-8b30-02797ab89319",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold (359B) is the quote plus the two-sentence site description; prediction (R 1.0, P 0.193) adds the nav bar '**PROXY** **WHOIS** **RQUOTE** ...', a 'GIVE ME MORE RANDOM QUOTE' heading, 'generated in 0.010506 seconds', and a ~2.5KB topic index ('apocrypha bible-old ... liz-taylor') that in the HTML is one <small> element containing 136 consecutive <a> links with essentially zero non-link text — textbook link-density nav that survived the veto.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Ensure the link-density veto fires on long inline runs of anchors not wrapped in ul/li (link-text ratio ~1.0 over 100+ links), which currently appear to bypass list-based nav detection.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "e91fe39f-1921-47c4-9fff-03ab7a6197da",
+        "failure_mode": "under_missed_content",
+        "evidence": "Prediction has the SEC. 201 heading but misses gold's body: 'Title II (20 U.S.C. 6601 et seq.) is amended to read as follows:' and the bullet link line. In the HTML that text is bare text placed directly inside '<ul class=content>' with no <li>, followed by a single <a href=pg20.html> link — malformed markup that the list/link-density rule apparently vetoed. Not CSS-hidden. Prediction instead kept breadcrumb ('Laws & Guidance ELEMENTARY & SECONDARY EDUCATION'), Previous/Next nav table, and 'Print this page ... Share this page' UI (P 0.348).",
+        "fixable_by": "classifier",
+        "fix_sketch": "Exempt <ul> elements containing substantial bare text (no <li> children) from the list veto, and drop print/share/prev-next rows.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "bd9db8f2-2921-4a83-9c73-cc868d631fa4",
+        "failure_mode": "under_missed_content",
+        "evidence": "R 0.314 vs P 0.73: gold's 15-entry 'Cast + Crew' list ('Mrighdeep Singh Lamba – Director', 'Pulkit Samrat – Hunny', ...) is entirely absent from the prediction. In the HTML it is a visible carousel: <ol class=carousel-items> of <li> cards each wrapping an <a> to /people/... with span.carousel-cast-crew__title (name) and span.carousel-cast-crew__sub-title (role) — no display:none/hidden/aria-hidden on the section; it was vetoed as a link-heavy carousel list. The prediction kept only the overview facts and synopsis.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Rescue carousel/card lists whose items pair a linked name with non-link role text (cast-crew pattern) instead of vetoing them on link density.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "01bd89f9-5512-4773-8894-1258810302f2",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold's first ~300 lines are pure site chrome that the charter labels noise: a feedback form ('Name / Please enter your name. / Email / ... Send Feedback'), a login box, and the full Beckett megaMenu dropdown nav ('Home News Forums Popular Sports Forums Baseball Box-Breaks Trading Vintage ... Search Coin On Price Guide ... Marketplace'), which in the HTML is ul.megaMenu hover-dropdown markup (h2 'Popular Sports Forums' at line 190) and input placeholders (line 70-88). Our prediction correctly extracted all 7 forum posts (that is why R is only 0.36 against the nav-padded gold), adding only minor MyBB chrome ('Find all posts by this user', 'Quote this message in a reply', thread rating).",
+        "fixable_by": "gold_edit_proposal",
+        "fix_sketch": "Propose trimming the ~300 lines of megaMenu nav and feedback/login form text from the gold, keeping only the post bodies with author/date headers.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "2e7edb31-8024-4c73-9536-6e78b596bc6b",
+        "failure_mode": "over_chrome",
+        "evidence": "R 1.0: prediction contains all of gold (title, Source/Date/Type, three overview paragraphs). P 0.313 because it adds download/share CTAs ('Click here to download now', 'DOWNLOAD NOW', 'Save for Later / Email a Colleague / Rate This Asset') and the entire 'View All Categories' directory — 17 paragraphs like '**Business Intelligence** : Analytics, Business Process Management, ...' which in the HTML (line 755) are <p> elements composed exclusively of <a> links separated by commas — pure nav that beat the link-density veto because it is paragraph-shaped rather than list-shaped.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Apply the link-density veto to paragraph-shaped blocks too (near-100% link text across comma-separated anchors), and drop download/share CTA lines.",
+        "rendering_related": false
+      },
+      {
+        "warc_record_id": "2a9c62cc-2624-4cad-a036-ef575e30828e",
+        "failure_mode": "hidden_content_extracted",
+        "evidence": "R 0.903 but P 0.344: prediction prepends the print dialog ('Printing Options / Please select the reports you would like to print.' from div#printModal), the 'Price Calculator' modal widget ('Begin by entering the retail book value'), and dozens of literal unrendered Velocity placeholders '**$tooltip.getTerm()** / $tooltip.getText()' plus tooltip popup bodies (Odometer Check, Salvage Title, ...) from div.tooltip elements. These modals/tooltips are hidden in a real render, but the hiding rules live in external stylesheets (media.carfax.com css + jquery.qtip) — the page's three inline <style> blocks and 5 inline display:none hits cover only emailConsole/print-media rules — so an in-page-CSS-only veto cannot catch them.",
+        "fixable_by": "classifier",
+        "fix_sketch": "Veto blocks containing unrendered template tokens (e.g. /\\$\\w+\\.\\w+\\(\\)/) and modal/tooltip-classed containers (div.tooltip, #printModal) even without in-page hide rules.",
+        "rendering_related": true
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Classify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "taxonomy:0",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a9ca1daec29dd684d",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206900514,
+      "queuedAt": 1786206899033,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207212137,
+      "tokens": 56576,
+      "toolCalls": 28,
+      "durationMs": 311622,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"9beb2616-561a-46ef-a169-5dd1f47fac75\",\"failure_mode\":\"near_empty_output\",\"evidence\":\"Prediction is 0 bytes. Gold (1571B) is the visible .entry-content of the page: h1 'Membership Benefits', h2 'Look to Glendale Area Schools Credit Union for:', and a 16-item <ul> where nearly every <li> is a link (e.g. <li><a href=\\\"/products-services/checking/\\\">FREE checking</a></li>).…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "taxonomy:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a7859fc3bb06f7f8f",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206901744,
+      "queuedAt": 1786206899033,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207274342,
+      "tokens": 79764,
+      "toolCalls": 46,
+      "durationMs": 372597,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"9c0edc63-643b-4b86-99f5-18483b2b20e3\",\"failure_mode\":\"gold_noise\",\"evidence\":\"Gold is only '**Thread:** Portugal F4 [11 March/ Guimaraes/Hard] Winner: Jules Marie / **Reply to Thread**' duplicated 3x with '---' separators (298B), while the page visibly renders a 'Topic Review (Newest First)' section with ~15 full forum posts (e.g. '(1)Jules Marie (FRA) d. (WC)Leonardo T…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "taxonomy:2",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a9224343f5d5b0352",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206900876,
+      "queuedAt": 1786206899034,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207285578,
+      "tokens": 68756,
+      "toolCalls": 42,
+      "durationMs": 384702,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"e736c20c-df30-42b2-9daa-c4125d5b359a\",\"failure_mode\":\"gold_noise\",\"evidence\":\"Gold's ~6k chars are a top-of-page schedule slider carousel (section#schedule, class 'slider-widget', items like 'Colorado College ... Recap'); its '# Schedule' heading comes from <h1 class=\\\"hide\\\"> (CSS-hidden). Meanwhile gold drops the visible main-article FAQ body ('What is a news feed? A …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "taxonomy:3",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a9d7badfbcb45ef69",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206901026,
+      "queuedAt": 1786206899034,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207324630,
+      "tokens": 63010,
+      "toolCalls": 34,
+      "durationMs": 423603,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"153c5996-ef65-48ac-b5b5-820a8c8c715e\",\"failure_mode\":\"gold_noise\",\"evidence\":\"Pred (P=1.0) is the complete rendered article. Gold's extra ~15KB (Jordan/Kobe, Rita Ora, 'The Weekly Drop' articles) comes from an escaped-JSON app-state blob inside a <script> (found at html pos 121746, between the last '<script' at 71015 and no closing tag: '\\\\\\\"titleTag\\\\\\\":\\\\\\\"Michael Jor…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "taxonomy:4",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a856fb53c3c4d3830",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206901170,
+      "queuedAt": 1786206899034,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207275984,
+      "tokens": 60208,
+      "toolCalls": 39,
+      "durationMs": 374814,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"0bb1415f-e56a-4786-b4fc-d73eeebfe404\",\"failure_mode\":\"under_missed_content\",\"evidence\":\"Gold is entirely Instagram-feed captions ('I'm Baaaaack! After a much needed social media break...', flatbread post) that exist in the HTML only as img alt text and truncated <span class=\\\"sbi-screenreader\\\"> spans inside the JS Instagram widget (sbi_photo anchors with placeholder.pn…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "taxonomy:5",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a6950d798cf97b72a",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786206900960,
+      "queuedAt": 1786206899034,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing catastrophic extraction failures for the resiliparse markdown extractor.\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse\nPython: /opt/miniconda3/envs/resiliparse/bin/python\n\nTarget list: /private/tmp/claude-501/-Users-michaelryan-Documents-School-Stanford-Research-chatnoir-resiliparse/a4af13b8-6adf-4d4b-8d90-6fee2beae6ba/scratchpad/tail54.…",
+      "lastProgressAt": 1786207231937,
+      "tokens": 69612,
+      "toolCalls": 41,
+      "durationMs": 330977,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"35181712-06ea-49c5-98f8-b28edb1a33da\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Gold is only 'Tuesday, May 31, 2016' (F1 0.087, P 0.045, R 1.0). Prediction adds sidebar widget/form text: 'Account Login | Username | Password', 'Quick Poll What is your favorite color?', 'Breaking News Alerts ... standard messaging rates apply', weather table '64°F Clear | Carrollton, MO', …"
+    }
+  ],
+  "totalTokens": 397926,
+  "totalToolCalls": 230
+}

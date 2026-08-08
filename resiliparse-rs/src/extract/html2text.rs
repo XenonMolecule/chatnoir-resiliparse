@@ -223,6 +223,8 @@ tag_consts!(
     LXB_TAG_CENTER,
     LXB_TAG_CODE,
     LXB_TAG_DD,
+    LXB_TAG_SMALL,
+    LXB_TAG_FONT,
     LXB_TAG_DETAILS,
     LXB_TAG_DIV,
     LXB_TAG_DL,
@@ -1301,6 +1303,37 @@ unsafe fn is_text_heavy_list(node: *mut lxb_dom_node_t) -> bool {
     }
 }
 
+/// Inline anchor-run nav (0105): long runs of consecutive links in
+/// paragraph-shaped containers (`<p>`/`<small>`/`<font>`/`<dd>`) bypass the
+/// list-based nav vetoes. Requires many anchors AND near-total link text so
+/// prose with citations never fires.
+unsafe fn is_anchor_run(node: *mut lxb_dom_node_t) -> bool {
+    unsafe {
+        let element_text = get_collapsed_string(&get_node_text(node));
+        if element_text.len() < 300 {
+            return false;
+        }
+        let dom_coll = lxb_dom_collection_make_noi((*node).owner_document, 40);
+        lxb_dom_elements_by_tag_name(node.cast(), dom_coll, b"a".as_ptr(), 1);
+        let n = lxb_dom_collection_length_noi(dom_coll);
+        let mut link_len = 0usize;
+        let mut link_ns = 0usize;
+        for i in 0..n {
+            let lt = get_collapsed_string(&get_node_text(lxb_dom_collection_node_noi(dom_coll, i)));
+            link_len += lt.len();
+            link_ns += lt.iter().filter(|c| !c.is_ascii_whitespace()).count();
+        }
+        lxb_dom_collection_destroy(dom_coll, true);
+        let text_ns = element_text.iter().filter(|c| !c.is_ascii_whitespace()).count();
+        // avg-anchor-length cap: nav labels are short; anchor-wrapped story
+        // teasers (news archives) run long and are content (0105 train
+        // crater). Non-link text is capped in absolute non-space bytes: a
+        // pure link index has none, while thread lists / product cards
+        // interleave dates and prices between the anchors — content.
+        n >= 25 && text_ns.saturating_sub(link_ns) <= 32 && link_len / n <= 60
+    }
+}
+
 /// Check if element contains an excessive number of links compared to the whole content length.
 unsafe fn is_link_cluster(node: *mut lxb_dom_node_t, max_link_ratio: f64, max_length: usize) -> bool {
     unsafe {
@@ -1348,6 +1381,10 @@ static SEARCH_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|[\s_-])search(?:[_-]?(?:ba
 static SKIP_LINK_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|\s)(?:link[_-]?)?(?:skip(?:[_-]?(?:to|link))?|scroll[_-]?(?:up|down)|next|prev(?:ious)?|permalink|pagination|skip-to-(?:main-)?content)(?:$|\s|[_-]?(?:post|article))");
 static DISPLAY_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|\s)(?:(?:is|visually)[_-])?(?:display-none|hidden|invisible|collapsed|h-0|nocontent|expandable)(?:-xs|-sm|-lg|-2?xl)?(?:$|\s)");
 static DISPLAY_CSS: LazyLock<Regex> = regex_ci!(r"(?:^|;\s*)(?:display\s?:\s?none|visibility\s?:\s?hidden)(?:$|\s?;)");
+// Unrendered client-side template tokens (0105): Velocity `$obj.method()`
+// and Rails `translation_missing` placeholders only surface when the page's
+// JS templating never ran — a rendered page hides these blocks.
+static TEMPLATE_TOKEN: LazyLock<Regex> = regex_ci!(r"\$[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\(\)|translation_missing");
 static MODAL_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|\s)(?:wp-|p-|-l)?(?:modal|popup|lightbox)(?:[_-]*(?:window|pane|box))?(?:$|[\s_-])");
 static GALLERY_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|[\s_-])(?:gallery|carousel)(?:$|[\s_-])");
 static SIGNIN_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|[\s_-])(?:(?:log[_-]?in|sign[_-]?(?:in|up)|account)|user[_-](?:info|profile|settings|actions))(?:$|[\s_-])");
@@ -1594,6 +1631,17 @@ unsafe fn is_main_content_node(
         // Hidden elements
         if lxb_dom_element_has_attribute(node.cast(), b"hidden".as_ptr(), 6) {
             return false;
+        }
+
+        // Inline anchor-run nav and unrendered template payloads (0105,
+        // markdown config only — plain config mirrors the Cython reference)
+        if md_chrome {
+            if matches!(local_name, LXB_TAG_P | LXB_TAG_SMALL | LXB_TAG_FONT | LXB_TAG_DD)
+                && !relax.listing_cards
+                && is_anchor_run(node)
+            {
+                return false;
+            }
         }
 
         // rel attributes (markdown config keeps author anchors — the gold
@@ -7619,6 +7667,16 @@ fn strip_ui_label_lines(text: String) -> String {
                 || (tl.ends_with(" posts")
                     && tl[..tl.len() - 6].trim().chars().all(|c| c.is_ascii_digit())));
         if !tl.is_empty() && (postbit || (heading_ok && LABELS.contains(&tl.as_str()))) {
+            removed_any = true;
+            continue;
+        }
+        // Unrendered template-token lines (0105): `$tooltip.getTerm()`,
+        // `translation_missing` — client-side placeholders a rendered page
+        // never shows. Line-level so code blocks (4-space/fenced) survive.
+        if !line.starts_with("    ")
+            && !line.starts_with('\t')
+            && regex_search_not_empty(tl.as_bytes(), &TEMPLATE_TOKEN)
+        {
             removed_any = true;
             continue;
         }
