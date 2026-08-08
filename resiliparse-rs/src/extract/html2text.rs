@@ -2148,9 +2148,43 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             // Relative gate (0051): the model removed most of the page on a
             // low-link-density (article-like) page — a listing page (high
             // ld) keeps its vetoes; gold keeps little there.
+            // Tier 0a (0106, markdown only): near-empty output + a unique
+            // article container -> rescue rooted at the container. The
+            // body-wide tiers below resurrect the site shell on husk pages
+            // (gascu family); the container is the precise target when the
+            // page names one.
+            let mut rooted_rescued = false;
+            if opts.preserve_formatting == FormattingOpts::Markdown
+                && result_content_len < RESCUE_NEAR_EMPTY_ABS
+                // engine pages (Blogger/WordPress/Typepad/...) keep comments
+                // outside the article container — their rescue goes through
+                // the engine handlers/body-wide tiers, not the rooted crop.
+                // A stray <img> in <head> force-closes it and dumps the
+                // generator meta into <body> (fraudswatch), so scan both.
+                && generator_meta(doc).is_empty()
+                && query_selector_all_raw(doc, (*doc).body.cast(), b"meta[name=\"generator\"]").is_empty()
+                && !(result_content_len < RESCUE_NEAR_EMPTY_ABS + 100
+                    && regex_search_not_empty(result.as_bytes(), &ERROR_STUB_TEXT))
+            {
+                let cands = query_selector_all_raw(
+                    doc,
+                    (*doc).body.cast(),
+                    b".entry-content, .article-body, .articleBody, .article-text, .post-content, .postcontent, [itemprop=\"articleBody\"]",
+                );
+                if cands.len() == 1 {
+                    let r = extract_plain_text_from_node(doc, cands[0], opts);
+                    if content_len(&r) > RESCUE_KEEP_FACTOR * result_content_len.max(1) {
+                        result = r;
+                        result_content_len = content_len(&result);
+                        rooted_rescued = true;
+                    }
+                }
+            }
+
             let model_gutted = model_veto_mass > 2 * result_content_len.max(1)
                 && page_link_density < 0.30;
-            if !model_veto_nodes.is_empty()
+            if !rooted_rescued
+                && !model_veto_nodes.is_empty()
                 && (result_content_len < RESCUE_NEAR_EMPTY_ABS || model_gutted)
             {
                 let mut set3 = effective_tpl.clone().unwrap_or_default();
@@ -2191,8 +2225,9 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                             cell.chars().filter(|c| c.is_alphabetic()).count() >= 16
                         })
                 });
-            let mut rescued = false;
-            if !is_error_stub
+            let mut rescued = rooted_rescued;
+            if !rescued
+                && !is_error_stub
                 && !has_md_table
                 && result_content_len < RESCUE_NEAR_EMPTY_ABS
                 && body_text_len(doc) > RESCUE_BODY_FACTOR * result_content_len.max(1)
