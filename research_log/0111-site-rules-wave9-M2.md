@@ -24,3 +24,17 @@ Guardrails: plain 1000/1000 identical, extract_golden 7/7.
 - Golden: 0.8850/0.8041 — Lev solidly in the goal band; F1 gap −0.0150.
 - Wave-lane session arc: 0.8704/0.7880 → 0.8850/0.8041 (+0.0146/+0.0161)
   across 0104–0111.
+
+## M2 vaulted-test result (declared checkpoint, --allow-test)
+**Test: 0.8244 / 0.7279** (M1 test: 0.8218/0.7225 → +0.0026/+0.0054).
+
+Honest read: at M1 test led dev; now test LAGS dev by ~0.030/0.034. The
+site-rule lane (0098→0111, +~0.02 dev) is fitted to dev domains and mostly
+does not transfer — test's gains since M1 match the generalizable lanes only
+(rescue tiers, boilerplate strips, anchor-run/template vetoes, engine
+handlers). Implications:
+1. The devset goal (stop-hook: 0.9/0.8–0.85 on lpv11 dev) is still served
+   by waves; the science claim about generalization must cite TEST.
+2. Future generalizable-lane wins matter double; consider a wave-style
+   fleet that extracts GENERIC (cross-site) patterns from dev diffs instead
+   of domain-gated selectors.
