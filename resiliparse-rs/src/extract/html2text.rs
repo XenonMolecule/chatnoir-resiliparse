@@ -5656,6 +5656,8 @@ fn strip_ui_label_lines(text: String) -> String {
         "smilies are on", "[img] code is on", "posting rules",
         "thread tools", "you may not post attachments",
         "you may not edit your posts",
+        "loading...", "jump to:", "email print", "user avatar",
+        "quantcast", "reactions:", "post reply", "\u{ab} previous next \u{bb}",
         "i want!", "tag a friend", "be the first to post a tip",
         "please follow and like us:", "error: content is protected !!",
         "new schedule b search engine", "newest trade data!",
