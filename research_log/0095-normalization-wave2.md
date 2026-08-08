@@ -14,3 +14,10 @@ remaining ~400 variance docs project to <+0.001 total. The
 presentation-normalization vein is EXHAUSTED at wave-2; further waves
 are not worth agent spend. F1 unchanged throughout (invariant
 fingerprint).
+
+## Content-divergent docs (31) — dispositioned
+Notes cluster into: gold-kept images (6 — the 0059 learned-only family's
+minority side), heterogeneous per-site chrome additions (12 — site
+singletons, sub-milli each), structural reordering (wiki/docs pages —
+walls). No batchable family; all consistent with prior dispositions.
+The normalization waves double as a confirming audit of the loss map.
