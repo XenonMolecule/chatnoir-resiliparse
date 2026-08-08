@@ -1978,9 +1978,29 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                                 }
                             }
                         }
+                        // domain-gated content whitelist (0101): the node and
+                        // every element beneath it join the whitelist (the
+                        // walk checks per-node membership)
+                        for (d_, sel) in SITE_WHITELIST {
+                            if dom == *d_ {
+                                for n in query_selector_all_raw(doc, body, sel) {
+                                    model_whitelist.insert(n);
+                                    let mut depth = 0usize;
+                                    let mut end = false;
+                                    let mut c = n;
+                                    loop {
+                                        c = next_node(n, c, &mut depth, &mut end);
+                                        if c.is_null() {
+                                            break;
+                                        }
+                                        model_whitelist.insert(c);
+                                    }
+                                }
+                            }
+                        }
                     }
                     page_has_card_grid = grid;
-                    model_whitelist = wl;
+                    model_whitelist.extend(wl);
                     model_veto_nodes = mv;
                     model_veto_mass = mvm;
                     page_link_density = pld;
@@ -2911,6 +2931,142 @@ unsafe fn tpl_vetoes(
 /// containers verified chrome-only on their doc (0096 extraction).
 /// Fires ONLY on its own domain (og:url/canonical) — zero cross-site
 /// risk by construction.
+/// Domain-gated content WHITELIST (cycle 0101): site-specific content
+/// containers our rules drop; forces them kept via the model-whitelist
+/// path (overrides is_main_content_node + tpl/model vetoes). Same
+/// zero-cross-site construction as SITE_VETOES.
+const SITE_WHITELIST: &[(&[u8], &[u8])] = &[
+    (b"425sqftart.com", b".blogtitle-box"),
+    (b"425sqftart.com", b".postmetadata"),
+    (b"aber.ac.uk", b".module-x-column-right"),
+    (b"aber.ac.uk", b".notes"),
+    (b"aber.ac.uk", b".reading-cat"),
+    (b"ace-ed.org.uk", b".channelSummaryContainer"),
+    (b"alibris.com", b".product"),
+    (b"allegramarketingprint.com", b"#case-study-wrap"),
+    (b"allegramarketingprint.com", b".content-col"),
+    (b"allegramarketingprint.com", b".inner-wrap"),
+    (b"alt.com", b".rcm"),
+    (b"androidpolice.com", b".dsq-comment-message"),
+    (b"androidpolice.com", b".external"),
+    (b"androidpolice.com", b".list-unstyled"),
+    (b"belangerinc.com", b".shadow_outer"),
+    (b"bellydance.org", b".pageHeading"),
+    (b"bepress.com", b".vc_single_image-img"),
+    (b"bimmerfest.com", b"#intelliTXT"),
+    (b"biotech-capital.com", b".abstract"),
+    (b"blip.fm", b".tweem"),
+    (b"blurb.com", b".features-and-details-section__book-stats"),
+    (b"books.google.com.au", b"#metadata_content_table"),
+    (b"careers.govt.nz", b".csc-textpic-text"),
+    (b"cbssports.com", b".completed-games-table"),
+    (b"cbssports.com", b".profile-news-item-header"),
+    (b"cheftalk.com", b".thread-hier"),
+    (b"cyclonefanatic.com", b".message"),
+    (b"dictionary.cambridge.org", b".cdo-topic"),
+    (b"dictionary.cambridge.org", b".def"),
+    (b"dictionary.cambridge.org", b".main-cloud-preample"),
+    (b"dictionary.reference.com", b".right-rail-container"),
+    (b"dittrickswines.com", b".ch-footer-hidden-description"),
+    (b"duckhuntingchat.com", b".signature"),
+    (b"efloras.org", b"#tableLinkList"),
+    (b"english-subtitles.club", b".promo-center"),
+    (b"eurofound.europa.eu", b".element-invisible"),
+    (b"eurofound.europa.eu", b".field-name-body"),
+    (b"eurofound.europa.eu", b".field-name-field-ef-topic"),
+    (b"fabulous-emma.com", b".maintable"),
+    (b"fangirluprising.com", b".entry-date"),
+    (b"fatsecret.com", b".factPanel"),
+    (b"foodily.com", b"#cards"),
+    (b"gawker.com", b".first-text"),
+    (b"gawker.com", b".headline"),
+    (b"hotrecordsociete.bandcamp.com", b"#bio-text"),
+    (b"hotrecordsociete.bandcamp.com", b"#track_table"),
+    (b"hotrecordsociete.bandcamp.com", b".location"),
+    (b"hsc.wvu.edu", b".rte"),
+    (b"huskers.com", b".FooterText"),
+    (b"huskers.com", b".extendedHeight"),
+    (b"ideas.repec.org", b"#related-body"),
+    (b"ieeexplore.ieee.org", b".col-1-grd"),
+    (b"ieeexplore.ieee.org", b".col-2-grd"),
+    (b"imdb.com", b".filmo-row"),
+    (b"ito-yarn.com", b"#content-area"),
+    (b"ito-yarn.com", b".field-item"),
+    (b"ito-yarn.com", b".field-items"),
+    (b"jessicacarneyassociates.co.uk", b".entry-content"),
+    (b"juanmanuelsara.com", b".continue-link"),
+    (b"kesq.com", b".headline"),
+    (b"kesq.com", b".postedAt"),
+    (b"kesq.com", b".updatedAt"),
+    (b"kingston.ac.uk", b".contentblock"),
+    (b"kingston.ac.uk", b".leftcontentimg"),
+    (b"kohls.com", b"#bv-content-show"),
+    (b"libertysentinel.org", b".article-title"),
+    (b"libertysentinel.org", b".author-links"),
+    (b"libertysentinel.org", b".post-description"),
+    (b"linda-artandmore.blogspot.com", b".profile-datablock"),
+    (b"lowpowerlab.com", b".entry-content"),
+    (b"makemoneyforabsolutebeginner.blogspot.com", b"#header-wrapper"),
+    (b"mastercraft.com", b".fieldset"),
+    (b"morford.rootsandthreads.com", b"#footerw"),
+    (b"mountainguard.com", b".masthead-heading"),
+    (b"mountainguard.com", b".pi-slider"),
+    (b"music.dartmouth.edu", b".content-parent"),
+    (b"nameberry.com", b".lastedited"),
+    (b"nameberry.com", b".signaturecontainer"),
+    (b"ncbi.nlm.nih.gov", b".res_logo"),
+    (b"ncbi.nlm.nih.gov", b".ui-ncbi-toggler-slave"),
+    (b"nvnews.net", b"#nointelliTXT"),
+    (b"pt.usc.edu", b"#ctl00_ctl00_MainContent_ContentSubpageInterior_DropZone_columnDisplay_ctl00_controlcolumn_ctl01_WidgetHost_WidgetHost_widget_CB"),
+    (b"pwmag.com", b".bylineList"),
+    (b"read718.org", b"#input_6_21_1_label"),
+    (b"read718.org", b"#input_6_21_2_label"),
+    (b"read718.org", b"#input_6_29"),
+    (b"read718.org", b"#input_6_38"),
+    (b"read718.org", b".gfield_label"),
+    (b"rosko123.wordpress.com", b".tags"),
+    (b"scienceblogs.com", b".field--type-entity-reference"),
+    (b"scienceblogs.com", b".field--type-text-with-summary"),
+    (b"sevenforums.com", b"#collapseobj_sig_0"),
+    (b"smallbizpages.co.uk", b".listing-details"),
+    (b"smallbizpages.co.uk", b".wpbdp-listing"),
+    (b"smartdevicelink.com", b".github-link"),
+    (b"sports-boards.net", b".blockbody"),
+    (b"spreaker.com", b".track_tags"),
+    (b"stampedia.net", b".stampspec"),
+    (b"thetaborfoundation.org", b".entry-content"),
+    (b"tomshardware.com", b".bbcode"),
+    (b"tomshardware.com", b".spaceL5"),
+    (b"tv.com", b"._standard_sub_module"),
+    (b"tvwbb.com", b".signaturecontainer"),
+    (b"ucsdtritons.com", b"#article_info"),
+    (b"ucsdtritons.com", b".dateArticle"),
+    (b"use.perl.org", b".copyright"),
+    (b"valleyvet.com", b".modal-body"),
+    (b"valleyvet.com", b".modal-header"),
+    (b"vectra-c.com", b"#footer_copyright"),
+    (b"wccftech.com", b".size-large"),
+    (b"wccftech.com", b".wp-video"),
+    (b"weather.weatherbug.com", b"#box-news-hdlns"),
+    (b"weather.weatherbug.com", b"#box-radar-map-preview"),
+    (b"weather.weatherbug.com", b"#box-radar-map-xtra"),
+    (b"weather.weatherbug.com", b"#box-tools"),
+    (b"weather.weatherbug.com", b"#featURLtxt_1"),
+    (b"weather.weatherbug.com", b"#featURLtxt_2"),
+    (b"weather.weatherbug.com", b"#footer-tou"),
+    (b"weather.weatherbug.com", b"#hnav-doppler"),
+    (b"weather.weatherbug.com", b"#hnav-slmap"),
+    (b"weather.weatherbug.com", b"#vnav-allergies-map"),
+    (b"weather.weatherbug.com", b"#vnav-maps"),
+    (b"weather.weatherbug.com", b".boxbody"),
+    (b"weather.weatherbug.com", b".boxhdr"),
+    (b"weather.weatherbug.com", b".boxmore"),
+    (b"weather.weatherbug.com", b".map-preview-wrap"),
+    (b"weather.weatherbug.com", b".th-info"),
+    (b"wowdigsite.com", b"#post-94"),
+    (b"wpbf.com", b".copyright"),
+];
+
 const SITE_VETOES: &[(&[u8], &[u8])] = &[
     (b"itknowledgeexchange.techtarget.com", b"#commentObject-miniReg_v2-form-1"),
     (b"crazydaysandnights.net", b".widget-content"),
