@@ -168,3 +168,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0093 — NEGATIVE: convention unification](0093-NEGATIVE-convention-unification.md) — majority unification is zero-sum, live-verified; per-doc fleet normalization is the only path
 - [0095 — Normalization wave 2](0095-normalization-wave2.md) — 83 docs, 0 failures; vein exhausted on the diminishing curve
 - [0096 — Chrome-class tokens](0096-chrome-class-tokens.md) — deep extraction: 2 ship, widget-content bisected out; lane exhausted
+- [0097 — NEGATIVE census: JSON-LD rescue](0097-NEGATIVE-jsonld-census.md) — 2 fixable docs across 154 candidates; embedded-JSON vein closed
