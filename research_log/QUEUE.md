@@ -81,3 +81,19 @@ a JS layer, not reachable statically). Remaining: 12 forum-misc
 (engines with 1-doc presence), 8 listing/tag (wall), 60 "other" =
 individually-diagnosed singletons at +0.0002-0.0005 each. The grind
 lane remains open but per-cycle yield is now firmly sub-0.001.
+
+## Mid-band family table (0080 fleet, 242 docs — status after 0081)
+| family | docs | status |
+|---|---|---|
+| kept-sidebar-widget | 29 | heterogeneous site CSS — model territory, no generic rule |
+| dropped-list-items | 20 | page-purpose link lists = listing-wall variant |
+| kept-form-chrome | 18 | heterogeneous; no shared classes |
+| dup-content | 15 | CLOSED 0081 (both text + DOM negative) |
+| dropped-images | 15 | CLOSED (27% container-scoped keep; learned-only stands) |
+| kept-footer | 13 | charter keeps copyright; per-doc gold variance |
+| kept-listing-cards/nav/format-links | 30 | walls |
+| gold-noise | 9 | golden v7 candidates (fleet misses) |
+| remainder | ~93 | singletons <=0.3 milli each |
+Verdict: mid-band families resolve into walls, model territory, or
+singletons — matching the 0080 ceiling read. The F1 path at volume
+needs per-doc fleet fixes (owner-gated scale) or new signal classes.
