@@ -142,3 +142,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8268** / Lev **0.7306**
 - [0066 — vBulletin 5 handler](0066-vbulletin5-handler.md) — li.b-post + announcements + golden v3: +0.0009 F1 / +0.0012 Lev both dev targets, zero regressions
 - [0067 — Google Forms handler](0067-google-forms-handler.md) — ss-form questions + choices: +0.0005 F1 both dev targets
 - [0068 — CPAN POD handler](0068-cpan-pod-handler.md) — byte-exact; engine triage lane drained: 5 cycles, +0.0055 F1 golden, zero regressions
+- [0069 — NEGATIVE census: title rescue](0069-NEGATIVE-title-rescue-census.md) — 99 dropped titles, best gate 57% gold-keep; wall #14, format bucket wall-bound
