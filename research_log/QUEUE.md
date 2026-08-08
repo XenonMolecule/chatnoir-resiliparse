@@ -73,3 +73,11 @@ case is wrong bold, small per-instance Lev), so the crater class does
 not apply; still run the full three-target battery and watch for the
 unexplained 0062 parser interaction (verify lawyerfox stays 3277B).
 Gold-side conventions already measured in 0035 (bold-census).
+
+## v5-era loss map (0073 window)
+sub-0.5 golden docs: 81 (0.056 F1 mass). complex.com family = wall #15
+(content in double-escaped JSON script payloads; client-rendered — needs
+a JS layer, not reachable statically). Remaining: 12 forum-misc
+(engines with 1-doc presence), 8 listing/tag (wall), 60 "other" =
+individually-diagnosed singletons at +0.0002-0.0005 each. The grind
+lane remains open but per-cycle yield is now firmly sub-0.001.
