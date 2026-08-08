@@ -151,3 +151,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7321**
 - [0075 — Safe batch](0075-safe-batch.md) — strips + Blogspot widget subset: golden 9-up-0-down; first golden-primary divergence logged
 - [0076 — LiveJournal handler](0076-livejournal-handler.md) — b-singlepost rebuild, probe 0.19→0.98
 - [0077 — Legacy guestbook](0077-legacy-guestbook.md) — condolence rebuild, probe 0.21→0.91; golden-primary divergence #2
+- [0078 — Runtime checkpoint](0078-runtime-checkpoint.md) — 2.90 ms/doc (+6%/5 cycles, logged); engine pool closed; triage-verification policy
