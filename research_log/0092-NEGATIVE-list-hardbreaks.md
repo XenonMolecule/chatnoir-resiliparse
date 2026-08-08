@@ -12,3 +12,9 @@ member measured. Emitting hb on all items would win 83 docs and lose
 
 This measurement likely accounts for a large share of the >=0.85
 bucket's 77 Lev-milli residue identified in the 0080 ceiling analysis.
+
+## Addendum: class-token census (same window)
+The mid-band css_hints yield almost exclusively site-singleton tokens.
+Only `.textwidget` has scale (280 docs) at 9% keep — above the strip
+bar, and block-vetoes carry the 0074/0081 census≠action risk. No ship.
+The class-token vein is mined out at census level.
