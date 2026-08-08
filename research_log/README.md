@@ -135,3 +135,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8223** / Lev **0.7260**
 - [0059 — NEGATIVE: md images v2](0059-NEGATIVE-md-images.md) — golden keeps 9% of walk-visible images, best gate 49% precision: family is learned-selection-only
 - [0060 — NEGATIVE: model-primary](0060-NEGATIVE-model-primary.md) — pure-model selection bounded below hybrid at every tau; architecture settled
 - [0061 — NEGATIVE: confident learning](0061-NEGATIVE-confident-learning.md) — label cleaning neutral; model program closed at settled hybrid optimum
+- [0062 — NEGATIVE: CSS-hidden vetoes](0062-NEGATIVE-css-hidden.md) — three variants; JS-reveal idiom breaks the static proxy + unexplained crater; needs real computed styles
