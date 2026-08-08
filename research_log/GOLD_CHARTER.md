@@ -40,3 +40,10 @@ C2). A sidebar listing ten headlines = noise (rule N4/N5).
   dev_golden.jsonl.gz alongside it.
 - Every fleet edit spec must be mechanically verified (apply → check
   article + comments survive) before inclusion.
+
+## Refinement (owner ruling, 2026-08-08 — biotech-capital case)
+Dated timeline/newswire sections whose entries carry SUMMARY BODY TEXT
+(headline + at least a sentence of prose per entry) are CONTENT, even
+when they link onward — the body-text rule (C2/N5 boundary) governs,
+not the section's teaser-like shape. Bare headline-link lists remain
+noise (N5).
