@@ -4795,6 +4795,25 @@ const SITE_VETOES: &[(&[u8], &[u8])] = &[
     (b"glassdoor.com", b".preIcon20"),
     (b"glassdoor.com", b".successBox"),
     (b"glassdoor.com", b".unsignedCommentLink"),
+
+    (b"census.gov", b"#TopicsMain"),
+    (b"census.gov", b"#TopLink1"),
+    (b"census.gov", b"#TopLink2"),
+    (b"census.gov", b"#TopLink3"),
+    (b"census.gov", b"#TopLink4"),
+    (b"census.gov", b"#TopLink5"),
+    (b"census.gov", b"#TopLink6"),
+    (b"census.gov", b"#TopLink7"),
+    (b"census.gov", b"#TopLink8"),
+    (b"census.gov", b"#TopLink9"),
+    (b"census.gov", b"#TopLink10"),
+    (b"census.gov", b"#TopLink11"),
+    (b"census.gov", b"#GeoLink5"),
+    (b"census.gov", b"#LibLink3"),
+    (b"census.gov", b"#LibLink4"),
+    (b"census.gov", b"#DataLink1"),
+    (b"census.gov", b"#AboutLink3"),
+    (b"census.gov", b"td[bgcolor=\"#FFFFCC\"]"),
 ];
 
 /// Page domain from og:url or canonical link (lowercased, www-stripped).
@@ -4834,6 +4853,53 @@ unsafe fn page_domain(doc: *mut lxb_html_document_t) -> Vec<u8> {
                 }
             }
             child = (*child).next;
+        }
+        // Fallback (0109): no og:url/canonical (pre-social-web pages) —
+        // take the majority host of absolute links when it clearly
+        // dominates (>=10 links and >=60% of all absolute hrefs).
+        if best.is_empty() {
+            let body: *mut lxb_dom_node_t = (*doc).body.cast();
+            if !body.is_null() {
+                let dom_coll = lxb_dom_collection_make_noi((*body).owner_document, 40);
+                lxb_dom_elements_by_tag_name(body.cast(), dom_coll, b"a".as_ptr(), 1);
+                let mut counts: std::collections::HashMap<Vec<u8>, usize> = std::collections::HashMap::new();
+                let mut total = 0usize;
+                for i in 0..lxb_dom_collection_length_noi(dom_coll) {
+                    let a = lxb_dom_collection_node_noi(dom_coll, i);
+                    let href = get_node_attr(a, b"href").to_ascii_lowercase();
+                    if let Some(pos) = href.windows(3).position(|w| w == b"://") {
+                        let rest = &href[pos + 3..];
+                        let end = rest.iter().position(|&b| b == b'/').unwrap_or(rest.len());
+                        let mut d = &rest[..end];
+                        if d.starts_with(b"www.") {
+                            d = &d[4..];
+                        }
+                        if !d.is_empty() {
+                            *counts.entry(d.to_vec()).or_insert(0) += 1;
+                            total += 1;
+                        }
+                    }
+                }
+                lxb_dom_collection_destroy(dom_coll, true);
+                if let Some((d, c)) = counts.into_iter().max_by_key(|(_, c)| *c) {
+                    // Domains whose rules were fitted to og:url-bearing pages
+                    // and misfire on link-majority siblings (0109 bisect).
+                    const FALLBACK_EXCLUDE: &[&[u8]] = &[
+                        b"theserverside.com",
+                        b"pt.usc.edu",
+                        b"usc.edu",
+                        b"bimmerwerkz.com",
+                        b"motoprofi.com",
+                        b"iclassifiedsnetwork.com",
+                        b"menstennisforums.com",
+                        b"cricketarchive.com",
+                        b"convertunits.com",
+                    ];
+                    if c >= 10 && c * 10 >= total * 6 && !FALLBACK_EXCLUDE.contains(&d.as_slice()) {
+                        best = d;
+                    }
+                }
+            }
         }
         best
     }
