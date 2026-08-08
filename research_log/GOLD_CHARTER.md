@@ -47,3 +47,11 @@ Dated timeline/newswire sections whose entries carry SUMMARY BODY TEXT
 when they link onward — the body-text rule (C2/N5 boundary) governs,
 not the section's teaser-like shape. Bare headline-link lists remain
 noise (N5).
+
+## Refinement (owner ruling, 2026-08-08 — weatherbug case)
+An edit must not reduce a document to a husk. If applying a spec leaves
+<300 chars or <15% of the original, the edit is suspect: legitimate
+ONLY when the removed mass is unambiguous junk (N1/N2 dumps) or pure
+no-body-text chrome. Data/listing/widget sections on a page ABOUT that
+data (weather modules on a weather page) are content. When in doubt,
+the edit is the error, not the doc.
