@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_cpan_pod,
                 extract_gforms,
                 extract_vbulletin5,
                 extract_yahoo_mb,
@@ -3943,6 +3944,78 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// (gold bolds them) with choice lists in `ul.ss-choices li` (gold
 /// renders `- choice  ` with hard breaks). Fires only on the ss-form
 /// wrapper; description text comes from the generic walk of the header.
+/// search.cpan.org POD handler (cycle 0068): section h1s (with the
+/// tucs up.gif anchor) render as `**HEADING**` in gold, preceded by the
+/// module abstract as a bare title line; `pre.sh_perl` becomes a perl
+/// fence. Gate: the tucs up-arrow image (template-unique).
+unsafe fn extract_cpan_pod(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        if query_selector_all_raw(doc, body, b"img[src*=\"tucs/img/up.gif\"]").is_empty() {
+            return None;
+        }
+        let h1s = query_selector_all_raw(doc, body, b"h1");
+        if h1s.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        let mut sections = 0usize;
+        for (idx, &h) in h1s.iter().enumerate() {
+            let mut heading = collapsed_text(h);
+            if let Some(strip) = heading.strip_suffix('^') {
+                heading = strip.trim_end().to_string();
+            }
+            if heading.is_empty() {
+                continue;
+            }
+            // section body: siblings until the next h1
+            let mut section = String::new();
+            let mut n = (*h).next;
+            while !n.is_null() && (*n).local_name != LXB_TAG_H1 {
+                if (*n).type_ == LXB_DOM_NODE_TYPE_ELEMENT {
+                    let tagname = get_qualified_name(n);
+                    if tagname == b"pre" {
+                        let code = String::from_utf8_lossy(&get_node_text(n)).to_string();
+                        let lang = if get_node_attr(n, b"class").windows(7).any(|w| w == b"sh_perl") {
+                            "perl"
+                        } else {
+                            ""
+                        };
+                        section.push_str(&format!("\n```{}\n{}\n```\n", lang, code.trim_end()));
+                    } else {
+                        let t = extract_plain_text_from_node(doc, n, opts);
+                        if !t.trim().is_empty() {
+                            section.push('\n');
+                            section.push_str(t.trim_end());
+                            section.push('\n');
+                        }
+                    }
+                }
+                n = (*n).next;
+            }
+            if idx == 0 && heading == "NAME" {
+                // abstract line leads the document
+                let first = section.trim().lines().next().unwrap_or("").to_string();
+                if !first.is_empty() {
+                    out.push_str(&first);
+                    out.push('\n');
+                }
+            }
+            out.push_str(&format!("\n**{}**\n", heading));
+            out.push_str(&section);
+            sections += 1;
+        }
+        if sections >= 2 {
+            Some(out.trim().to_string())
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn extract_gforms(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
