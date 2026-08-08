@@ -3367,7 +3367,7 @@ unsafe fn wp_comment_rebuild(
         if body.is_null() {
             return None;
         }
-        let items = query_selector_all_raw(doc, body, b"li.comment, div.comment[id^=\"comment\"], div.oneComment");
+        let items = query_selector_all_raw(doc, body, b"li.comment, div.comment[id^=\"comment\"], div.oneComment, li.social-comment");
         if items.len() < 2 {
             return None;
         }
@@ -3380,7 +3380,7 @@ unsafe fn wp_comment_rebuild(
             let mut author = query_selector_all_raw(
                 doc,
                 c,
-                b".comment-author .fn, cite.fn, .comment-author cite, .c-head a.url, .comment-author b, .comment-author a, .commentAuthorLink",
+                b".comment-author .fn, cite.fn, .comment-author cite, .c-head a.url, .comment-author b, .comment-author a, .commentAuthorLink, cite.social-fn",
             )
             .first()
             .map(|&n| collapsed_text(n))
@@ -3402,7 +3402,7 @@ unsafe fn wp_comment_rebuild(
             let mut date = query_selector_all_raw(
                 doc,
                 c,
-                b".comment-metadata, .comment-meta, .commentmetadata, .c-date, .c-head span, time, .commentAuthor a",
+                b".comment-metadata, .comment-meta, .commentmetadata, .c-date, .c-head span, time, .commentAuthor a, .social-comment-meta a",
             )
             .iter()
             .map(|&n| collapsed_text(n))
@@ -3419,7 +3419,7 @@ unsafe fn wp_comment_rebuild(
             let Some(&bn) = query_selector_all_raw(
                 doc,
                 c,
-                b".comment-content, .c-body, .commenttext, .comment-text, .comment-body, .commentContent",
+                b".comment-content, .c-body, .commenttext, .comment-text, .comment-body, .commentContent, .social-comment-body",
             )
             .first() else {
                 continue;

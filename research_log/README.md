@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8273** / Lev **0.7311** (0070) · golden **0.8399/0.7518** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8279** / Lev **0.7318** (0071) · golden **0.8405/0.7525** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -144,3 +144,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8273** / Lev **0.7311**
 - [0068 — CPAN POD handler](0068-cpan-pod-handler.md) — byte-exact; engine triage lane drained: 5 cycles, +0.0055 F1 golden, zero regressions
 - [0069 — NEGATIVE census: title rescue](0069-NEGATIVE-title-rescue-census.md) — 99 dropped titles, best gate 57% gold-keep; wall #14, format bucket wall-bound
 - [0070 — oneComment theme](0070-onecomment-theme.md) — WP rebuild selectors: 13KB comments recovered, +0.0005 both dev targets
+- [0071 — Social-plugin comments](0071-social-comments.md) — golden crosses 0.84 F1; 8th straight zero-regression ship
