@@ -1,0 +1,22 @@
+[
+ {
+  "url": "https://coolestfamilyontheblock.com/2010/12/01/my-letter-to-santa-1984/?replytocom=833",
+  "note": "gold dropped 16 nested CoolMama reply comments; comments are content C3"
+ },
+ {
+  "url": "https://www.playfire.com/game/stalker-call-of-pripyat-2",
+  "note": "gold dropped feed-item comment threads (Esski, ruben6f et al.); comments are content C3"
+ },
+ {
+  "url": "http://www.sirstevesguide.com/archive/index.php/t-37960.html",
+  "note": "gold swapped 2 ASCII hyphens to U+2011 absent in source; needs char repair not removal"
+ },
+ {
+  "url": "http://forum.realityfanforum.com/index.php/topic,20715.msg471365.html",
+  "note": "gold dropped later real posts (realshowfan, Moo); forum posts are content C3"
+ },
+ {
+  "url": "http://www.hometheaterforum.com/topic/45610-comprehensive-non-oar-dvd-list/",
+  "note": "gold dropped first-post br-separated movie title list (thread core content)"
+ }
+]
