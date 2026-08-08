@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0096) · golden **0.8490/0.7636** (v11) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0098) · golden **0.8507/0.7659** (v11) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -169,3 +169,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0095 — Normalization wave 2](0095-normalization-wave2.md) — 83 docs, 0 failures; vein exhausted on the diminishing curve
 - [0096 — Chrome-class tokens](0096-chrome-class-tokens.md) — deep extraction: 2 ship, widget-content bisected out; lane exhausted
 - [0097 — NEGATIVE census: JSON-LD rescue](0097-NEGATIVE-jsonld-census.md) — 2 fixable docs across 154 candidates; embedded-JSON vein closed
+- [0098 — Domain-gated site vetoes](0098-site-vetoes.md) — NEW mechanism, zero cross-site risk: **+0.0017 F1 / +0.0023 Lev golden**; F1 crosses 0.85

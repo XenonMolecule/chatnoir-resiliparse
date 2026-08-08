@@ -1967,7 +1967,18 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
                 if body.is_null() {
                     None
                 } else {
-                    let (v, grid, wl, mv, mvm, pld) = tpl_vetoes(generator_kind(doc), body);
+                    let (mut v, grid, wl, mv, mvm, pld) = tpl_vetoes(generator_kind(doc), body);
+                    // domain-gated site vetoes (0098)
+                    let dom = page_domain(doc);
+                    if !dom.is_empty() {
+                        for (d_, sel) in SITE_VETOES {
+                            if dom == *d_ {
+                                for n in query_selector_all_raw(doc, body, sel) {
+                                    v.insert(n);
+                                }
+                            }
+                        }
+                    }
                     page_has_card_grid = grid;
                     model_whitelist = wl;
                     model_veto_nodes = mv;
@@ -2893,6 +2904,80 @@ unsafe fn tpl_vetoes(
         }
         let pld = totals.link_len as f64 / totals.text_len.max(1) as f64;
         (vetoes, large_repeated, whitelist, model_veto, model_veto_mass, pld)
+    }
+}
+
+/// Domain-gated selector vetoes (cycle 0098): site-specific chrome
+/// containers verified chrome-only on their doc (0096 extraction).
+/// Fires ONLY on its own domain (og:url/canonical) — zero cross-site
+/// risk by construction.
+const SITE_VETOES: &[(&[u8], &[u8])] = &[
+    (b"itknowledgeexchange.techtarget.com", b"#commentObject-miniReg_v2-form-1"),
+    (b"crazydaysandnights.net", b".widget-content"),
+    (b"digitimes.com", b".mr-box"),
+    (b"kottke.org", b"#side"),
+    (b"phabricator.wikimedia.org", b".phabricator-standard-page-footer"),
+    (b"blogs.iptv.org", b"#allsidebars"),
+    (b"straightdope.com", b"#widgets_column"),
+    (b"waitrose.com", b".ratingform"),
+    (b"witchesandpagans.com", b"#latest-posts"),
+    (b"npbearings.com", b".textwidget"),
+    (b"milngavieherald.co.uk", b".trending-stories__list"),
+    (b"trophytracking.com", b"#copyrights-area"),
+    (b"childrenwithdiabetes.com", b".texttiny"),
+    (b"philamuseum.org", b"#folksonomy"),
+    (b"thorax.bmj.com", b".highwire-extract-pdf-wrapper"),
+    (b"ornaross.com", b".header-center"),
+    (b"slideshare.net", b".ssActions"),
+    (b"borderlands.fandom.com", b"#ca-viewsource"),
+    (b"honeynet.org", b"#sidebar-right"),
+    (b"tablethotels.com", b"#hotel-rates-and-rooms"),
+    (b"energy.opendata.ch", b"#menu-menu-1"),
+    (b"cheatmasters.com", b".footertext"),
+    (b"partitionsdechansons.com", b".frame_bordure2"),
+    (b"nsf.gov", b".pageheadline"),
+    (b"mitsuko2011.com", b".related-posts"),
+];
+
+/// Page domain from og:url or canonical link (lowercased, www-stripped).
+unsafe fn page_domain(doc: *mut lxb_html_document_t) -> Vec<u8> {
+    unsafe {
+        let head: *mut lxb_dom_node_t = (*doc).head.cast();
+        if head.is_null() {
+            return Vec::new();
+        }
+        let mut best: Vec<u8> = Vec::new();
+        let mut child = (*head).first_child;
+        while !child.is_null() {
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT {
+                let url_attr: Vec<u8> = if (*child).local_name == LXB_TAG_META
+                    && get_node_attr(child, b"property") == b"og:url"
+                {
+                    get_node_attr(child, b"content").to_vec()
+                } else if (*child).local_name == LXB_TAG_LINK
+                    && get_node_attr(child, b"rel") == b"canonical"
+                {
+                    get_node_attr(child, b"href").to_vec()
+                } else {
+                    Vec::new()
+                };
+                if !url_attr.is_empty() {
+                    let s = url_attr.to_ascii_lowercase();
+                    if let Some(pos) = s.windows(3).position(|w| w == b"://") {
+                        let rest = &s[pos + 3..];
+                        let end = rest.iter().position(|&b| b == b'/').unwrap_or(rest.len());
+                        let mut d = &rest[..end];
+                        if d.starts_with(b"www.") {
+                            d = &d[4..];
+                        }
+                        best = d.to_vec();
+                        break;
+                    }
+                }
+            }
+            child = (*child).next;
+        }
+        best
     }
 }
 
