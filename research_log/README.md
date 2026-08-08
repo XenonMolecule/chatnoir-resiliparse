@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8399** / Lev **0.7453** (0101) · golden **0.8647/0.7812** (v11) — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8435** / Lev **0.7494** (0102) · golden **0.8683/0.7855** (v11) — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -173,3 +173,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8399** / Lev **0.7453**
 - [0099 — Site-veto wave 2](0099-site-vetoes-wave2.md) — 271 rules: **+0.0055 F1 / +0.0068 Lev golden**, the journey largest extractor gain
 - [0100 — Site-veto wave 3](0100-site-vetoes-wave3.md) — 266 net new rules: golden 0.8610/0.7775; lane total +0.0120/+0.0139
 - [0101 — Site whitelist wave 4](0101-site-whitelist-wave4.md) — recall mirror: golden crosses 0.86/0.78; four-wave lane +0.0157/+0.0176
+- [0102 — Site-rules wave 5](0102-site-rules-wave5.md) — 726 dual rules + permanent blocklist: golden 0.8683/0.7855; lane +0.0193/+0.0219
