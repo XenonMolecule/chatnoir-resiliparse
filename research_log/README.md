@@ -165,3 +165,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0089 — Golden v9](0089-golden-v9-typography.md) — phantom U+2011/U+202F normalized source-gated (625 docs): the old typography wall was gold noise
 - [0090 — NEGATIVE: quote/dash normalization](0090-NEGATIVE-quote-dash-normalization.md) — cp1252 mojibake defeats the naive source-absence test; v9 stands
 - [0092 — NEGATIVE census: list hard-breaks](0092-NEGATIVE-list-hardbreaks.md) — 46%-vs-4% convention is per-doc coin-flip; largest Lev-residue member measured
+- [0093 — NEGATIVE: convention unification](0093-NEGATIVE-convention-unification.md) — majority unification is zero-sum, live-verified; per-doc fleet normalization is the only path
