@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8282** / Lev **0.7323** (0072) · golden **0.8405/0.7526** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8282** / Lev **0.7323** (0072) · golden **0.8424/0.7546** (v5) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -146,3 +146,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8282** / Lev **0.7323**
 - [0070 — oneComment theme](0070-onecomment-theme.md) — WP rebuild selectors: 13KB comments recovered, +0.0005 both dev targets
 - [0071 — Social-plugin comments](0071-social-comments.md) — golden crosses 0.84 F1; 8th straight zero-regression ship
 - [0072 — Related-section strip](0072-related-section-strip.md) — guarded post-pass, prototyped-then-ported: +0.0003/+0.0005 dev, zero craters
+- [0073 — Golden v4/v5](0073-golden-v4-v5.md) — 3 gold repairs + owner timeline ruling swept fleet-wide: golden 0.8424/0.7546
