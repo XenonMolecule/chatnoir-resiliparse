@@ -7671,10 +7671,47 @@ fn strip_ui_label_lines(text: String) -> String {
         "i want!", "tag a friend", "be the first to post a tip",
         "please follow and like us:", "error: content is protected !!",
         "new schedule b search engine", "newest trade data!",
+        "bookmark the permalink.", "bookmark the permalink",
+        "linkback",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
+    // vBulletin "Similar Threads" teaser table (0107): a single-cell table
+    // header row opens the block; skip table rows until a non-table line.
+    let mut in_similar_table = false;
     for line in text.split('\n') {
+        if in_similar_table {
+            if line.trim_start().starts_with('|') || line.trim().is_empty() {
+                removed_any = true;
+                continue;
+            }
+            in_similar_table = false;
+        }
+        let lt_full = line.trim();
+        if lt_full.eq_ignore_ascii_case("| similar threads |") {
+            in_similar_table = true;
+            removed_any = true;
+            continue;
+        }
+        // Forum status line: "Currently Active Users Viewing This Thread: ..."
+        if lt_full.len() < 90
+            && lt_full
+                .to_lowercase()
+                .starts_with("currently active users viewing this thread")
+        {
+            removed_any = true;
+            continue;
+        }
+        // WordPress attachment-page suffix: "… | Full size is 640 × 425
+        // pixels" tails the kept byline; drop the suffix, keep the byline.
+        if let Some(pos) = line.to_lowercase().find(" | full size is ") {
+            if line.trim_end().to_lowercase().ends_with("pixels") {
+                removed_any = true;
+                out.push_str(line[..pos].trim_end());
+                out.push('\n');
+                continue;
+            }
+        }
         let was_heading = line.trim_start().starts_with('#');
         let t = line.trim().trim_start_matches(['-', '\u{2022}', '#', ' ']).trim();
         let t = t.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.').trim();
