@@ -160,3 +160,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0084 — Strip batch 4](0084-strip-batch4.md) — 8 lines at 0-5% keep: 370 docs up across splits
 - [0085 — Orphan headings](0085-orphan-headings.md) — empty-section chrome headings: 283 docs up, zero craters
 - [0086 — Menu strip; census mined out](0086-menu-strip.md) — last strip above the bar; single-line census closed
+- [0087 — NEGATIVE: linky veto](0087-NEGATIVE-linky-veto.md) — conditioned thresholds double-count model features; operating point confirmed from 5th direction
