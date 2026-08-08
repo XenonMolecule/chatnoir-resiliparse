@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_vbulletin5,
                 extract_yahoo_mb,
                 extract_perlmonks,
                 extract_nabble,
@@ -3933,6 +3934,87 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// Yahoo message-board thread handler (cycle 0064): `.mb-message-body`
 /// blocks with `.mb-author-actual` author, `.mb-timestamp abbr` time and
 /// `.mb-message-bd` body. Gold: `**author — time**  \nbody`.
+/// vBulletin 5 thread handler (cycle 0066): posts in `div.b-post` with
+/// `div.author strong` (or b-username) author, `time[itemprop=dateCreated]`
+/// visible text, body `div.js-post__content-text` (falls back to
+/// `.b-post__content`). Gold: `**author — date**` + body.
+unsafe fn extract_vbulletin5(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let posts_sel = query_selector_all_raw(doc, body, b"li.b-post, div.b-post");
+        if posts_sel.is_empty() {
+            return None;
+        }
+        let mut out = String::new();
+        let mut posts = 0usize;
+        let mut total = 0usize;
+        let page_text_len = get_collapsed_string(&get_node_text(body)).len();
+        // Announcement modules precede the thread and gold keeps them
+        // (pacersdigest rules post, 0066); emit before the post stream.
+        for &an in query_selector_all_raw(doc, body, b"div.announcement-tabs")
+            .iter()
+            .take(1)
+        {
+            let text = extract_plain_text_from_node(doc, an, opts);
+            let t = text.trim();
+            if !t.is_empty() {
+                out.push_str("# Announcement\n\n");
+                out.push_str(t);
+            }
+        }
+        for &c in &posts_sel {
+            let author = query_selector_all_raw(doc, c, b"div.author strong, .b-username, .author a")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let mut date = query_selector_all_raw(doc, c, b"time")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            if date.len() > 48 {
+                date.truncate(0);
+            }
+            let Some(&bn) = query_selector_all_raw(doc, c, b"div.js-post__content-text, .b-post__content")
+                .first()
+            else {
+                continue;
+            };
+            // post-count chip, duplicated timestamp and title live inside
+            // the content container on some skins — skip them
+            let mut sub = ExtractOpts { main_content: false, ..opts.clone() };
+            sub.skip_elements.push(".b-post__count".to_string());
+            sub.skip_elements.push(".OLD__post-date".to_string());
+            sub.skip_elements.push("h2".to_string());
+            sub.skip_elements.push(".b-post__title".to_string());
+            let text = extract_plain_text_from_node_opts(doc, bn, &sub);
+            if author.is_empty() || text.trim().is_empty() {
+                continue;
+            }
+            total += text.len();
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("\n\n");
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        let dated_single = posts == 1 && out.contains('\u{2014}');
+        if (posts >= 2 && total * 4 >= page_text_len) || dated_single {
+            Some(out)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn extract_yahoo_mb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();

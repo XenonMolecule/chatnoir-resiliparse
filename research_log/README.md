@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8248** / Lev **0.7284** (0065) · golden **0.8363/0.7485** (v2) · train 0.8144/0.7157 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8257** / Lev **0.7296** (0066) · golden **0.8383/0.7502** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -139,3 +139,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8248** / Lev **0.7284**
 - [0063 — NEGATIVE: CSS-bold](0063-NEGATIVE-css-bold.md) — signal wrong, not the code: gold bolds a curated subset of visually-bold text; wall #6 sealed both directions
 - [0064 — Yahoo mb handler](0064-yahoo-mb-handler.md) — one-off engine, one doc 0.07→0.9: +0.0009 F1 both targets, zero regressions
 - [0065 — Single-post threads + golden v2](0065-single-post-threads.md) — dated 1-post relaxation + owner review round 1: +0.0016 F1 dev, zero dev regressions
+- [0066 — vBulletin 5 handler](0066-vbulletin5-handler.md) — li.b-post + announcements + golden v3: +0.0009 F1 / +0.0012 Lev both dev targets, zero regressions
