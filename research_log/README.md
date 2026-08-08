@@ -163,3 +163,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0087 — NEGATIVE: linky veto](0087-NEGATIVE-linky-veto.md) — conditioned thresholds double-count model features; operating point confirmed from 5th direction
 - [0088 — Golden v8](0088-golden-v8-augments.md) — five augment repairs incl. a misattribution fix: 0.8488/0.7612
 - [0089 — Golden v9](0089-golden-v9-typography.md) — phantom U+2011/U+202F normalized source-gated (625 docs): the old typography wall was gold noise
+- [0090 — NEGATIVE: quote/dash normalization](0090-NEGATIVE-quote-dash-normalization.md) — cp1252 mojibake defeats the naive source-absence test; v9 stands
