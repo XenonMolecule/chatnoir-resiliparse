@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_livejournal,
                 extract_cpan_pod,
                 extract_gforms,
                 extract_vbulletin5,
@@ -3948,6 +3949,78 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// tucs up.gif anchor) render as `**HEADING**` in gold, preceded by the
 /// module abstract as a bare title line; `pre.sh_perl` becomes a perl
 /// fence. Gate: the tucs up-arrow image (template-unique).
+/// LiveJournal single-post handler (cycle 0076): `.b-singlepost` page —
+/// gold is `**username — date**`, display name, `**Tags:** ...`, `---`,
+/// `# title`, then the post body. Username from data-ljuser, date from
+/// the time element's text (links collapsed), display name from
+/// .b-singlepost-author-user-screen (text before the paren).
+unsafe fn extract_livejournal(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let posts = query_selector_all_raw(doc, body, b"article.b-singlepost-body, .b-singlepost-bodywrapper");
+        if posts.is_empty() {
+            return None;
+        }
+        let scoped = query_selector_all_raw(doc, body, b".b-singlepost-author [data-ljuser]");
+        let user = scoped
+            .first()
+            .or(query_selector_all_raw(doc, body, b"[data-ljuser]").first())
+            .map(|&n| String::from_utf8_lossy(&get_node_attr(n, b"data-ljuser")).trim().to_string())
+            .unwrap_or_default();
+        if user.is_empty() {
+            return None;
+        }
+        let mut date = query_selector_all_raw(doc, body, b".b-singlepost-author-date, time")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        date = date.replace(' ', " ");
+        if date.len() > 48 {
+            date.truncate(0);
+        }
+        let screen = query_selector_all_raw(doc, body, b".b-singlepost-author-user-screen")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .map(|t| t.split('(').next().unwrap_or("").trim().to_string())
+            .unwrap_or_default();
+        let title = query_selector_all_raw(doc, body, b"h1.b-singlepost-title, .b-singlepost-title")
+            .first()
+            .map(|&n| collapsed_text(n))
+            .unwrap_or_default();
+        let tags: Vec<String> = query_selector_all_raw(doc, body, b".b-singlepost-tags a, .b-singlepost-tag")
+            .iter()
+            .map(|&n| collapsed_text(n))
+            .filter(|t| !t.is_empty())
+            .collect();
+        let mut out = String::new();
+        if date.is_empty() {
+            out.push_str(&format!("**{user}**\n\n"));
+        } else {
+            out.push_str(&format!("**{user} \u{2014} {date}**\n\n"));
+        }
+        if !screen.is_empty() {
+            out.push_str(&screen);
+            out.push_str("\n\n");
+        }
+        if !tags.is_empty() {
+            out.push_str(&format!("**Tags:** {}\n\n", tags.join(", ")));
+        }
+        out.push_str("---\n\n");
+        if !title.is_empty() {
+            out.push_str(&format!("# {}\n", title.trim()));
+        }
+        let text = extract_plain_text_from_node(doc, posts[0], opts);
+        if !text.trim().is_empty() {
+            out.push('\n');
+            out.push_str(text.trim_end());
+        }
+        Some(out.trim_end().to_string())
+    }
+}
+
 unsafe fn extract_cpan_pod(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
