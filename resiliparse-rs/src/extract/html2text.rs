@@ -5220,6 +5220,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // ("Author\tMessage", 0048)
             text = normalize_tabs(text);
             text = strip_ui_label_lines(text);
+            text = strip_related_sections(text);
             text = promote_heading_levels(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
             // gold keeps repeats on some templates; disabled pending
@@ -5385,7 +5386,77 @@ fn normalize_tabs(text: String) -> String {
 fn md_post_passes(text: String) -> String {
     let text = normalize_tabs(text);
     let text = strip_ui_label_lines(text);
+    let text = strip_related_sections(text);
     promote_heading_levels(text)
+}
+
+/// Related/teaser section strip (cycle 0072): a heading in the
+/// related-content family plus its short link-teaser section (guarded:
+/// <=25 lines, <=max(600, 15% of doc) chars, no prose line >200 chars —
+/// the tampabay guard: unbounded consumption ate an article).
+fn strip_related_sections(text: String) -> String {
+    fn is_rel_heading(t: &str) -> Option<usize> {
+        let t = t.trim();
+        if !t.starts_with('#') {
+            return None;
+        }
+        let lvl = t.len() - t.trim_start_matches('#').len();
+        let rest = t.trim_start_matches('#').trim().to_lowercase();
+        const FAMS: &[&str] = &[
+            "you may also", "related articles", "related posts", "related stories",
+            "related news", "related content", "more from", "recommended for you",
+            "see also", "around the web", "popular posts", "popular articles", "trending",
+        ];
+        if FAMS.iter().any(|f| rest.starts_with(f)) {
+            Some(lvl)
+        } else {
+            None
+        }
+    }
+    if !text.contains('#') {
+        return text;
+    }
+    let lines: Vec<&str> = text.split('\n').collect();
+    let total = text.len();
+    let mut out: Vec<&str> = Vec::with_capacity(lines.len());
+    let mut i = 0usize;
+    let mut changed = false;
+    while i < lines.len() {
+        if let Some(lvl) = is_rel_heading(lines[i]) {
+            let mut j = i + 1;
+            while j < lines.len() {
+                let t = lines[j].trim_start();
+                if t.starts_with('#') && (t.len() - t.trim_start_matches('#').len()) <= lvl {
+                    break;
+                }
+                j += 1;
+            }
+            let seg: Vec<&&str> = lines[i + 1..j].iter().filter(|l| !l.trim().is_empty()).collect();
+            let seg_chars: usize = seg.iter().map(|l| l.len()).sum();
+            // absolute floor only for large docs: on small pages the
+            // section must stay a minor share (quote-site craters, 0072)
+            let cap = std::cmp::max(600, total * 3 / 20);
+            if seg.len() <= 25
+                && seg_chars <= cap
+                && seg_chars * 4 <= total
+                && !seg.iter().any(|l| l.trim().len() > 200)
+            {
+                changed = true;
+                i = j;
+                continue;
+            }
+        }
+        out.push(lines[i]);
+        i += 1;
+    }
+    if !changed {
+        return text;
+    }
+    let mut s = out.join("\n");
+    while s.contains("\n\n\n") {
+        s = s.replace("\n\n\n", "\n\n");
+    }
+    s
 }
 
 fn strip_ui_label_lines(text: String) -> String {
