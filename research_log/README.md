@@ -170,3 +170,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0096 — Chrome-class tokens](0096-chrome-class-tokens.md) — deep extraction: 2 ship, widget-content bisected out; lane exhausted
 - [0097 — NEGATIVE census: JSON-LD rescue](0097-NEGATIVE-jsonld-census.md) — 2 fixable docs across 154 candidates; embedded-JSON vein closed
 - [0098 — Domain-gated site vetoes](0098-site-vetoes.md) — NEW mechanism, zero cross-site risk: **+0.0017 F1 / +0.0023 Lev golden**; F1 crosses 0.85
+- [0099 — Site-veto wave 2](0099-site-vetoes-wave2.md) — 271 rules: **+0.0055 F1 / +0.0068 Lev golden**, the journey largest extractor gain
