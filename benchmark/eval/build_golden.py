@@ -8,6 +8,10 @@ specs = {json.loads(l)['warc_record_id']: json.loads(l) for l in open(SPECS) if 
 REPAIRS = 'research_log/gold_repairs.jsonl'
 import os
 repairs = {}
+NORM = 'research_log/gold_normalized.jsonl'
+normalized = {}
+if os.path.exists(NORM):
+    normalized = {json.loads(l)['warc_record_id']: json.loads(l)['normalized_gold'] for l in open(NORM) if l.strip()}
 if os.path.exists(REPAIRS):
     repairs = {json.loads(l)['warc_record_id']: json.loads(l)['repaired_gold'] for l in open(REPAIRS) if l.strip()}
 def apply_spec(gold, spec):
@@ -38,7 +42,9 @@ with gzip.open(SRC,'rt') as fin, gzip.open(DST,'wt') as fout:
         if '\u202f' in g and '\u202f' not in d['html'] and '&#8239;' not in d['html']:
             d['final_output'] = g = g.replace('\u202f', ' '); d['gold_typo_fixed'] = True
         if d.get('gold_typo_fixed'): n += 1
-        if k in repairs:
+        if k in normalized:
+            d['final_output'] = normalized[k]; d['gold_normalized'] = True; n += 1
+        elif k in repairs:
             d['final_output'] = repairs[k]; d['gold_edited'] = True; d['gold_repaired'] = True; n += 1
         elif k in specs:
             ng = apply_spec(d['final_output'], specs[k])
