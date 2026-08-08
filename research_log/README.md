@@ -153,3 +153,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7321**
 - [0077 — Legacy guestbook](0077-legacy-guestbook.md) — condolence rebuild, probe 0.21→0.91; golden-primary divergence #2
 - [0078 — Runtime checkpoint](0078-runtime-checkpoint.md) — 2.90 ms/doc (+6%/5 cycles, logged); engine pool closed; triage-verification policy
 - [0079 — NEGATIVE: domain conventions](0079-NEGATIVE-domain-conventions.md) — walls are per-doc annotator variance, not site style; last cheap arbitration idea closed
+- [0080 — Ceiling analysis](0080-ceiling-analysis.md) — Lev goal at the annotator-variance ceiling; F1 path runs through the 242-doc mid-band (fleet-shaped volume)
