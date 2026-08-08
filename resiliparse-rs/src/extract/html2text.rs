@@ -5001,6 +5001,14 @@ const BLOGGER_CHROME_SELECTORS: &[&[u8]] = &[
     b".blog-pager",
     b"#blog-pager",
     b".post-labels",
+    // unambiguous sidebar widgets (0075). Image/Profile/Label widgets are
+    // EXCLUDED: they carry content on some templates (poltavabloggen
+    // crater in the 0074 combined test).
+    b".widget.LinkList",
+    b".widget.BlogArchive",
+    b".widget.FollowByEmail",
+    b".widget.Attribution",
+    b".widget.Followers",
 ];
 
 unsafe fn extract_plain_text_from_doc(
@@ -5499,6 +5507,9 @@ fn strip_ui_label_lines(text: String) -> String {
         "smilies are on", "[img] code is on", "posting rules",
         "thread tools", "you may not post attachments",
         "you may not edit your posts",
+        "i want!", "tag a friend", "be the first to post a tip",
+        "please follow and like us:", "error: content is protected !!",
+        "new schedule b search engine", "newest trade data!",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
