@@ -5675,7 +5675,21 @@ fn strip_ui_label_lines(text: String) -> String {
         // genuine gold content (form pages); only strip heading lines whose
         // label is unambiguous chrome (multi-word or long).
         let heading_ok = !was_heading || tl.contains(' ') || tl.len() >= 10;
-        if !tl.is_empty() && heading_ok && LABELS.contains(&tl.as_str()) {
+        // Forum postbit user-stats prefixes (0082): "Joined:", "Posts: N",
+        // "Rep Power: N" etc. — 0-6% gold keep-rate across 3.5K instances.
+        // Location: excluded (13% keep — real content on some pages).
+        let postbit = !was_heading
+            && tl.len() < 40
+            && (tl.starts_with("joined:")
+                || tl.starts_with("join date:")
+                || tl.starts_with("rep power:")
+                || (tl.starts_with("posts:")
+                    && tl[6..].trim().chars().all(|c| c.is_ascii_digit() || c == ','))
+                || (tl.starts_with("thanks:")
+                    && tl[7..].trim().chars().all(|c| c.is_ascii_digit() || c == ','))
+                || (tl.ends_with(" posts")
+                    && tl[..tl.len() - 6].trim().chars().all(|c| c.is_ascii_digit())));
+        if !tl.is_empty() && (postbit || (heading_ok && LABELS.contains(&tl.as_str()))) {
             removed_any = true;
             continue;
         }

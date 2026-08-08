@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7321** (0077) · golden **0.8469/0.7587** (v6) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8287** / Lev **0.7325** (0082) · golden **0.8473/0.7591** (v6) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -155,3 +155,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7321**
 - [0079 — NEGATIVE: domain conventions](0079-NEGATIVE-domain-conventions.md) — walls are per-doc annotator variance, not site style; last cheap arbitration idea closed
 - [0080 — Ceiling analysis](0080-ceiling-analysis.md) — Lev goal at the annotator-variance ceiling; F1 path runs through the 242-doc mid-band (fleet-shaped volume)
 - [0081 — NEGATIVE ×2: dedup family](0081-NEGATIVE-dedup-family.md) — text-level dedup sealed (wall #5, 3rd attempt); DOM-gated summary veto census-live divergence
+- [0082 — Postbit strips](0082-postbit-strips.md) — Joined/Posts/Rep-Power prefixes at 0-6% keep: 15 dev docs up, zero down
