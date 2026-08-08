@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0094) · golden **0.8489/0.7631** (v10) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0095) · golden **0.8489/0.7634** (v11) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -166,3 +166,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0090 — NEGATIVE: quote/dash normalization](0090-NEGATIVE-quote-dash-normalization.md) — cp1252 mojibake defeats the naive source-absence test; v9 stands
 - [0092 — NEGATIVE census: list hard-breaks](0092-NEGATIVE-list-hardbreaks.md) — 46%-vs-4% convention is per-doc coin-flip; largest Lev-residue member measured
 - [0093 — NEGATIVE: convention unification](0093-NEGATIVE-convention-unification.md) — majority unification is zero-sum, live-verified; per-doc fleet normalization is the only path
+- [0095 — Normalization wave 2](0095-normalization-wave2.md) — 83 docs, 0 failures; vein exhausted on the diminishing curve
