@@ -136,3 +136,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8223** / Lev **0.7260**
 - [0060 — NEGATIVE: model-primary](0060-NEGATIVE-model-primary.md) — pure-model selection bounded below hybrid at every tau; architecture settled
 - [0061 — NEGATIVE: confident learning](0061-NEGATIVE-confident-learning.md) — label cleaning neutral; model program closed at settled hybrid optimum
 - [0062 — NEGATIVE: CSS-hidden vetoes](0062-NEGATIVE-css-hidden.md) — three variants; JS-reveal idiom breaks the static proxy + unexplained crater; needs real computed styles
+- [0063 — NEGATIVE: CSS-bold](0063-NEGATIVE-css-bold.md) — signal wrong, not the code: gold bolds a curated subset of visually-bold text; wall #6 sealed both directions
