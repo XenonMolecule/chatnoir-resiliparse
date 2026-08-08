@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0088) · golden **0.8488/0.7612** (v8) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0089) · golden **0.8489/0.7624** (v9) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -162,3 +162,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328**
 - [0086 — Menu strip; census mined out](0086-menu-strip.md) — last strip above the bar; single-line census closed
 - [0087 — NEGATIVE: linky veto](0087-NEGATIVE-linky-veto.md) — conditioned thresholds double-count model features; operating point confirmed from 5th direction
 - [0088 — Golden v8](0088-golden-v8-augments.md) — five augment repairs incl. a misattribution fix: 0.8488/0.7612
+- [0089 — Golden v9](0089-golden-v9-typography.md) — phantom U+2011/U+202F normalized source-gated (625 docs): the old typography wall was gold noise

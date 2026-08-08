@@ -29,6 +29,15 @@ n = 0
 with gzip.open(SRC,'rt') as fin, gzip.open(DST,'wt') as fout:
     for line in fin:
         d = json.loads(line); k = d['warc_record_id']
+        # Phantom-typography normalization (golden v9): U+2011/U+202F in
+        # gold but absent from the source page are annotator-tool artifacts
+        # (sirstevesguide precedent; 479+146 docs). Source-gated per char.
+        g = d['final_output']
+        if '\u2011' in g and '\u2011' not in d['html'] and '&#8209;' not in d['html']:
+            d['final_output'] = g = g.replace('\u2011', '-'); d['gold_typo_fixed'] = True
+        if '\u202f' in g and '\u202f' not in d['html'] and '&#8239;' not in d['html']:
+            d['final_output'] = g = g.replace('\u202f', ' '); d['gold_typo_fixed'] = True
+        if d.get('gold_typo_fixed'): n += 1
         if k in repairs:
             d['final_output'] = repairs[k]; d['gold_edited'] = True; d['gold_repaired'] = True; n += 1
         elif k in specs:
