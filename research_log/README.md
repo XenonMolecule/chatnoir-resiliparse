@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8257** / Lev **0.7296** (0066) · golden **0.8383/0.7502** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8262** / Lev **0.7299** (0067) · golden **0.8388/0.7506** (v3) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -140,3 +140,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8257** / Lev **0.7296**
 - [0064 — Yahoo mb handler](0064-yahoo-mb-handler.md) — one-off engine, one doc 0.07→0.9: +0.0009 F1 both targets, zero regressions
 - [0065 — Single-post threads + golden v2](0065-single-post-threads.md) — dated 1-post relaxation + owner review round 1: +0.0016 F1 dev, zero dev regressions
 - [0066 — vBulletin 5 handler](0066-vbulletin5-handler.md) — li.b-post + announcements + golden v3: +0.0009 F1 / +0.0012 Lev both dev targets, zero regressions
+- [0067 — Google Forms handler](0067-google-forms-handler.md) — ss-form questions + choices: +0.0005 F1 both dev targets

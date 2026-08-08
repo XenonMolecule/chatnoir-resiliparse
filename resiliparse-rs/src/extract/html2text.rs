@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_gforms,
                 extract_vbulletin5,
                 extract_yahoo_mb,
                 extract_perlmonks,
@@ -3938,6 +3939,79 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// `div.author strong` (or b-username) author, `time[itemprop=dateCreated]`
 /// visible text, body `div.js-post__content-text` (falls back to
 /// `.b-post__content`). Gold: `**author — date**` + body.
+/// Google Forms handler (cycle 0067): questions in `div.ss-q-title`
+/// (gold bolds them) with choice lists in `ul.ss-choices li` (gold
+/// renders `- choice  ` with hard breaks). Fires only on the ss-form
+/// wrapper; description text comes from the generic walk of the header.
+unsafe fn extract_gforms(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        if query_selector_all_raw(doc, body, b"form.ss-form, div.ss-form-container").is_empty() {
+            return None;
+        }
+        let titles = query_selector_all_raw(doc, body, b"div.ss-q-title");
+        if titles.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        // form title + description
+        if let Some(&t) = query_selector_all_raw(doc, body, b"h1.ss-form-title, .ss-form-title").first() {
+            out.push_str(&format!("# {}\n", collapsed_text(t)));
+        }
+        if let Some(&d) = query_selector_all_raw(doc, body, b".ss-form-desc").first() {
+            let txt = extract_plain_text_from_node(doc, d, opts);
+            if !txt.trim().is_empty() {
+                out.push('\n');
+                out.push_str(txt.trim());
+                out.push('\n');
+            }
+        }
+        let mut questions = 0usize;
+        for &t in &titles {
+            let title = collapsed_text(t);
+            if title.is_empty() {
+                continue;
+            }
+            out.push_str(&format!("\n**{}**  \n", title.trim_end()));
+            // choices: the ul.ss-choices sibling within the same question item
+            let mut anc = (*t).parent;
+            let mut choices: Vec<String> = Vec::new();
+            for _ in 0..4 {
+                if anc.is_null() {
+                    break;
+                }
+                let lis = query_selector_all_raw(doc, anc, b"ul.ss-choices li.ss-choice-item, ul.ss-choices li");
+                if !lis.is_empty() {
+                    for &li in &lis {
+                        let c = collapsed_text(li);
+                        if !c.is_empty() {
+                            choices.push(c);
+                        }
+                    }
+                    break;
+                }
+                anc = (*anc).parent;
+            }
+            for (i, c) in choices.iter().enumerate() {
+                if i + 1 == choices.len() {
+                    out.push_str(&format!("- {}\n", c));
+                } else {
+                    out.push_str(&format!("- {}  \n", c));
+                }
+            }
+            questions += 1;
+        }
+        if questions >= 2 {
+            Some(out.trim_end().to_string())
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn extract_vbulletin5(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
