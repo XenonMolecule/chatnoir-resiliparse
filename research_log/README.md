@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8287** / Lev **0.7327** (0084) · golden **0.8481/0.7602** (v7) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8288** / Lev **0.7328** (0085) · golden **0.8482/0.7603** (v7) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -158,3 +158,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8287** / Lev **0.7327**
 - [0082 — Postbit strips](0082-postbit-strips.md) — Joined/Posts/Rep-Power prefixes at 0-6% keep: 15 dev docs up, zero down
 - [0083 — Golden v7](0083-golden-v7.md) — 7 gold-noise specs applied; Lev crosses 0.76; 5 augment cases pending owner
 - [0084 — Strip batch 4](0084-strip-batch4.md) — 8 lines at 0-5% keep: 370 docs up across splits
+- [0085 — Orphan headings](0085-orphan-headings.md) — empty-section chrome headings: 283 docs up, zero craters

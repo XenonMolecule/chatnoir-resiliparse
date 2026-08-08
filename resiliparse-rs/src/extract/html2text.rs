@@ -5378,6 +5378,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
             text = normalize_tabs(text);
             text = strip_ui_label_lines(text);
             text = strip_related_sections(text);
+            text = strip_orphan_headings(text);
             text = promote_heading_levels(text);
             // dedup_paragraphs measured dev-positive/train-negative (0031) —
             // gold keeps repeats on some templates; disabled pending
@@ -5544,6 +5545,7 @@ fn md_post_passes(text: String) -> String {
     let text = normalize_tabs(text);
     let text = strip_ui_label_lines(text);
     let text = strip_related_sections(text);
+    let text = strip_orphan_headings(text);
     promote_heading_levels(text)
 }
 
@@ -5551,6 +5553,55 @@ fn md_post_passes(text: String) -> String {
 /// related-content family plus its short link-teaser section (guarded:
 /// <=25 lines, <=max(600, 15% of doc) chars, no prose line >200 chars —
 /// the tampabay guard: unbounded consumption ate an article).
+/// Orphan chrome-heading strip (cycle 0085): a heading with an EMPTY
+/// section (next heading or EOF follows immediately) whose text is
+/// censused chrome. Orphan-gated: "No comments:" with actual comments
+/// after it is Blogspot content-adjacent and stays.
+fn strip_orphan_headings(text: String) -> String {
+    const ORPHANS: &[&str] = &[
+        "no comments:", "0 comments:", "0 comments", "archives",
+        "personal tools", "search", "pages", "categories",
+    ];
+    if !text.contains('#') {
+        return text;
+    }
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut drop = vec![false; lines.len()];
+    let mut changed = false;
+    for i in 0..lines.len() {
+        let t = lines[i].trim();
+        if !t.starts_with('#') {
+            continue;
+        }
+        let name = t.trim_start_matches('#').trim().to_lowercase();
+        if !ORPHANS.contains(&name.as_str()) {
+            continue;
+        }
+        let mut j = i + 1;
+        while j < lines.len() && lines[j].trim().is_empty() {
+            j += 1;
+        }
+        if j >= lines.len() || lines[j].trim_start().starts_with('#') {
+            drop[i] = true;
+            changed = true;
+        }
+    }
+    if !changed {
+        return text;
+    }
+    let mut s = lines
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !drop[*i])
+        .map(|(_, l)| *l)
+        .collect::<Vec<_>>()
+        .join("\n");
+    while s.contains("\n\n\n") {
+        s = s.replace("\n\n\n", "\n\n");
+    }
+    s
+}
+
 fn strip_related_sections(text: String) -> String {
     fn is_rel_heading(t: &str) -> Option<usize> {
         let t = t.trim();
