@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_yahoo_mb,
                 extract_perlmonks,
                 extract_nabble,
                 extract_webbbs,
@@ -3918,6 +3919,60 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// "monkbar" skin's unmistakable ids). Author/date live in the two
 /// `span.attribution` fragments of the title bars; body is `div.notetext`;
 /// the gold keeps the trailing "In Section …" link-back line.
+/// Yahoo message-board thread handler (cycle 0064): `.mb-message-body`
+/// blocks with `.mb-author-actual` author, `.mb-timestamp abbr` time and
+/// `.mb-message-bd` body. Gold: `**author — time**  \nbody`.
+unsafe fn extract_yahoo_mb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let msgs = query_selector_all_raw(doc, body, b"div.mb-message-body");
+        if msgs.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        let mut posts = 0usize;
+        for &m in &msgs {
+            let author = query_selector_all_raw(doc, m, b".mb-author-actual")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            let mut date = query_selector_all_raw(doc, m, b".mb-timestamp abbr, .mb-timestamp")
+                .first()
+                .map(|&n| collapsed_text(n))
+                .unwrap_or_default();
+            if date.len() > 48 {
+                date.truncate(0);
+            }
+            let Some(&bn) = query_selector_all_raw(doc, m, b".mb-message-bd").first() else {
+                continue;
+            };
+            let text = extract_plain_text_from_node(doc, bn, opts);
+            if author.is_empty() || text.trim().is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            if date.is_empty() {
+                out.push_str(&format!("**{author}**"));
+            } else {
+                out.push_str(&format!("**{author} \u{2014} {date}**"));
+            }
+            out.push_str("  \n");
+            out.push_str(text.trim_end());
+            posts += 1;
+        }
+        if posts >= 2 {
+            Some(out)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn extract_perlmonks(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
