@@ -72,7 +72,7 @@ Both F1/Lev and ms/doc. Net effect in one line.
 
 ## Index
 
-lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7322** (0076) · golden **0.8462/0.7580** (v6) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
+lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7321** (0077) · golden **0.8469/0.7587** (v6) · train 0.8145/0.7159 — M1 crossed; test@M1 0.8218/0.7225. Goal: 0.90 / 0.80–0.85 (GOALS.md). Baseline 0.7619/0.6540 (0001).
 **Iteration base: Rust** (`resiliparse-rs/src/extract/`) since 0002; Cython frozen as reference.
 
 - [0001 — Cython baseline](0001-cython-baseline.md) — lpv11 dev 0.7619/0.6540, 1.64 ms/doc; defaults = best stock config; parity oracle for 0002
@@ -150,3 +150,4 @@ lpv11/dev (raw HTML, markdown config since 0009): F1 **0.8283** / Lev **0.7322**
 - [0074 — Golden v6 + widget negative](0074-golden-v6-husk-review.md) — husk review narrows 5 (range-overshoot hazard); golden 0.8453/0.7572; widget/vB-alias reverted
 - [0075 — Safe batch](0075-safe-batch.md) — strips + Blogspot widget subset: golden 9-up-0-down; first golden-primary divergence logged
 - [0076 — LiveJournal handler](0076-livejournal-handler.md) — b-singlepost rebuild, probe 0.19→0.98
+- [0077 — Legacy guestbook](0077-legacy-guestbook.md) — condolence rebuild, probe 0.21→0.91; golden-primary divergence #2

@@ -1924,6 +1924,7 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
             // One-off engines (cycle 0030): disjoint exact gates, 0017-style.
             for handler in [
+                extract_legacy_gb,
                 extract_livejournal,
                 extract_cpan_pod,
                 extract_gforms,
@@ -3954,6 +3955,81 @@ unsafe fn body_text_total(body: *mut lxb_dom_node_t) -> usize {
 /// `# title`, then the post body. Username from data-ljuser, date from
 /// the time element's text (links collapsed), display name from
 /// .b-singlepost-author-user-screen (text before the paren).
+/// Legacy.com guestbook handler (cycle 0077): `div.GuestBookEntry` with
+/// `.postedDate`, `.message`, `.SigneeName`. Gold: `## Condolences` then
+/// per entry `**DATE**  \nmessage  \n— signee` (em-dash signature line).
+/// Page title/dates from the obit header when present.
+unsafe fn extract_legacy_gb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
+    unsafe {
+        let body: *mut lxb_dom_node_t = (*doc).body.cast();
+        if body.is_null() {
+            return None;
+        }
+        let entries = query_selector_all_raw(doc, body, b"div.GuestBookEntry");
+        if entries.len() < 2 {
+            return None;
+        }
+        let mut out = String::new();
+        if let Some(&t) = query_selector_all_raw(doc, body, b"h1").first() {
+            let title = collapsed_text(t);
+            if !title.is_empty() {
+                out.push_str(&format!("# {}\n\n", title.trim()));
+            }
+        }
+        if let Some(&y) = query_selector_all_raw(doc, body, b".YearsLower").first() {
+            let years = collapsed_text(y).replace(" - ", " \u{2013} ");
+            if !years.is_empty() {
+                out.push_str(&format!("**{}**  \n\n", years.trim()));
+            }
+        }
+        out.push_str("## Condolences\n");
+        let mut n = 0usize;
+        for &e in &entries {
+            let date = query_selector_all_raw(doc, e, b".postedDate")
+                .first()
+                .map(|&x| collapsed_text(x))
+                .unwrap_or_default();
+            let msg = query_selector_all_raw(doc, e, b".message")
+                .first()
+                .map(|&x| collapsed_text(x))
+                .unwrap_or_default();
+            let signee = query_selector_all_raw(doc, e, b".SigneeName")
+                .first()
+                .map(|&x| collapsed_text(x))
+                .unwrap_or_default();
+            if msg.is_empty() && signee.is_empty() {
+                continue;
+            }
+            out.push('\n');
+            if !date.is_empty() {
+                out.push_str(&format!("**{}**  \n", date.trim()));
+            }
+            if !msg.is_empty() {
+                out.push_str(msg.trim());
+                out.push_str("  \n");
+            }
+            if !signee.is_empty() {
+                out.push_str(&format!("\u{2014} {}\n", signee.trim()));
+            }
+            n += 1;
+        }
+        if let Some(&d) = query_selector_all_raw(doc, body, b"div.Disclaimer").first() {
+            // charter C4: legal/disclaimer text is content
+            let t = extract_plain_text_from_node(doc, d, opts);
+            if !t.trim().is_empty() {
+                out.push('\n');
+                out.push_str(t.trim());
+                out.push('\n');
+            }
+        }
+        if n >= 2 {
+            Some(out.trim_end().to_string())
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn extract_livejournal(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
