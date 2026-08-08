@@ -63,3 +63,13 @@ ARTICLE_RESCUE_MAX_COUNT=3 (the page has ~15). Correct fix requires
 distinguishing "many small content articles" from "teaser stream" —
 page-type wall instance #13. Not chased at 3-doc scale; unlocks with
 any future page-type capability.
+
+## Next rendering probe: CSS-bold (0063 candidate)
+Reuse the 0062 <style> parser but for `font-weight:bold|700+` classes →
+wrap matching spans' text in ** during markdown serialization. Attacks
+wall #6 (visual bold, 100+ census ops incl. course-header-title,
+span.label families). Unlike 0062 this is ADDITIVE (no veto — worst
+case is wrong bold, small per-instance Lev), so the crater class does
+not apply; still run the full three-target battery and watch for the
+unexplained 0062 parser interaction (verify lawyerfox stays 3277B).
+Gold-side conventions already measured in 0035 (bold-census).
