@@ -19,3 +19,11 @@ Reverted; parity verified vs 0153.
 Remaining header-recall census after 0153: 67 docs (26 "other" engines,
 24 WP, 11 vBulletin, 5 phpBB, 1 Invision). Each needs template-specific
 evidence, not a global rule.
+
+## Handler-gate audit (closes the 0150/0153 pattern)
+Swept every engine signature against docs where we emit no rebuilt headers.
+After the phpBB fix, **no further mis-gated handlers exist** — the matches
+are either loose-regex false positives (skactonlaw, popsugar) or engines
+with genuinely no handler: MyBB (jcink, beckett), YAF (packershome,
+moomba). Those are 2–3 docs each, i.e. ~1e-4 apiece: real but not
+gap-closing. The "existing handler not reached" vein is now mined out.
