@@ -3903,6 +3903,9 @@ const SITE_WHITELIST: &[(&[u8], &[u8])] = &[
     (b"encycolorpedia.pt", b"#named"),
     (b"newstral.com", b".panel"),
     (b"query.nytimes.com", b".summaryText"),
+
+    (b"androidpolice.com", b".single"),
+    (b"happysadlola.blogspot.com", b".fauxborder-left"),
 ];
 
 const SITE_VETOES: &[(&[u8], &[u8])] = &[
