@@ -6109,11 +6109,8 @@ unsafe fn page_domain(doc: *mut lxb_html_document_t) -> Vec<u8> {
                     // and misfire on link-majority siblings (0109 bisect).
                     const FALLBACK_EXCLUDE: &[&[u8]] = &[
                         b"theserverside.com",
-                        b"pt.usc.edu",
-                        b"usc.edu",
                         b"bimmerwerkz.com",
                         b"motoprofi.com",
-                        b"iclassifiedsnetwork.com",
                         b"menstennisforums.com",
                         b"cricketarchive.com",
                         b"convertunits.com",
