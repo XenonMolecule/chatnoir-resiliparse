@@ -260,6 +260,7 @@ tag_consts!(
     LXB_TAG_TEXTAREA,
     LXB_TAG_TH,
     LXB_TAG_TIME,
+    LXB_TAG_TITLE,
     LXB_TAG_TR,
     LXB_TAG_UL,
     LXB_TAG_VIDEO,
@@ -6215,6 +6216,25 @@ unsafe fn page_domain(doc: *mut lxb_html_document_t) -> Vec<u8> {
     }
 }
 
+/// Page <title> text (0161): the only reliable purpose signal available to
+/// a static extractor.
+unsafe fn doc_title(doc: *mut lxb_html_document_t) -> Vec<u8> {
+    unsafe {
+        let head: *mut lxb_dom_node_t = (*doc).head.cast();
+        if head.is_null() {
+            return Vec::new();
+        }
+        let mut child = (*head).first_child;
+        while !child.is_null() {
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT && (*child).local_name == LXB_TAG_TITLE {
+                return get_collapsed_string(&get_node_text(child));
+            }
+            child = (*child).next;
+        }
+        Vec::new()
+    }
+}
+
 /// Coarse generator class for the model (v5): 0 none/other, 1 blogger,
 /// 2 wordpress, 3 forum engine.
 unsafe fn generator_kind(doc: *mut lxb_html_document_t) -> u8 {
@@ -8563,7 +8583,29 @@ unsafe fn extract_plain_text_from_doc_impl2(
         if !opts.noscript {
             skip_selectors.insert(b"noscript".to_vec());
         }
-        if !opts.form_fields {
+        // Form-purpose pages (0161): DOM density cannot tell an article page
+        // with a comment form from a form page with prose (0160 negative).
+        // The page TITLE encodes purpose — "Register A Child", "Checkout",
+        // "Send Page to a Friend" — so gate on title vocabulary plus a
+        // modest input count.
+        let form_purpose = opts.main_content
+            && opts.preserve_formatting == FormattingOpts::Markdown
+            && !(*doc).body.is_null()
+            && query_selector_all_raw(doc, (*doc).body.cast(), b"input").len() >= 5
+            && {
+                let t = doc_title(doc).to_ascii_lowercase();
+                let t = String::from_utf8_lossy(&t).to_string();
+                [
+                    "register", "sign up", "signup", "checkout", "check out",
+                    "contact us", "apply now", "application form", "order form",
+                    "send page", "send message", "send a message",
+                    "registration",
+                ]
+                .iter()
+                .any(|k| t.contains(k))
+            };
+        let form_fields_eff = opts.form_fields || form_purpose;
+        if !form_fields_eff {
             for sel in [b"textarea".as_slice(), b"input", b"button", b"select", b"option", b"label"] {
                 skip_selectors.insert(sel.to_vec());
             }
@@ -8584,7 +8626,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
                 list_bullets: opts.list_bullets,
                 links: opts.links,
                 alt_texts: opts.alt_texts,
-                form_fields: opts.form_fields,
+                form_fields: form_fields_eff,
                 noscript: opts.noscript,
             },
         };
