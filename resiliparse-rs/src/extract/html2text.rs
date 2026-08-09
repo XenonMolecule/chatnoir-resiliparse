@@ -6245,8 +6245,18 @@ unsafe fn extract_vbulletin(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -
 unsafe fn extract_phpbb(doc: *mut lxb_html_document_t, opts: &ExtractOpts) -> Option<String> {
     unsafe {
         let body: *mut lxb_dom_node_t = (*doc).body.cast();
-        if body.is_null() || !get_node_attr(body, b"id").eq_ignore_ascii_case(b"phpbb") {
+        if body.is_null() {
             return None;
+        }
+        // Gate (0153): body#phpbb is the stock theme's marker, but 29 of the
+        // 36 phpBB-markup docs in dev are custom themes without it. Accept
+        // unambiguous post markup as an alternative entry condition.
+        if !get_node_attr(body, b"id").eq_ignore_ascii_case(b"phpbb") {
+            let bodies = query_selector_all_raw(doc, body, b".postbody").len();
+            let profiles = query_selector_all_raw(doc, body, b".postauthor, .postdetails, .postprofile").len();
+            if bodies < 2 || profiles < 2 {
+                return None;
+            }
         }
         // Only thread views: search results / member pages share the postbody
         // markup but the gold treats them differently (bogleheads search page,
