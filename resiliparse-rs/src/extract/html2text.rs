@@ -8825,6 +8825,12 @@ fn strip_ui_label_lines(text: String) -> String {
         "email this page", "print this page", "email this pageprint this page",
         "garage list", "reply with quote", "view options",
         "report a problem", "no comments posted for this article.",
+        "likelike", "please login to remove!", "(permalink)",
+        "find all posts by this user", "quote this message in a reply",
+        "get adobe flash player",
+        "content on this page requires a newer version of adobe flash player.",
+        "content on this page requires a newer version of adobe flash player",
+        "taking too long? try again or cancel this request.",
         "[buy photo]", "buy photo",
         "there are no comments yet.", "be the first to comment!",
         "be the first to comment", "sort: oldest | newest",
@@ -8924,6 +8930,21 @@ fn strip_ui_label_lines(text: String) -> String {
         }
         // Ad-targeting machine lines (0120): "action:article | category:X | adString:..."
         if tl.contains("| adstring:") || tl.contains("| zoneid:") {
+            removed_any = true;
+            continue;
+        }
+        // Engine-chrome prefix/skeleton lines (0133, band-79 lexicon batch)
+        if !was_heading
+            && (tl.starts_with("view full version :")
+                || tl.starts_with("[date prev][date next]")
+                || (tl.starts_with("quote originally posted by") && tl.ends_with("view post"))
+                || (tl.starts_with("thanked ") && tl.contains(" times in ") && tl.ends_with(" posts"))
+                || (tl.starts_with("slide ")
+                    && tl.len() < 20
+                    && tl.contains(" of ")
+                    && tl[6..].replace(" of ", "").chars().all(|c| c.is_ascii_digit()))
+                || tl.starts_with("users browsing this forum"))
+        {
             removed_any = true;
             continue;
         }
