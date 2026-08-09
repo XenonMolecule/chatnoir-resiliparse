@@ -349,3 +349,4 @@
 {"warc_record_id": "01bd89f9-5512-4773-8894-1258810302f2", "spec": {"ranges": [["Name", "Vintage"]], "note": "0108: beckett megaMenu nav + feedback/login form (charter N4, approved nav-chrome family)"}}
 {"warc_record_id": "6c75c17c-4cf2-4689-9d0d-c389be73f593", "spec": {"ranges": [["# United States Census Bureau", "- Reference"]], "note": "0108: census.gov display:none mega-menu rollover panels (charter N4)"}}
 {"warc_record_id": "57c9a813-5243-45a3-8214-acd047ca2551", "spec": {"ranges": [["# Untangling the Retail Supply Chain", "# It\u2019s Not About"]], "note": "0108: multichannelmerchant 522-heading mega-menu block before search results (charter N4)"}}
+{"warc_record_id": "3c351df9-f849-442c-aa27-337e8603ecf1", "spec": {"patterns": ["feeds.feedburner.com/~r"]}, "note": "0134: feedburner tracking-pixel beacon (machine junk, charter N1)"}
