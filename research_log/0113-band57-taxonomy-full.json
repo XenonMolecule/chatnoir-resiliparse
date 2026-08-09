@@ -1,0 +1,653 @@
+{
+  "summary": "Mine the F1 0.5-0.7 dev_golden band for GENERIC cross-site fix patterns",
+  "agentCount": 7,
+  "logs": [],
+  "result": {
+    "total": 67,
+    "byMode": {
+      "over_chrome": 32,
+      "under_missed_content": 22,
+      "gold_noise": 3,
+      "engine_missing": 7,
+      "other": 3
+    },
+    "patterns": [
+      {
+        "name": "link-and-media-serialization",
+        "description": "Emitter: never flatten URLs to bare text inside the selected content flow. Emit <img> as ![alt](src) even when alt=\"\" (derive alt from filename slug: hyphens->spaces, strip -WxH size suffix); resolve lazy images via data-src/data-srcset/data-lazy-src/data-original when src is a data:/1px placeholder; treat imgs with 'attach'/attachment.php URLs as content, synthesizing alt from fieldset legend or nearby label. Emit in-content anchors as [text](href), including file-asset links (.pdf/.doc/uploads paths), button-styled anchors (class~btn), and media iframes (youtube/embed src) as links. Unwrap (do not delete) self-permalink anchors (href==page URL, rel=bookmark) around headlines/<time>.",
+        "doc_count": 13,
+        "risk": "low"
+      },
+      {
+        "name": "adjacent-duplicate-dedupe",
+        "description": "Emit each text once: (a) drop an img alt/title that equals the immediately adjacent sibling text or a neighboring link to the same href ('Show'+alt'Show', 'Canada Canada', flag/rank badges); (b) collapse consecutive duplicate short lines and emit verbatim-duplicated multi-line blocks (>=200 normalized chars) only once per document (duplicated article containers, browser banners, tooltip/glossary mirrors); (c) drop a leading plain-text line equal to the first emitted H1 (optionally plus a site-name suffix — <title> echo); (d) collapsed-expander dedupe: drop a paragraph ending '(more)' when a later paragraph starts with the same normalized prefix, and drop bare '(more)'/'(less)' toggle lines.",
+        "doc_count": 12,
+        "risk": "low"
+      },
+      {
+        "name": "nav-signature-lexicon",
+        "description": "Structural/text signatures for nav lines: breadcrumb runs of short link tokens joined by '>'/'>>'/'»'/':' (or elements titled/classed breadcrumb/'Navigation bar'), pipe-separated link rows (>=4 short link tokens joined by '|'), rows of >=5 one-word all-caps links (bold does not exempt), accessibility skip-links ('Skip ... navigation', 'go to page content'), page-action pairs ('Email this page'/'Print this page', 'Back to Article', 'Save | Post a comment'), divs classed page-navigation/page-previous/page-next, and image alts inside pure-nav anchors (href='#', alt starting Skip/Go to/ADVERT, alt ending ' Logo').",
+        "doc_count": 9,
+        "risk": "low"
+      },
+      {
+        "name": "repeated-line-family-veto",
+        "description": "A short line (<~60 chars) whose exact text recurs >=3 times interleaved across sibling item blocks or once per content section is per-item widget chrome — strip all occurrences ('Cite This Source', 'View Options', 'Report a problem', 'Add comment', 'see more', 'Ocen:'). Extend to skeleton matches where only numbers/usernames vary ('N replies | N view(s)', '<user> is offline', 'Old <date>') and to alt-text families differing only by a trailing index ('... photo 0..15' = thumbnail gallery). Repeated identical headings with empty bodies are the same family.",
+        "doc_count": 9,
+        "risk": "low"
+      },
+      {
+        "name": "markdown-shape-emitter-fixes",
+        "description": "Emitter hygiene: render h1-h6 inside table cells as bold text (never '####' in a pipe row); when an <li> contains a heading, unwrap the list and emit flat blocks (never nest headings in list items); do not promote styled divs/full-sentence notice paragraphs to headings; never emit emphasis runs wrapping only whitespace (bare '***'); always insert a space/newline between adjacent inline elements so texts never fuse ('bargainingnoun'); demote prose-<pre> (high stopword ratio, few code symbols) to paragraphs instead of a code fence; when a table's first row is a single spanning cell followed by an all-bold/th row, demote the caption row to text and promote row 2 to the header.",
+        "doc_count": 9,
+        "risk": "low"
+      },
+      {
+        "name": "content-list-link-density-rescue",
+        "description": "Gated exemptions from the link-density/nav veto: (a) a link-only <ul> directly following a kept heading inside the main container is content (FAQ/TOC, tags/keywords/authors/TERMS — data-keyword/rel attrs are strong signals); if it stays pruned, prune the now-orphaned heading too; (b) items with measured-quantity shape (number/fraction+unit before the link, data-ingredient attrs) or substantial per-item prose are content; (c) inline anchors participating in sentence flow (lowercase text adjacent to non-link words/punctuation) never count toward density and are never dropped individually; (d) anchors with empty href='' or single-character text weigh 0; (e) person-card/roster lists (thumb + name-link + 'as <role>') under Cast/Team/Squad headings, nested one-item-per-level inheritance chains, and lists introduced by a retained paragraph ('the links below') are content.",
+        "doc_count": 11,
+        "risk": "medium"
+      },
+      {
+        "name": "trailing-boilerplate-strip-with-copyright-exception",
+        "description": "After the article body (esp. past an end marker/copyright line), strip: paywall/subscription CTA runs (>=3 imperative anchors 'CLICK HERE'/'LOG-IN'/'subscribe'), signup promos ('Register for FREE', 'Join <site>'), legal-disclaimer blocks signposted by Terms of Use/Privacy Policy/'Last Updated:' or ending in a run of dot/pipe-separated policy links, '(Find|View) this article at:' + own URL, mailing-list/render boilerplate ('This archive was generated by hypermail', 'generated in N seconds', 'Received on <date>'). EXCEPTION (charter): rescue plain 'Copyright © <years> ... All rights reserved' sentences and all-caps legal disclaimers even inside pruned footers — copyright lines are content.",
+        "doc_count": 12,
+        "risk": "medium"
+      },
+      {
+        "name": "hidden-subtree-and-widget-veto",
+        "description": "Never emit text that is not rendered: subtrees with inline display:none/visibility:hidden, hide-class vocabulary (hide, hidden, mfp-hide, modal, popup, dialog, tooltip, overlay [with close child], printModal), javascript:-toggled disclosure blocks, onclick-only non-anchor spans/divs (no href), single-char '[X]' close controls, form-label lines whose form was stripped, and CSS/escaped-HTML fragments leaking into text ('selector { prop: value; }', '<div id='). EXCEPTIONS: a display:none section whose adjacent header has paired Show/Hide toggle controls (accordion) is collapsed content — extract it and suppress the toggle labels; modal bodies holding numeric data (nutrition dl/dt) are content.",
+        "doc_count": 9,
+        "risk": "medium"
+      },
+      {
+        "name": "teaser-rail-strip",
+        "description": "Drop related-content rails detected by repeated card skeletons: >=3-5 consecutive sibling blocks each terminated by an identical short link ('More', 'More>>', 'Read more') or a timestamp/counter line (e.g. '^\\d\\d\\.\\d\\d\\.\\d\\d \\d\\d:\\d\\d', '... Reads: [\\d,]+'), under headers from {Latest N, Related/Similar Topics, Sponsored links/Content, NEXT/MORE}, especially after the article's end marker or copyright. A heading whose text is a phrase doubled (img alt == adjacent link text) followed by a mid-sentence-truncated excerpt is a teaser card. Must be gated off on listing/archive pages (see homogeneous-sibling-amnesty).",
+        "doc_count": 8,
+        "risk": "medium"
+      },
+      {
+        "name": "forum-platform-chrome-vocab",
+        "description": "Within a post container, strip lines matching the closed vBulletin/phpBB family when >=2 co-occur: {'Reply With Quote', '<name> is offline/online', \"<name>'s Avatar\", 'iTrader:', 'Join Date:'/'Location:'/'Drives:'/'Bikes:', 'Garage List', 'Appreciate N', 'Old <date>, <time>', '#<n>', 'Mentioned/Tagged/Quoted: N Post(s)', 'Liked N Times in N Posts'}; plus board boilerplate '^It is currently <datetime>$', '^Users browsing this forum:', 'Page N of N', '[ N posts ]', 'Reply to topic', orphan labels ('By:', 'Posted in'), and the underscore-only signature delimiter (cull it and following lines to the post boundary). Gold shape is author+timestamp+body only.",
+        "doc_count": 6,
+        "risk": "low"
+      },
+      {
+        "name": "data-markup-keep-signals",
+        "description": "Positive keep signals that override layout/link-density pruning: tables with data-table markers (<caption>, <th scope=col>, summary=) even single-column/link-bearing; small 2-column label:value tables (every left cell a short 'Label:' string) and label+value rows inside mixed tables; rows carrying a duration pattern \\d{1,2}:\\d{2} (track tables) — drop button-only cells, never the row; schema.org microdata (itemprop=datePublished spans on kept headlines, itemscope NewsArticle cards in the main column); and bare text nodes that are direct children of sectioning elements (section/main/div#content).",
+        "doc_count": 5,
+        "risk": "low"
+      },
+      {
+        "name": "homogeneous-sibling-amnesty",
+        "description": "Keep/drop decisions are made once per structural family: when sibling elements share an identical structural signature (same tag+class family, e.g. article.hentry, teaser-card sets), if any member classifies as content, keep all members — interleaved keep/drop of identical siblings is classifier noise. On archive/term listing pages (short bare-term h1, /tag/ /category/ URL segment) where homogeneous teaser blocks dominate the main region, the teasers ARE the content: suspend 'latest-/spotlight-/related-/block' class-vocabulary pruning for that run.",
+        "doc_count": 4,
+        "risk": "medium"
+      },
+      {
+        "name": "encoding-and-leak-hygiene",
+        "description": "Byte-level repairs before emission: detect charset mis-decoding (high rate of '?' or U+FFFD adjacent to letters where smart punctuation belongs, e.g. 'History?s', 'Fran�ais') and re-decode as cp1252/utf-8; strip BOM and stray GUID/opaque-token lines at document start; never emit entity-escaped HTML tag syntax found in text nodes ('<blockquote class=' as literal text) — treat as noise or re-parse; drop JS page-state stubs ('Please reload this page ...', 'Loading... please wait').",
+        "doc_count": 4,
+        "risk": "medium"
+      }
+    ],
+    "docs": [
+      {
+        "warc_record_id": "87e56e4f-f33c-47ae-aae5-0dfe0b7c04b9",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred appends sidebar blocks gold excludes: 'Aggregated Blog' (a feed link) and 'We are a 501c3 non-profit... Consider donating to support our forensic challenges' — in HTML this paragraph sits inside <div class=\"block block-block\"> directly followed by a PayPal <form action=\"https://www.paypal.com/cgi-bin/webscr\">. Secondary recall loss: gold has '![HoneyProxy - Tab Headers (Request)](http://honeynet.org/files/images/hnp-headers-request.preview.png)' but pred emits only the bare alt text with no image markdown, losing the URL tokens.",
+        "generic_pattern": "Strip text blocks whose container holds a payment/subscribe <form> (paypal/donate/signup action URLs) — donation and newsletter blurbs are chrome; and when a content <img> with a real src/alt is kept, emit full ![alt](src) markdown instead of degrading to bare alt text."
+      },
+      {
+        "warc_record_id": "0b5ed98d-9071-4ff2-831a-494465bd4dd8",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold includes the 'Casting department (6 credits)' and 'Casting director' filmographies; in HTML they sit in <div class=\"filmo-category-section\" style=\"display:none;\"> behind a toggle header with paired spans 'Hide'/'Show' (onclick=toggleFilmoCategory) — pred drops the collapsed sections and instead leaks the toggle labels as 'Show Show Casting department (6 credits)' and 'Hide Hide Show Show' (anchor text plus img alt=\"Show\" duplicated). Pred also adds teaser chrome gold excludes ('User Lists', 'a list of 65 people created 16 Jan 2011', 'Connect with IMDb').",
+        "generic_pattern": "Accordion rescue: a display:none sibling section whose adjacent header contains paired Show/Hide toggle controls is collapsed content, not chrome — extract it; conversely suppress the toggle control text itself, and never emit an <img> alt that duplicates the immediately adjacent sibling text ('Show'+alt'Show' -> 'Show Show')."
+      },
+      {
+        "warc_record_id": "ec9e32c1-1cef-4980-bdaa-af1954b7a19e",
+        "failure_mode": "gold_noise",
+        "evidence": "The bulk of the recall gap (r=0.416) is gold's 'Nearby words for barren lands' block: ~50 pure navigation links ('barrel distortion, barrel engine, ...') living in <section class=\"right-rail-nearby-words\"> with carousel controls (<button class=\"nearby-move-button nearby-prev\">) — per charter nav/related-teasers are noise, so gold over-includes here. Smaller legitimate misses are the right-rail 'Difficulty index... Few English speakers likely know this word' and 'Word Value... Scrabble 8 / Words With Friends 10' widgets; pred also adds action-link chrome 'Cite This Source' (twice) and promo 'Why was \"tantrum\" trending last week?'.",
+        "generic_pattern": "Suppress repeated short action-link lines drawn from a cite/share vocabulary ('Cite This Source', 'Why was X trending') that recur verbatim after each content section — a repeated-line family fix that also helps other reference sites."
+      },
+      {
+        "warc_record_id": "5458c2d0-633f-4cd5-b97c-9ec4c7f47c01",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred is riddled with edit-UI link clusters gold excludes: 'edit Help', 'add Help', 'add show full crew', 'show all aliases', 'show full history', 'vote no votes yet', pagination '< 7 > < 09 >', and the footer license blurb 'All text information on this page is licensed under... www.moviepilot.de'. In HTML these are <a class=\"edit-button\">/<a class=\"help-button\"> anchors packed inside each <div class=\"headline-box\"> before its <h3>. Secondary recall loss: the Cast list ('Lorne Greene ... as Ben Cartwright') is a <ul> of image+link cards that got vetoed.",
+        "generic_pattern": "Suppress link-only micro-clusters adjacent to headings whose anchor texts come from an edit/admin vocabulary {edit, add, Help, vote, show all X, show full X, history} — wiki-style edit chrome recurs across CMS sites; separately, a <ul> of person-cards (thumbnail + name-link + 'as <role>' text) under a Cast/Crew heading is content despite high link density."
+      },
+      {
+        "warc_record_id": "81672d1a-9d75-49f7-b4ca-38faa85bffbe",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred loses the class inheritance chain — nested single-item <ul class=\"inheritance\"> lists ('java.lang.Object ... org.apache.commons.math3.linear.NonSquareMatrixException', each level one link-only <li>) — and the whole 'Constructor Summary' section whose <table class=\"overviewSummary\"> has a <caption>Constructors</caption>, <th scope=\"col\">Constructor and Description</th> and one data row with code + description ('Construct an exception from the mismatched dimensions.'). Both were pruned as link-heavy/layout structures. Gold's Method Summary is an editorial rewrite ('omitted for brevity'), so full recovery there is impossible.",
+        "generic_pattern": "Treat tables bearing data-table markers (<caption>, <th scope=col>, summary= attribute) as content even when single-column and link-bearing; and keep strictly-nested one-item-per-level link lists (breadcrumb/inheritance chains) as indented text lines instead of vetoing them as nav."
+      },
+      {
+        "warc_record_id": "a16e4c89-7e14-40e8-bc2b-c01d3940d5a5",
+        "failure_mode": "under_missed_content",
+        "evidence": "Recall 0.473: pred keeps only 3 of ~10 gold Timeline entries — each is an <article itemtype=\"http://schema.org/NewsArticle\" class=\"story\"> card with a label span (Newswire/Video), <span itemprop=\"datePublished\">June 13 2018</span> and an <h1> headline link; entries without summary paragraphs (all 'Video' items, 'Futura Medical phase III trial on track...') were dropped as teasers and every publish date was stripped even from kept entries (gold byline '*16:51 04 Jan 2018*' also lost, present as itemprop=\"datePublished\"). The company-profile paragraph and the key-value share-price table ('Market: AIM', 'Market Cap: 42.35M', td.title/td pairs) were also pruned.",
+        "generic_pattern": "Keep text carrying schema.org microdata signals: itemprop=datePublished spans attached to kept headlines, and full headline+date+summary of itemscope NewsArticle cards in the main column; also keep small 2-column label:value tables (every left cell a short 'Label:' string) as data, not layout."
+      },
+      {
+        "warc_record_id": "c8d653d2-7c70-4504-a08c-c77938ec98ca",
+        "failure_mode": "over_chrome",
+        "evidence": "Recall is 1.0; precision 0.457 comes entirely from the subscription CTA block appended after the article: 'Subscribers must **LOG-IN** to read this full story.', 'For new online-only & print/online combo subscriptions **CLICK HERE**.', with '**CLICK HERE**' repeated four times plus 'Stories can also be purchased from our archives for $2.00 per article.' Gold ends at the article text.",
+        "generic_pattern": "Suppress trailing paywall/subscription blocks: consecutive lines dominated by imperative CTA anchors ('CLICK HERE', 'LOG-IN', 'subscribe') repeated 3+ times with login/subscription vocabulary immediately after the article body — a cross-newspaper paywall signature."
+      },
+      {
+        "warc_record_id": "0f520fd0-9447-4af6-8a02-9e37dca19164",
+        "failure_mode": "under_missed_content",
+        "evidence": "Precision is 1.0; recall 0.477. Pred misses 'No data at this moment' — a bare text node sitting directly inside <section id=\"content\"> with no wrapper element — and both team rosters ('N.T. Paranavitana ... R M S Eranga', 'M J Guptill ...'), which are link-only <ul>s inside <aside id=\"sidebar\" role=\"complementary\"> under 'Sri Lanka Team' breadcrumbs, vetoed as nav. Formatting divergence too: pred emits '#### Sri Lanka' headings inside table cells where gold uses '**Sri Lanka**<br>'.",
+        "generic_pattern": "Two fixes: (1) capture bare text nodes that are direct children of sectioning elements (section/main/div#content) instead of only element-wrapped text; (2) in the markdown emitter, render h1-h6 occurring inside table cells as bold text, never as '####' inside a pipe row. Roster-style link-only lists (anchor texts shaped like person names, e.g. initials+surname) under a 'X Team'/'Squad' heading are data worth a gated rescue."
+      },
+      {
+        "warc_record_id": "95684e27-1df4-407a-8751-f376e35c3624",
+        "failure_mode": "over_chrome",
+        "evidence": "Recall 1.0; the precision loss is layout-table nav rows and the footer legal block: pred emits '| | Back to Ask the Diabetes Team | **Ask the Diabetes Team**', degenerate rows '| |', '| | Home | Return to Top', then 'Last Updated: Tuesday April 06, 2010', 'This Internet site provides information of a general nature...', 'you agree to our Terms of Use, Legal Notice, and Privacy Policy.' Gold cuts everything after the article's own trailer ('Posted to Meal Planning, Food and Diet').",
+        "generic_pattern": "Drop table rows whose cells are empty or contain only navigation links (row text = link text, nav vocabulary like Home/Back to/Return to Top) — layout-table headers/footers; and suppress trailing site-disclaimer blocks signposted by 'Last Updated:' + Terms of Use/Privacy Policy/legal-notice vocabulary."
+      },
+      {
+        "warc_record_id": "2d37fabe-be01-4718-9813-046b333c8e55",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred loses the entire ingredients list — in HTML a plain <ul> of '<li data-ingredient=\"all-purpose+flour\"><span>3 </span> cups <a href=...>all-purpose flour</a></li>' items whose only link is the ingredient name, so the list's link density triggered a nav veto — plus the byline 'By southern chef in louisiana', the rating, and the whole Nutrition Info block ('Calories: 2606...') which lives in a <div class=\"modal-body\"> popup that gold includes. Pred instead leaks the related-teaser '16 Sweet Holiday Breads' (twice) and the 'Join the Conversation' tab list ('all / reviews / tweaks / q & a').",
+        "generic_pattern": "Exempt lists from the link-density veto when items match a measured-quantity shape (leading number/fraction + unit before the link, data-ingredient-style attributes) — ingredient/spec lists are content; and treat modal-body blocks containing dl/dt-dd numeric data (nutrition facts) as content rather than hidden widget chrome."
+      },
+      {
+        "warc_record_id": "6c75c17c-4cf2-4689-9d0d-c389be73f593",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred keeps the heading '# Additional Information' but drops its only content — a <ul> of three <li><i> items with substantial prose ('Contact the Data Dissemination Branch of the Foreign Trade Division with any questions...', 'MORE DATA: Data for all countries and 6-digit NAICS codes...') — leaving an empty section plus stray emphasis artifacts: bare '***' lines and broken '**Source*:' from <i>/<b> wrappers around pruned or whitespace content. It also leaks nav-image alt texts '[Skip all navigation and go directly to page content]', '[To top of page]', '[ADVERT: USATrade Online]' from anchor-wrapped images.",
+        "generic_pattern": "When a kept heading's entire section content is a single pruned list, rescue the list if its items average substantial non-link prose (text-heavy li with one inline link); emitter must never output emphasis runs wrapping only whitespace ('***' alone); and skip alt text of images inside pure-navigation anchors (href='#...' self-links, alt starting 'Skip'/'Go to'/'ADVERT')."
+      },
+      {
+        "warc_record_id": "4f6a7a56-993f-44d5-9f66-987e50ac0040",
+        "failure_mode": "over_chrome",
+        "evidence": "Recall 0.977; precision 0.54 from a sidebar testimonial rail gold excludes: '### Success stories' followed by ~27 teaser cards each ending in a standalone 'More' link ('Dora Murielle Rajonhson / Biological Systems and Organisms / More', one card even duplicated verbatim), plus empty scaffold headings '## You are here', '## Search form', '## APPLY NOW'. Formatting bug too: the closed-notice paragraph is emitted as '## The call for applications ... is now closed.' where gold has a plain paragraph.",
+        "generic_pattern": "Suppress teaser-card rails detected by a repeated-line family: 5+ sibling cards each terminated by the identical short link token ('More', 'Read more') — and drop breadcrumb/search scaffold headings ('You are here', 'Search form') that head no body text; in the emitter, styled <div>/notice text should not be promoted to a markdown heading when it is a full sentence paragraph."
+      },
+      {
+        "warc_record_id": "3c050c33-2ce7-4909-a570-9ef66672bd34",
+        "failure_mode": "engine_missing",
+        "evidence": "Gold contains 4 content images: '![Schematic_PSU](https://lowpowerlab.com/wp-content/uploads/2016/09/Schematic_PSU-300x177.png)' etc.; pred has none (r=0.355). HTML imgs have empty alt ('class=\"aligncenter size-medium wp-image-2206\" src=...Schematic_PSU-300x177.png alt') and the engine emits images only as alt text, so they vanish; gold derives alt from the src basename. Also the date inside a self-permalink is dropped: gold 'Posted on September 29, 2016 by Felix' vs pred 'Posted on by Felix' (HTML: '<a href=.../schematics-drawings/ rel=bookmark><time class=entry-date>September 29, 2016</time></a>'), and pred appends glued prev/next nav 'Install examplesJohn's review' from '<div class=page-navigation><a class=page-previous...><a class=page-next...>'.",
+        "generic_pattern": "Emit in-content <img> as ![alt](src) even when alt is empty, deriving alt from the src filename stem (gold does exactly this); additionally, unwrap rather than delete self-permalink anchors (href == page URL, rel=bookmark) that wrap <time>/headline text, and treat divs with class tokens page-navigation/page-previous/page-next as chrome."
+      },
+      {
+        "warc_record_id": "f8f3ac02-de1b-4296-a5d3-8d8277f46909",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred misses the header <em> quote block gold keeps (': And it goes against the grain of building small tools... --Larry Wall in <1992Aug26.184221.29627@netlabs.com>') and the footer '<div class=\"copyright\">Stories, comments, journals, and other submissions on use Perl; are Copyright 1998-2006, their respective owners.</div>' which the charter marks as content. Pred also emits hidden widget text from '<div id=\"commentControlBoxStatus\" class=\"hide\"><b>Loading... please wait.</b></div>' and comment-control panels ('Full/Abbreviated/Hidden' from id=ccw-*-panel divs).",
+        "generic_pattern": "Keep short footer copyright sentences (class token 'copyright' or text signature 'Copyright <year-range>' / 'their respective owners') as content per charter; conversely drop subtrees whose class list contains 'hide'/'hidden' (CSS-hidden status widgets like 'Loading... please wait.')."
+      },
+      {
+        "warc_record_id": "c6042777-f7d0-46e5-8ed6-eb510310eda7",
+        "failure_mode": "engine_missing",
+        "evidence": "Precision is 1.0 and recall 0.38: the only loss is the 20-logo client grid gold keeps as '![RISD](http://bepress.com/wp-content/uploads/2016/12/risd.png)' ... '![UCF](...)'. In HTML each is '<figure class=\"wpb_wrapper vc_figure\"><a href=\"http://digitalcommons.risd.edu/\"...><img ... src=...risd.png class=\"vc_single_image-img attachment-full\" alt=\"\" .../></a></figure>' — empty alt, so the alt-text-only image policy emits nothing; gold synthesizes alt from the filename (risd.png -> RISD).",
+        "generic_pattern": "Same engine rule as 3c050c33: emit ![alt](src) for in-content images inside <figure>/content columns, deriving alt from filename when alt=\"\"; an image-only figure wrapped in a link is content, not navigation."
+      },
+      {
+        "warc_record_id": "8905d25d-997c-4d47-9585-8b7374f52d09",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred (p=0.464) repeats per-photo widget lines five times: 'Oceń:' and 'Zgłoś jako nieodpowiednie' from onclick-only spans ('<span id=\"reportIAPLnk_65406432\" class=\"taLnk\" onclick=\"getIAPVoteOptions();\">Zgłoś jako nieodpowiednie</span>' — no href), emits the unsupported-browser banner twice (div class=\"unsupportedBrowser\" and div class=\"userAgent\" both contain 'Zauważyliśmy, że używasz nieobsługiwanej przeglądarki'), plus thumbnail-nav photo-title list and 'Poprzedni zestaw zdjęć' pagination. Formatting note: gold renders captions as '#### 5th floor room with flat screen TV (roadlesstraveledguy, maj 2013)', pred emits '**5th floor room...**' bold.",
+        "generic_pattern": "Drop text whose only interactivity is an onclick handler on a non-anchor element (span/div with onclick, no href), and treat a short line repeated verbatim >=3 times interleaved between content blocks as a per-item widget family; dedupe multi-line blocks that appear verbatim twice in one document (browser-upgrade banners)."
+      },
+      {
+        "warc_record_id": "1912c6ca-ca2f-41c6-a58f-51a87018824f",
+        "failure_mode": "engine_missing",
+        "evidence": "Precision 1.0, recall 0.425: all loss is link/embed emission. Gold has '[Jerry Falwell](http://tv.gawker.com/tag/jerryfalwell/)' etc. while pred outputs bare text and even '[Dlisted]' with no URL (source is '[<a href=\"http://dlisted.com/node/40027\">Dlisted</a>]'). Gold's '[Watch the video](http://www.youtube.com/embed/RMB10wwmWrU?...)' comes from an <iframe class=\"youtube\"> the engine drops entirely, and the H1 '<h1 class=\"headline hover-highlight entry-title\"><a href=<page-url> ...>Watch Jerry ...' is deleted because its sole child is a self-permalink anchor.",
+        "generic_pattern": "Emit [text](href) for in-content anchors and render media iframes (youtube/embed src) as a link; unwrap headings whose entire content is a self-permalink anchor (h1.entry-title > a[href==page URL]) instead of dropping the title."
+      },
+      {
+        "warc_record_id": "bbac7ef6-5a95-4061-a8f5-2e5e1bfc03ef",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred drops whole catalog sections gold keeps: e.g. under '## 1867-3-21 First issue' the items '<li id=\"spec212860\"><a href=\"\"> 1/2schilling 1867-4 perfMethod2 Typographed 2colors-printing</a></li>' (empty href) are missing, as are the 1875 and 1876 sections (r=0.444) — link-only <ul>s misread as nav. Meanwhile pred emits the stray single-letter links '<a href=\"http://www.stampedia.net/stamp/catalogue/stamp,212860/ja\">l</a>' as nested items ('  - l') which gold omits, and drops the footer '© Copyright 2009-2012 Stampedia project' gold keeps.",
+        "generic_pattern": "Count anchors with empty href=\"\" as plain text (weight 0) in link-density/nav scoring — an all-<a href=\"\"> list is a JS data widget, not navigation; and suppress link-only list items whose text is a single character."
+      },
+      {
+        "warc_record_id": "29ee72ba-5968-446e-b6a3-13858b268716",
+        "failure_mode": "over_chrome",
+        "evidence": "After the terminal marker '(The end)' pred appends related-poem teaser cards (p=0.478): '## The Black Mammy The Black Mammy' plus a truncated excerpt ending mid-sentence ('...to thy bosom pressed'), same for 'To Horace Bumstead'. Source is '<div class=\"block_books\"><span class=\"title_list\">NEXT BOOKS</span><h2>...<img ... alt=\"The Black Mammy\" /> <a ...>The Black Mammy</a>' — the doubled title comes from img-alt + anchor text both flattened to text. Pred also keeps footer 'Copyright 2010 By FOB, All Rights Reserved - **Contact Us** | **Privacy Policy**'.",
+        "generic_pattern": "A heading whose text is the same phrase repeated twice (img alt == adjacent link text) followed by a truncated excerpt is a teaser card, especially after an end-of-article marker or in containers labeled 'NEXT/RELATED/MORE'; suppress the block and dedupe img-alt when it duplicates adjacent anchor text."
+      },
+      {
+        "warc_record_id": "b3d12bb4-e857-4a66-bdc8-f9363a5f2666",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred (p=0.481, r=0.995) dumps ~150 lines of raw SMTP headers ('Return-Path: <u-boot-bounces@lists.denx.de>', 'X-Google-DKIM-Signature: ...') that live in '<div id=\"patchheaders\" class=\"patchheaders\" style=\"display:none;\">' behind '<a id=\"togglepatchheaders\" href=\"javascript:toggle_headers(...)\">show</a>'. Gold renders the row as '| Headers | (show) ... (omitted) |'. Secondary formatting: gold renders the patchmeta table as markdown table rows, pred as plain 'Message ID\\t\\t20120527...' lines.",
+        "generic_pattern": "Drop (or elide) subtrees hidden with inline style display:none — particularly ones toggled by a sibling javascript:-href 'show'/'toggle' link; collapsed-by-default disclosure content is chrome unless it is the page's main body."
+      },
+      {
+        "warc_record_id": "9901fdec-072e-4fce-87f4-19d5edfaea99",
+        "failure_mode": "over_chrome",
+        "evidence": "Recall is 1.0; extras halve precision (0.494): the breadcrumb 'W3C home > Mailing lists > Public > public-css-testsuite@w3.org > October 2010' comes from '<map title=\"Navigation bar to upper levels\" id=\"upper\"><p><a href=...>W3C home</a> &gt; ...'; plus mail-archive boilerplate 'Received on Monday, 18 October 2010 21:05:47 GMT' and '*This archive was generated by hypermail 2.2.0+W3C-0.50 ...*', and the From/Date/To/Cc/Message-ID header block gold omits.",
+        "generic_pattern": "Treat a top-of-document run of links separated by '>'/'&gt;' (or inside an element titled/classed 'breadcrumb'/'Navigation bar') as chrome, and recognize mailing-list-archive boilerplate text signatures ('This archive was generated by hypermail', trailing 'Received on <date>') as footer noise."
+      },
+      {
+        "warc_record_id": "94d6affd-1e46-4fd7-8614-a1e1c9f3769a",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold lists the two comments FIRST ('**kvennarad — December 19, 2013 at 5:41 am**\\n\\nWorks for me.') and the poem last, but DOM/rendered order is post (idx 7569) -> 'Tags:' (18990) -> comments (21106); since scoring is order-sensitive ROUGE-L LCS (benchmark/eval/metrics.py), the scrambled gold order alone costs ~1/3 of alignment despite near-identical token bags (word-level diff is only ~15 tokens). Genuine but minor engine issues: pred drops 'Tags: coffee, constipation, music, poem, word blockage' and keeps '### 2 Responses to “it's just a constipated holding pattern”' plus trailing ' #' permalink glyphs which gold omits.",
+        "generic_pattern": ""
+      },
+      {
+        "warc_record_id": "4b37db97-07ab-4b30-9c6e-d7675d041e9a",
+        "failure_mode": "over_chrome",
+        "evidence": "Recall 1.0, precision 0.519. Pred repeats the diff-widget label 'View Options' before all five file sections, keeps breadcrumb 'Diffusion MediaWiki 34dad2522704', the 'Actions' menu label, and the legal footer 'Content licensed under Creative Commons Attribution-ShareAlike 3.0 ... · Wikimedia Foundation · Privacy Policy · Code of Conduct · Terms of Use · Disclaimer · CC-BY-SA · GPL' which gold (edited) drops. Formatting: pred promotes section headings to '# Description' where gold has '## Description', and keeps empty 'M/A' status columns gold trimmed from the Changes table.",
+        "generic_pattern": "Same repeated-line family as 8905d25d: an identical short action label repeated verbatim once per content section ('View Options' x5) is widget chrome; also suppress end-of-page legal/license paragraphs that terminate in a run of dot/pipe-separated policy links (Privacy Policy · Terms of Use · Disclaimer)."
+      },
+      {
+        "warc_record_id": "73a34d39-86a9-476c-9c50-eeeac62c8788",
+        "failure_mode": "over_chrome",
+        "evidence": "Gold is just \"**Big Windy — 04-25-2008, 08:51 AM**\" plus the one-line message; pred (P=0.349) adds the whole vBulletin user panel: \"Drives: audi s4\", \"Location: seatac, wa\", \"iTrader: (**0**)\", \"Garage List\", \"Big Windy's Avatar\", \"Big Windy is offline United_States\", \"Appreciate 0\", \"Reply With Quote\". The message body itself is fully recovered (R=0.917).",
+        "generic_pattern": "vBulletin/forum post-chrome vocabulary: within a single post container, short lines matching the closed family {\"Reply With Quote\", \"<name> is offline/online\", \"iTrader:\", \"<name>'s Avatar\", \"Join Date:\", \"Drives:\", \"Location:\", \"Garage List\", \"Appreciate N\"} are platform UI shared across thousands of forum domains; strip them when >=2 of these signatures co-occur in one post block."
+      },
+      {
+        "warc_record_id": "6c2d0198-8447-46f1-a9f8-2bbb4562c294",
+        "failure_mode": "other",
+        "evidence": "The patent text lives in <pre itemprop=\"text\"> inside div.doc_foto; pred emits it as one 17KB code fence of raw two-column OCR with interleave artifacts and page-margin numbers (\"hot fuel line sec 30 tions\", stray \"70\"/\"75\" lines) that the edited gold reflows into clean paragraphs, plus doc-viewer chrome: \"код для вставки\", \"###### Автор\", \"**Просмотров:** 0\", \"**Размер файла:** 465 Кб\", \"Пожаловаться на содержимое документа\". P=0.377 vs R=0.897 — the extra mass is OCR fragments gold's edit removed.",
+        "generic_pattern": "Demote prose-<pre>: a <pre> whose content is dominated by natural-language sentences (hundreds of words, high stopword ratio, few code symbols) should be emitted as paragraphs, not a code fence; and a trailing label:value metadata run after the document body (Author/Category/Views/File size/Tags) is doc-viewer chrome regardless of language."
+      },
+      {
+        "warc_record_id": "067a995b-e1a6-4331-909a-20d183b40496",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred (R=0.386) truncates at \"## Sponsored Content\" and opens with a stray GUID line \"0CFE69074D054EC786164AC7D52B6357\"; it misses the radar thumbnail grid that gold keeps — HTML has <h4>Doppler Radar</h4> followed by <img ... alt=\"Doppler Radar\"> in div.map-previews — plus the \"Satellite/Radar Near Princeton, IN\" list and \"Weather Videos\" section. Note gold also carries charter-noise (17-item \"Radar & Maps\" nav list, \"## Footer\", \"Privacy Policy | Terms of Use\", map-control \"NW | N | NE\"), so part of the recall gap is gold's over-inclusion.",
+        "generic_pattern": "Media-preview rescue: a grid of blocks where each block is a heading (h3-h5) followed by a linked <img> whose alt text equals that heading's text is a content-bearing media module, not nav — exempt it from link-density pruning when it sits inside the main region of a page whose h1 topic matches the module."
+      },
+      {
+        "warc_record_id": "8ec62a1a-a8dc-43f5-937b-ac5afd0bd38f",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred (P=0.411, R=1.0) wraps the one-table gold in header/footer chrome: \"Site map Contact us Print version\", breadcrumb \"Home : ITU-T : Publications : Recommendations : H�Series : H.222.1\", \"Recently posted�-� Search Recommendations�-� Shopping cart\", and footer \"Top�-� Feedback�-� Contact us�-� Copyright � ITU�2008�All Rights Reserved / Updated :�2003/02/10\". Also mojibake (\"Fran�aisEspa�ol\" language switcher, NBSP decoded as �) and a table-shape divergence: pred emits the single-cell caption row \"**In force components**\" as the header and the real header (Number/Title/Status) as a bold body row, while gold promotes Number|Title|Status to the header row.",
+        "generic_pattern": "Breadcrumb/footer line families: strip a pre-content line of short capitalized segments joined by \" : \" or \">\" (breadcrumb) and trailing lines matching {\"Copyright (c) ... All Rights Reserved\", \"Updated :\", \"Site map\", \"Print version\", \"Contact us\"}; separately, when a table's first row is one cell spanning all columns followed by an all-bold/th row, demote the caption row to text and promote the second row to the markdown header."
+      },
+      {
+        "warc_record_id": "91450a10-1ab5-49af-bf30-4b38435f62c5",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred (P=0.45) repeats an identical action row for each of 10 community reviews: \"**I found this useful: Yes | No**\", \"Report a problem\", \"Add comment\", \"Comments\", \"Trust Rating *...%*\"; it also leaks hidden overlay help text (\"When the Update Twitter checkbox is selected your Tweet will automatically update...\", \"Please enter an abbreviation of up to three characters...\") which lives in div.overlay-content-inner blocks with a div.close button, plus commerce UI (\"Buy from Vinfolio\", \"Bid\", \"12 for sale\", \"Go\") and \"Loading Loading....\". Secondary gold defect: gold writes \"*No note provided.*\" for reviews whose notes ARE rendered in div.author-description (\"Simply superb. Fresh, youthful, intensely concentrated...\").",
+        "generic_pattern": "Repeated-line family veto: a short line whose exact text recurs >=3 times across sibling item blocks in one container (\"Report a problem\", \"Add comment\", \"I found this useful: Yes | No\") is per-item action UI — strip all occurrences; additionally strip subtrees carrying overlay/modal vocabulary (class contains 'overlay', with a 'close' child), which hold form help-text popups."
+      },
+      {
+        "warc_record_id": "c3da7800-a068-4254-a47e-42cb277db53f",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred emits \"Copy the following code and paste it into your web page to embed this video:\" which sits inside <div style='display:none'><div id='youTubeEmbed'> — an invisible embed popup — plus \"add a comment\", \"facebook comments\", and the footer table (\"Sign up for UCTV's monthly e-newsletter:\" / \"©2016 Regents of the University of California\"). It also fails to heading-ify the title, emitting the <title> string with site suffix \"...- UCTV - University of California Television\" instead of gold's \"# Values-Centered Leadership with Janis Heaphy\", and misses the rendered div#movie-title metadata line \"Premiere Date: 12/31/2007; 55 minutes\".",
+        "generic_pattern": "Hidden-subtree veto: never emit text under inline style display:none/visibility:hidden (these hold embed-code, schedule, and share popups); and the text signature \"Copy the following code ... to embed\" marks an embed-share widget regardless of site."
+      },
+      {
+        "warc_record_id": "7205a684-7eba-416f-9b89-ee4789034ccc",
+        "failure_mode": "over_chrome",
+        "evidence": "Article body is fully recovered (R=0.987) but pred (P=0.463) appends a sidebar of political teasers after the article's own terminators \"ENDS\" / \"© Scoop Media\": \"## NEW ZEALAND POLITICS > >\", then 9 teaser paragraphs each ending \"More>>\" and 6 empty repeated \"#### ALSO:\" headings, ending with \"Powered by Vodafone\".",
+        "generic_pattern": "Teaser-family strip: a run of blocks after the article's end (past a copyright line) in which most paragraphs terminate with a \"More>>\"/\"More >\"/\"Read More\" link and the same short heading (\"ALSO:\") repeats verbatim >=3 times is a related-teaser region — drop the whole run; repeated identical headings with empty bodies are themselves a noise signature."
+      },
+      {
+        "warc_record_id": "b52e83fe-8e52-4af9-b8da-ce8b7a989ea4",
+        "failure_mode": "under_missed_content",
+        "evidence": "Tag-listing page: gold keeps all 3 article teasers (\"Homeland Security: Spreaders of “Misinformation”...\", \"...Critics of COVID Mandates...\", \"Firms Accused of Vote Fraud...\"); pred (P=1.0, R=0.48) keeps only the third although all three sit in byte-identical containers: article.\"latest-posts-grid ...\" > div.align-items-center > div.spotlight-post inside main.site-main. The teaser-vocabulary classes ('latest-posts', 'spotlight') evidently pruned two of them.",
+        "generic_pattern": "Listing-page teaser exemption: when the page is an archive/term listing (short bare-term h1, URL path segment like /tag/ /category/ /taxonomy/) and homogeneous article-teaser blocks make up the majority of the main region's text, the teasers ARE the content — suspend 'latest-/spotlight-/related-' class-vocabulary pruning for that homogeneous run, and treat identically-structured siblings uniformly (never keep some and drop others)."
+      },
+      {
+        "warc_record_id": "322e5d7a-02a4-46f2-90d9-1ce0b6672006",
+        "failure_mode": "gold_noise",
+        "evidence": "Gold contains the abstract paragraph \"Rudy Bogad will captain the St. John's University basketball team...\" twice verbatim, but the HTML body renders it exactly once (div.abstractSummary > p.summaryText); the other two occurrences are <meta name=\"description\">/<meta name=\"lp\"> tags. Gold's \"April 02, 1967\" is the caption of a TimesMachine front-page-thumbnail promo, not article text. Pred's own minor chrome (\"### Article Preview\", \"- Permissions\", \"[ DISPLAYING ABSTRACT ]\") costs little next to the duplicated-paragraph recall penalty (R=0.52).",
+        "generic_pattern": ""
+      },
+      {
+        "warc_record_id": "4fc1bc16-1b1d-4d21-8824-0ef8b08409e4",
+        "failure_mode": "over_chrome",
+        "evidence": "Article body fully recovered, but pred (P=0.536) appends related-report promos: \"Sponsored links\" followed by three report teasers (\"2014 global high brightness LED market...\", \"Greater China touch panel shipment forecast...\") and \"Buy link\", plus headline links \"Analysis of China revised domestic semiconductor industry goals\", \"DIGITIMES Translation Services\", and image chrome \"Enlarge\" with a duplicated title line. Pred also drops gold's tail \"Categories: Bits + chips / Tags: FeRAM, FPGA, ...\".",
+        "generic_pattern": "Sponsored-region text signature: a standalone line/heading exactly \"Sponsored links\"/\"Sponsored Content\"/\"Sponsored Links\" opens a noise region extending through the following teaser list until the next structural boundary; separately strip single-word image-tool labels (\"Enlarge\") adjacent to figures, and a line that duplicates the article h1 verbatim next to an image."
+      },
+      {
+        "warc_record_id": "2eb897b3-25f5-4560-a368-5762e431400e",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred stops at \"## Cartoons\" and misses the \"Featured Articles\", \"Featured Commentary\", and \"Featured Blogs\" teaser sections gold keeps; in HTML these sit in <div id=\"block-views-articles-block_1..3\" class=\"block block-views\"> and were evidently pruned as sidebar-like 'block' modules while the kept sections were panel-panes. Pred also double-emits: each video title appears twice because the thumbnail's alt/title (\"alt=\\\"Otter Plays With Boy\\\"\") and the adjacent title link to the same href both render, and two column teasers (\"The Media's Sharpton Agenda in Ferguson\", \"Overdoing the Death of Robin Williams\") are emitted wholesale twice.",
+        "generic_pattern": "Adjacent-duplicate dedupe: when an <img> alt/title text equals the text of a neighboring link pointing to the same href (or an identical text block repeats consecutively), emit it once — alt+caption double-render is a cross-site CMS pattern; and on listing/taxonomy pages, homogeneous teaser-list modules inside the content column are content even when wrapped in generic 'block' containers."
+      },
+      {
+        "warc_record_id": "70bb15ad-1b8b-4c62-a14a-dd47a3e711bd",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction (P 0.341, R 1.0) appends a full news-teaser rail absent from gold: '**Latest 15 Reports**' followed by 15 alternating pairs like '31.07.15 12:57 Photo' / 'Turkey resumes war against Kurds with US approval'. It also emits a self-referential block '**Find this article at:**  \\nhttp://www.tamilnet.com/art.html?catid=13&artid=25438'. Charter: related-teasers = noise.",
+        "generic_pattern": "Cull runs of >=8 sibling items whose lines alternate a short timestamp-only line (e.g. ^\\d\\d\\.\\d\\d\\.\\d\\d \\d\\d:\\d\\d( Photo)?$) with a linked headline, especially under a 'Latest N ...' header — a repeated-line-family teaser rail. Separately, cull a '(Find|View) this article at:' line whose following line is the page's own URL."
+      },
+      {
+        "warc_record_id": "61d6450a-6cde-44f1-a93d-0b69dc62662e",
+        "failure_mode": "over_chrome",
+        "evidence": "Prediction (P 0.368) prepends a BOM plus a plain-text <title> echo 'Net Worth: State Legislature Rankings - - Florida Trend' right before the real '# Net Worth: State Legislature Rankings', then appends sidebar rails: 'Florida Business News' with headline+one-sentence teaser pairs ('Johnson & Johnson to open HQ in Tampa'), 'Florida Trend Video Pick', and a poll widget 'Ballot Box ... See Results' plus 'Subscribe'.",
+        "generic_pattern": "(1) Drop a leading plain-text line that equals the first emitted heading's text plus a site-name suffix (title-tag echo before H1). (2) Cull poll widgets: a short question line followed by 3-5 short option lines and a 'See Results'/'Vote' line. (3) Cull sidebar sections that are a bare section header followed by >=3 link-headline + one-sentence-teaser pairs with no other prose."
+      },
+      {
+        "warc_record_id": "80088d88-2ab0-433e-86c3-aa01b343c8b5",
+        "failure_mode": "over_chrome",
+        "evidence": "phpBB thread: prediction (P 0.408) keeps board chrome gold drops: 'It is currently Fri Oct 24, 2014 7:46 pm', 'Reply to topic Page **1** of **1** [ 4 posts ]', duplicated rank lines 'Bug Catcher\\nBug Catcher', 'Users browsing this forum: No registered users and 3 guests', and post signatures after the '_________________' delimiter ('**My reach is noble...**', 'Black Friend Code --- 5158 2229 2547'). Gold keeps only '**author — date**' + post body.",
+        "generic_pattern": "(1) A line consisting only of underscores ('_________________') is a forum-signature delimiter: cull it and following lines until the post boundary. (2) Cull forum-engine boilerplate text signatures: '^It is currently <datetime>$', '^Users browsing this forum:', 'Page N of N', '[ N posts ]', 'Reply to topic'. (3) Collapse consecutive duplicate short lines (img alt text repeated as adjacent text, e.g. rank badges)."
+      },
+      {
+        "warc_record_id": "9c127542-8acd-4940-b1c9-43efed6e61b1",
+        "failure_mode": "under_missed_content",
+        "evidence": "R 0.427: the extractor kept the lead-in 'Use the links below to access additional information about this case...' but vetoed the following <ul class=\"no-space-list\"> of 10 ECF links that gold keeps ('- Search for Party Aliases: https://ecf.azd.uscourts.gov/cgi-bin/qryAlias.pl?338128'), and culled the parties table containing gold content rows '#### Plaintiff: Terry Borboa / **Represented By:** Joel Tracy Ireland' because sibling rows are 'Search News [ Google News | Marketwatch | ... ]' link chrome.",
+        "generic_pattern": "(1) Rescue a link-only list when the immediately preceding RETAINED paragraph textually introduces it ('the links below', 'following links', 'use the links'). (2) Inside a mixed table, keep label+value rows (short label cell like 'Represented By:' plus a single-link value cell) instead of vetoing the whole table for the link-dense 'Search News/Search Web [ A | B | C ]' rows; the bracketed pipe-separated search-engine link row itself is a cullable text signature."
+      },
+      {
+        "warc_record_id": "c5b5c2e7-bee0-4e1d-a1c3-cc0d12da0fe8",
+        "failure_mode": "over_chrome",
+        "evidence": "vBulletin activity stream (P 0.444): every one of ~24 list items carries the same chrome lines the gold drops — 'Dr. James Naismith's Avatar', 'see more', '73 replies | 1259 view(s)' — plus a JS stub 'Please reload this page to view the 200+ new activity items that have been created.' and escaped HTML leaking as literal text: '<blockquote class=\"twitter-tweet\" data-partner=\"tweetdeck\">...' and '<div id=\"embedVideoContainer_...\"'.",
+        "generic_pattern": "(1) Within a list of >=5 sibling items, strip per-item lines whose pattern recurs in nearly every item: lines matching \"'s Avatar$\", '^see more$', '^\\d+ replies \\| \\d+ view\\(s\\)$'. (2) Cull page-state stubs matching 'Please reload this page ...'. (3) Never emit text tokens that contain raw escaped tag syntax like '<blockquote class=' or '<div id=' — treat entity-escaped HTML fragments in text nodes as noise or re-parse them."
+      },
+      {
+        "warc_record_id": "a8ab63bf-b66a-4eff-88c3-5c3346682ee3",
+        "failure_mode": "over_chrome",
+        "evidence": "P 0.451: prediction keeps board how-to boilerplate promoted to H1s — '# Posting a new Topic:', '# Some simple rules:', '# Want to promote your stuff?' ('List your place for **free** on **SurferDream**') — plus post scaffolding 'By:', 'Posted in', flag-alt duplication 'Canada Canada', and footer teasers 'Or view more Canada surf / travel topics here', 'surf atlas'. Gold keeps just '**Andy** – August 17 2006 20:08:00' + body.",
+        "generic_pattern": "(1) Collapse adjacent duplicate tokens where an img alt equals the immediately following text node ('Canada Canada'). (2) Cull orphan label-only lines ('By:', 'Posted in') that precede a bare username in forum post headers. (3) Sitewide instructional boilerplate blocks (short heading + 1-2 sentence second-person instructions about posting/registering, e.g. 'You don't need to register to post') repeated on every thread page are chrome — detectable as heading+prose blocks BEFORE the first post of a thread whose text is about using the site, not the topic."
+      },
+      {
+        "warc_record_id": "23e376d7-11d9-4ded-92b3-be5093085160",
+        "failure_mode": "engine_missing",
+        "evidence": "R 0.471: gold contains '![Costa de Almeria 19 – 25 October 2017 Issue 1685](https://cdn.euroweeklynews.com/...jpg?x65955)' and '[Download pdf to read offline](http://www.euroweeklynews.com/...1685-costa-de-almeria.pdf)'. In the HTML both imgs are lazy-loaded: src=\"data:image/svg+xml,%3Csvg...\" with the real URL only in data-src/data-srcset; the extractor emitted only the alt text 'Download pdf to read offline' with no image or href. Byline also splits 'By\\nEuro Weekly News\\n-\\n18 October 2017' where gold joins one line.",
+        "generic_pattern": "Lazy-image fallback: when an <img> src is a data:image placeholder (or missing/1px) and a data-src / data-srcset / data-lazy-src / data-original attribute holds an http(s) URL, emit the image using that URL (and keep the wrapping <a> as a link). Caption from figcaption or title when alt is empty."
+      },
+      {
+        "warc_record_id": "704e5c03-14a6-49ca-a9ab-8c161a734312",
+        "failure_mode": "under_missed_content",
+        "evidence": "R 0.63: gold has four attachment images '![Attached Images](attachment.php?...attachmentid=93914...)' but the HTML is '<img class=\"attach\" src=\"attachment.php?...\" alt=\"\" />' inside '<fieldset><legend>Attached Images</legend>' and prediction emitted only the text 'Attached Images'. Simultaneously P 0.672 from vBulletin post-header chrome: '#**30**', 'Old 04-26-2013, 04:05 AM', \"Wouter's Avatar\", 'Wouter Wouter is offline', 'Reply With Quote'.",
+        "generic_pattern": "Emit content images even with empty alt when they are forum attachments: img URL contains 'attachment' (attachment.php?attachmentid=...) or class contains 'attach', synthesizing alt from the enclosing fieldset legend/nearby label. Complementary chrome signatures: \"^Old <date>\" line, \"X's Avatar\", \"X X is offline\" (username doubled + status), 'Reply With Quote'."
+      },
+      {
+        "warc_record_id": "06232250-83f7-436c-a8f6-ff623f56b251",
+        "failure_mode": "under_missed_content",
+        "evidence": "R 0.495, P 1.0: the extractor culled the hero-carousel slides ('<div class=\"pi-slide\">... <h2>Premier insurance provider to the ski industry</h2><p>MountainGuard has been serving the ski industry for over 55 years.</p><a class=\"btn\" href=\"/about\">ABOUT US</a>') which gold keeps as '# heading + tagline + [ABOUT US](/about)', dropped the footer address table ('One New Hampshire Avenue / Suite 200 / Portsmouth, NH 03801') and the line 'Copyright © 2018 MountainGuard. All Rights Reserved.' (charter: copyright = content). Retained CTA texts lost their hrefs ('LEARN MORE' plain vs gold '[LEARN MORE](/services/claims-administration)').",
+        "generic_pattern": "(1) Do not cull carousel/slider containers (class vocab 'slide'/'slider'/'masthead') when a slide holds a heading plus a prose sentence — rendered article content per charter. (2) Keep footer 'Copyright ©...' lines (charter: content). (3) Preserve hrefs on button-styled anchors (class contains 'btn') instead of demoting them to bare text."
+      },
+      {
+        "warc_record_id": "b93aa826-148f-4a3b-a6f0-d2681dda7fff",
+        "failure_mode": "over_chrome",
+        "evidence": "P 0.518: the entire Terms of Service is inside a hidden modal '<div id=\"ag-terms\" class=\"mfp-hide\"><h3>Terms of Service</h3>...' (Magnific Popup hide class, never rendered); prediction emitted all of it ('Welcome to Hitvibz / These terms and conditions outline...'). Gold itself keeps the second half of the same hidden modal ('We will approve link requests...' onward) — gold noise per charter. Prediction also leaked stylesheet text '.fb_iframe_widget_fluid_desktop iframe { width: 100% !important; }' and dropped the article image '![Image](.../IMG-20190312-WA0021.jpg)' and the YouTube '<iframe src=\"https://www.youtube.com/embed/30mKr3rC_wk\">' gold keeps.",
+        "generic_pattern": "(1) Cull subtrees carrying hide-class vocabulary (mfp-hide, modal, popup, hidden, display:none inline style) — hidden modal/popup content is never rendered. (2) Suppress text shaped like CSS rules (selector { prop: value; }) leaking from <style> in body. (Gold-side: the retained half of this hidden ToS modal should be removed from gold under the same rule.)"
+      },
+      {
+        "warc_record_id": "6697278d-f590-4041-a501-e11dd16845fb",
+        "failure_mode": "over_chrome",
+        "evidence": "P 0.543: prediction emits the collapsed AND expanded description — a teaser paragraph ending 'As computers change the way we communicate,… (more)' immediately followed by the full paragraph plus a stray '(less)' — the title twice (plain line before '# Mysterious Messages...'), empty teaser headings '### From the same author', '### From the same publisher', '### Look for similar items', empty blockquotes '>', and a price fragment '### for $ 13.99 / 13.99'. Additionally mojibake: prediction 'History?s amazing secrets and codes?and' vs gold 'History’s' — curly quotes/dashes decoded to '?' (charset mis-detection), hurting every affected token.",
+        "generic_pattern": "(1) Collapsed-expander dedup: drop a paragraph ending in '(more)'/'… (more)' when a subsequent paragraph starts with the same normalized prefix; drop bare '(less)'/'(more)' toggle lines. (2) Drop a plain-text duplicate of the immediately following H1 (title echo). (3) Charset repair: a high rate of '?' directly adjacent to letters where smart punctuation is expected (X?s, word?word) signals wrong decoding — re-decode as cp1252/utf-8 before emission."
+      },
+      {
+        "warc_record_id": "6db21f5b-b048-4f0b-9071-cb2ba62011db",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred emits registration promo chrome gold excludes: \"## Register now to search thousands of members and post your FREE profile!\", \"## Join ChristianMingle.com ... Ready for a new relationship? Register for FREE today\", and the label \"Find ChristianMingle.com members by City:\" (its city link-list was cut but the label leaked). Symmetric recall loss: pred dropped the whole footer including charter-content copyright: gold keeps \"Copyright © 2014 Spark Networks® USA, LLC. All rights reserved.\" and \"SPARK NETWORKS USA, LLC DOES NOT CONDUCT BACKGROUND CHECKS...\" — in HTML these are <p>s inside div#footer sandwiched around a pipe-separated nav <p>, and the footer was pruned wholesale.",
+        "generic_pattern": "Two-sided rule: (a) veto call-to-action promo blocks — short sections whose text matches signup vocabulary (\"Register for FREE\", \"Join <site>\", \"In just a few minutes, you could be...\", \"post your FREE profile\") and that sit in nav_box/join-style side containers; (b) when pruning a footer container, rescue plain-text <p> children matching \"Copyright © ... All rights reserved\" or all-caps legal disclaimers (charter: copyright = content) even though a sibling <p> is a pipe-separated link row."
+      },
+      {
+        "warc_record_id": "1f6dd917-ab30-422a-b524-926f6e777826",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.371: pred keeps widget/nav text gold excludes: \"Move your mouse over me\", \"Mobile Version\", \"Home > Blog\", \"rssSubscribe Blog Roll\", a calendar widget close-control \"[X]\" (HTML: <a onclick=\"hide_blogcalendert()\">[X]</a>), the pipe nav row \"About | Sitemap | Advertise | Contact | Disclaimer | Privacy Statement\", footer tagline promoted to \"# Helping Scout leaders one resource at a time...\", and sponsor/hosting credits (\"Generously hosted by Techya\"). Minor recall miss: the post title link <a href=/blog/612/...><span class=\"blog_links\">The New Adventures of Ptsteve</span></a> (gold: \"### The New Adventures of Ptsteve\") was dropped as a link-only line even though it directly precedes the kept \"By: ptsteve On: 2013-03-14\" byline.",
+        "generic_pattern": "Veto pipe-separated link rows (>=4 short link tokens joined by \"|\") and widget-control text (single-character \"[X]\"/close anchors with onclick handlers, tooltip strings like \"Move your mouse over me\"); conversely, rescue a short link-only line as a heading when it immediately precedes a kept byline pattern (\"By: <name>\" / \"On: <date>\") followed by body text."
+      },
+      {
+        "warc_record_id": "12455361-0d47-4002-958d-00e279a481dd",
+        "failure_mode": "under_missed_content",
+        "evidence": "R=0.385: the 22-row track table (#track_table, rows like <td class=\"track-number-col\">1.</td><td class=\"title-col\"><a>Nearly Right But Not Quite</a><span class=\"time\">05:24</span></td> plus empty play/info/download button cells) collapsed to a degenerate \"| | / |\" table; the \"supported by\" fan list (div.name entries \"Skeks*\", \"selaoner\", ...) vanished; and pred keeps headings \"## tags\" and \"## license\" but empties them — the <a class=\"tag\"> anchors (ethiopia, kenya, ...) and CC license link were stripped as a link-only list.",
+        "generic_pattern": "Two rules: (a) in tables, drop cells containing only buttons/empty divs (play/download controls) but never drop the row when a sibling cell has real text, especially rows carrying a duration pattern \\d{1,2}:\\d{2} — that is a data/track table per charter; (b) when a heading is kept but its entire following block is pruned as a link-list (empty-section signature), rescue the link texts — tag/keyword lists under headings like tags/keywords/license are content."
+      },
+      {
+        "warc_record_id": "d5d47d5f-c707-4e93-a354-40fde3da1501",
+        "failure_mode": "under_missed_content",
+        "evidence": "R=0.495: definition sentences are built from inline word links (<span class=\"def\">the <a class=\"query\">system</a> in which <a class=\"query\">employees</a> <a class=\"query\">talk</a>...) so the link-density heuristic deleted the whole British definition and mangled examples — pred emits \"Unions will keep .\" where gold has \"Unions will keep collective bargaining rights.\" (the linked words were stripped from mid-sentence). Thesaurus synonyms link-list (arbitrate, arbitration, ...) and translations also lost. Also whitespace bug: pred joins \"collective bargainingnoun [U]\" (inline spans concatenated without space).",
+        "generic_pattern": "Inline anchors that participate in sentence flow — lowercase anchor text adjacent to non-link text/punctuation within the same block, many short anchors separated by bare words — must not count toward nav link-density and must never be dropped individually (dropping them deletes words from the middle of sentences). Separately: insert a space when adjacent inline elements would otherwise concatenate letters (\"bargainingnoun\")."
+      },
+      {
+        "warc_record_id": "39609e90-6482-49f7-bfb6-36a0f66ee704",
+        "failure_mode": "other",
+        "evidence": "P=0.427 with R=1.0: the raw HTML contains the identical <div class=\"news_item\"> article twice back-to-back (lines 102 and 145 both start \"<p>From Sematopia.com today, there's <a...>a quick example</a>...\"); gold keeps one copy, pred emits both full copies plus the stub-title/\"Link:\" chrome around each, roughly doubling output.",
+        "generic_pattern": "Deduplicate emitted blocks: when two normalized text blocks of substantial length (e.g. >=200 chars) are exact duplicates within one document, emit only the first — server-side duplicated article containers (print/mobile copies, listing echoes) are common and gold always keeps a single copy."
+      },
+      {
+        "warc_record_id": "529cf132-8268-4498-860a-cf652b4a8fd5",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.464: pred keeps the vBulletin per-post user-panel repeated for all 9 posts: \"AndjaVXC's Avatar\", \"Location: Vancouver, WA\", \"Bikes: ...\", \"Mentioned: 0 Post(s) / Tagged: 0 Thread(s) / Quoted: 9 Post(s) / Liked 6 Times in 6 Posts\", \"Old 02-08-16, 11:56 AM\", \"#**1**\", and \"AndjaVXC is offline\" — gold reduces each post to author+timestamp+body. Pred also keeps the \"**Related Topics**\" teaser table (charter: related-teasers = noise) and the subforum banner quote (\"I still feel that variable gears are only for people over forty-five...\").",
+        "generic_pattern": "Repeated-line-family chrome: lines whose skeleton recurs >=3 times across the document with only usernames/numbers varying (\"<user> is offline\", \"Mentioned: N Post(s)\", \"Quoted: N Post(s)\", \"Liked N Times in N Posts\", \"Old <date>, <time>\", \"#<n>\") are per-post UI panels, not content; plus a text-signature veto for \"Related Topics\"/\"Similar Threads\" sections and the \"View Post\" suffix after \"Originally Posted by X\"."
+      },
+      {
+        "warc_record_id": "4feb793e-ee7a-406b-a47b-5b65910c0ad3",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.479, pred is 25k chars vs gold 12.8k: pred appends the sidebar \"Latest Stories\" teaser stream — dozens of cards shaped \"By <Author>\" + truncated paragraph ending \"...\" + \"Apr. 26, 2017 08:45 AM EDT Reads: 3,221\" — which are related-article teasers (noise per charter). Also keeps event-registration chrome gold cuts: \"# Register Now!\", \"# Save on your \\\"Golden Pass\\\"! Call 201.802.3020\", \"Speaker Opportunities\", \"Exhibitor Info\". Gold keeps the article plus the Cloud Expo editorial section and copyright footer, which pred also has (R=0.949).",
+        "generic_pattern": "Teaser-stream detection via repeated card skeleton: consecutive blocks each ending with a metadata line matching \"^[A-Z][a-z]{2}\\.? \\d{1,2}, \\d{4} .* Reads: [\\d,]+$\" (or ending in a truncation ellipsis \"...\" immediately followed by such a counter line), repeated >=3 times, form a related-content rail — drop the whole family. Registration/CTA headings (\"Register Now\", \"Call <phone> ... to Register\") are the same promo-veto family as other docs."
+      },
+      {
+        "warc_record_id": "5e5b7683-3010-49db-b21a-3441ea83e32b",
+        "failure_mode": "under_missed_content",
+        "evidence": "R=0.633: gold's author list (\"Akkawi, F. – Northwestern Univ., Chicago, IL\", present in HTML as authorPreferredName anchors) and all three keyword sections (INSPEC CONTROLLED/NON CONTROLLED, IEEE TERMS — present as <h2>IEEE TERMS</h2><ul><li><a data-keyword=\"Acoustic propagation\">...) were dropped as link-only lists. Precision also hurt (P=0.67) by the purchase modal pred keeps: \"Full Text **Sign-In or Purchase**\", the \"$31 | $13\" pricing table, \"**Become an IEEE Member...** close button\", \"puzzle piece\" (image alt text of a modal illustration).",
+        "generic_pattern": "Same empty-section rescue as bandcamp/cambridge: a link-only <ul> directly under a kept/content heading (esp. taxonomy vocabulary: TERMS, INDEXING, keywords, authors) is content, not nav — anchors with data-keyword/rel-metadata attributes are a strong positive signal. Complementary chrome veto: blocks containing leaked UI alt/label strings like \"close button\" alongside purchase vocabulary (\"Sign-In or Purchase\", \"Member\"/\"Non-Member\" price tables) are modal/paywall chrome."
+      },
+      {
+        "warc_record_id": "054ad690-d57c-437b-a324-bd773201750f",
+        "failure_mode": "other",
+        "evidence": "Token overlap is high but the markdown shape diverges: gold renders the search-result card flat — \"## meanwhile, here in the states....\" then \"**shames-demise – Sep 16, 2018**\" then \"Thread: ... Forum: News & Debate / Replies: 6\" — while pred wraps it in an ordered list with a nested heading and bullet metadata: \"1. shames-demise\" / indented \"### meanwhile, here in the states....\" / \"- shames-demise - Thread - Sep 16, 2018 - Replies: 6 - Forum: News & Debate\", duplicating the username and scattering label/value pairs into separate bullets.",
+        "generic_pattern": "Markdown-shape rule: never nest a heading inside a list item — when an <li> contains an h2-h6, unwrap the (usually single-item) list wrapper and emit the heading and its metadata as flat block lines; short label/value fragments (Thread/Forum/Replies: N) belong on labeled lines, not one-word bullets, and a repeated username inside the same card should be emitted once."
+      },
+      {
+        "warc_record_id": "05ec8c3b-3a44-4b05-8b30-02797ab89319",
+        "failure_mode": "over_chrome",
+        "evidence": "P=0.513, R=1.0: pred keeps widget/nav chrome around the fortune: the bold link nav row \"**PROXY** **WHOIS** **RQUOTE** **TEXTS** **SOFT** **FOREX** **BBOARD**\", the header widget \"Random Quote #0 topic: politics, ...\", \"# RSS 2.0 GIVE ME MORE RANDOM QUOTE ANY, FROM politics!\", the form label \"Select Next Random Quote Topic:\", and the render-timer footer \"generated in 0.010506 seconds\".",
+        "generic_pattern": "Three text/structural signatures: (a) a row of >=5 consecutive one-word all-caps links is nav even when each is bold (bold links must not exempt a link-row from the nav-row test); (b) render-timer footers matching \"generated in [\\d.]+ seconds?\" are chrome; (c) form-widget label lines ending in a colon with the following <select>/form stripped (\"Select Next ... Topic:\") should be dropped with their form."
+      },
+      {
+        "warc_record_id": "407c36a0-a183-42fe-a135-141ea33c87a9",
+        "failure_mode": "under_missed_content",
+        "evidence": "P=1.0, R=0.525: the article body is essentially one image which pred omits entirely. Gold keeps \"![if we just spend more money create more govt programs it will solve everything](...649x325.jpg)\". In HTML it is <img loading=\"lazy\" class=\"alignleft size-large wp-image-2336\" src=\"...\" alt=\"\" ... srcset=\"...\"> inside a <p> in the entry content — the empty alt (and/or lazy-load attrs) caused the extractor to drop it, and gold derives its alt text from the filename slug.",
+        "generic_pattern": "Emit content-area images even when alt is empty: for an <img> that is a direct child of a body paragraph in the main content (wp-image-* / size-large style content classes, real src plus srcset), produce image markdown, deriving alt text from the filename slug (hyphens to spaces, size suffix like -649x325 removed) when alt=\"\" — currently empty-alt/lazy images are silently discarded, zeroing recall on image-centric posts."
+      },
+      {
+        "warc_record_id": "10270190-17ba-49e6-8c45-3d97dab98580",
+        "failure_mode": "under_missed_content",
+        "evidence": "Squarespace category page with 20 structurally identical sibling '<article class=\"entry h-entry hentry ...\">' posts; pred keeps only 7 (indices 10,12,13,16,17,19,20) and drops 13 interleaved others, e.g. dropped 'Steve Singleton - Bodyguard' (article-index-14) whose body '<div class=\"sqs-block html-block\"><p><strong>STEVE SINGLETON...' is byte-for-byte the same shape as kept 'Dan Crinnion - Killing Eve' (index-16). Gold keeps all 20 full posts plus their 'Tags:'/'Tagged:' footer lines, which pred drops even for kept posts. R=0.363.",
+        "generic_pattern": "Homogeneous-sibling amnesty: when sibling elements share an identical structural signature (same tag + class family, e.g. article.hentry/h-entry, each with heading + body paragraphs), the keep/drop decision must be made once for the whole family — if any member is classified content, keep all members; interleaved keep/drop of structurally identical siblings is classifier noise, never correct."
+      },
+      {
+        "warc_record_id": "4e0d4416-9e09-4787-8738-4d6f8e4d36f7",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred adds action-link runs 'Save | Post a comment |' and '**« Back to Article**' around the article, an empty comment section ('**sort:** oldest | newest', '## Comments', 'No comments posted for this article.'), a search widget ('##### I am looking for:', 'in: News, Blogs & Events Web'), and the site footer ('301 4th St SE , Minot, ND 58703 | 701-857-1900', '© 2014. All rights reserved.| Terms of Service and Privacy Policy'). Gold is only headline, date, and the one-line teaser body. P=0.364.",
+        "generic_pattern": "Empty-comment-section veto: a comments block whose only text is sort controls ('sort: oldest | newest') plus an empty-state stub ('No comments posted...') carries zero comment content and should be dropped whole; likewise drop short pipe-separated action-link runs ('Save | Post a comment |', 'Back to Article') adjacent to the article header/footer."
+      },
+      {
+        "warc_record_id": "2a9c62cc-2624-4cad-a036-ef575e30828e",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred opens with a hidden print dialog from '<div id=\"printModal\"><h4>Printing Options</h4>' ('Please select the reports you would like to print. / Select All / or Cancel') and dumps ~20 hidden tooltip definitions from '<div class=\"tooltip\" id=\"defSalvage\">' etc. ('**Salvage Title**', '**Junk Title**', with 'Rebuilt/Reconstructed Title' emitted verbatim twice), plus repeated CTAs 'Tell us what you know about this vehicle' and a duplicated print-summary sidebar ('CARFAX Vehicle Highlights' restating VIN/ownership). P=0.399 despite R=0.903.",
+        "generic_pattern": "Hidden-interaction-layer veto: drop containers whose id/class vocabulary marks overlay UI — 'modal', 'printModal', 'tooltip', 'popup', 'dialog' — these render invisible tooltip/dialog text; additionally, verbatim-duplicated block families (same multi-word paragraph emitted 2+ times, e.g. tooltip text mirroring glossary text) should be emitted at most once."
+      },
+      {
+        "warc_record_id": "38e8c691-75a6-4cac-b747-0039f7840356",
+        "failure_mode": "engine_missing",
+        "evidence": "Gold contains '![Jeannot Kuenzel](http://scienceblogs.com/pharyngula/files/2016/12/purplesquidmass-500x333.png)' and '[Jeannot Kuenzel](http://www.earthtouchnews.com/...)'; the HTML has a plain '<img src=\"http://...purplesquidmass-500x333.png\" alt=\"Jeannot Kuenzel\">' followed by an '<a href>'. Pred emits only the bare text 'Jeannot KuenzelJeannot Kuenzel' — image src and anchor href both stripped, and the two inline texts concatenated with no separator. On this tiny doc the missing URL tokens drive R to 0.443.",
+        "generic_pattern": "Serialize in-content images as markdown: an <img> with a real src inside the selected content flow should be emitted as ![alt](src), and an adjacent caption <a> should keep its href as [text](url); also always insert a separator (space/newline) between consecutive inline elements so their texts never fuse ('Jeannot KuenzelJeannot Kuenzel')."
+      },
+      {
+        "warc_record_id": "a16e4c89-7e14-40e8-bc2b-c01d3940d5a5",
+        "failure_mode": "under_missed_content",
+        "evidence": "Gold's '## Timeline' has 10 homogeneous entries ('### Newswire – June 13 2018', '### Video – April 26 2018', ...); pred keeps only 3 of them (e.g. 'Futura Medical starts work on Phase III trial...') and drops the other 7, and also drops the byline '**Author:** Polly Middlehurst', the '[YouTube video: ...]' placeholder, and the whole company-profile/market block ('**Market:** AIM', '**EPIC:** FUM', '**Market Cap:** 42.35M'). Pred meanwhile adds chrome 'Sign up', 'View full FUM profile View Profile', 'View All', '© biotech Capital 2018'. R=0.473.",
+        "generic_pattern": "Same homogeneous-sibling amnesty as the hentry case: a repeated teaser-card family (label line 'Newswire/Video/Article' + heading + one-sentence summary) must be kept or dropped as a unit — pred keeping 3 of 10 identical cards is per-item classifier noise; when several members pass the content test, extend content status to every sibling with the same structural signature."
+      },
+      {
+        "warc_record_id": "9951238c-9f6a-4393-9702-69547278ed86",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred adds transcoder/accessibility chrome: 'text-only page produced automatically by LIFT Text Transcoder Skip all navigation and go to page contentSkip top navigation and go to directorate navigation...', masthead 'National Science Foundation Home National Science Foundation - Computer & Information Science & Engineering (CISE)', 'Email this pagePrint this page' (emitted twice), 'All Images', 'Back to article | Note about images', image alt 'image of human brain', and trailing 'National Science Foundation Logo'. Gold is just the press-release caption block. P=0.457.",
+        "generic_pattern": "Skip-link/action-line veto: drop lines matching accessibility skip-link vocabulary ('Skip [all/top] navigation', 'go to page content') and page-action pairs ('Email this page', 'Print this page'), especially when the same action line repeats at top and bottom of the document; drop image alts ending in ' Logo' when the image is a linked masthead."
+      },
+      {
+        "warc_record_id": "86caf180-49be-499a-b824-c19e89f442b8",
+        "failure_mode": "under_missed_content",
+        "evidence": "Pred contains only the single post ('# Friday, August 01, 2008', '## Linda has a Little Lamb', body); gold additionally keeps the blog title '# Art and More', the author-profile widget ('## Auntie Linda', 'Waddy, Kentucky, United States', 'I'm a child of God, I'm an Artist...'), and the post image '![lamb and hearts](http://4.bp.blogspot.com/.../lamb+and+hearts.jpg)' which pred renders as an empty line. R=0.495 on a 600-byte gold.",
+        "generic_pattern": "Image serialization again dominates on short posts: emit ![alt](src) for images inside the post body (here the img sits in the schema.org BlogPosting itemscope with itemprop image_url). Secondary: page <h1>/blog-title and author-bio ('About me') text blocks adjacent to a lone post are gold-content on single-post blog pages — a bio paragraph with first-person prose should not be pruned as sidebar."
+      },
+      {
+        "warc_record_id": "d7dac384-0757-48cd-a6e4-200294108279",
+        "failure_mode": "over_chrome",
+        "evidence": "Pred adds a manufacturer nav line 'Aprilia BMW Cagiva Ducati Harley-Davidson Honda Kawasaki KTM Moto Guzzi Suzuki Triumph Yamaha', breadcrumbs 'Moto profi >> Manufacturers list >> Suzuki >> GSF 600 Bandit 2001' (twice), a 4x4 thumbnail-gallery table of alt texts 'Suzuki GSF 600 Bandit 2001 photo 0 ... photo 15' with 'Click photo to enlarge', 'Motoprofi logo', and footer 'Copyright © 2007 motoprofi.com. All rights reserved.' plus nav 'Home | Privacy Policy'. Gold is only the spec tables. P=0.486, R=1.0.",
+        "generic_pattern": "Numeric-suffix repeated-line family = gallery chrome: a table/list whose cells are linked images with near-identical alt strings differing only by a trailing index ('... photo 0', '... photo 1', ...) is a thumbnail gallery, drop it (with its 'Click photo to enlarge' caption); also drop breadcrumb lines recognizable by repeated '>>'/'»' separators between short link tokens."
+      },
+      {
+        "warc_record_id": "8e71bc69-5e3b-40c1-9b23-075a5577e5cf",
+        "failure_mode": "engine_missing",
+        "evidence": "Gold's payload is the attachment link '[PERSONAL DETAILS AND PREFERENCES](http://trophytracking.com/wp-content/uploads/2013/04/PERSONAL-DETAILS-AND-PREFERENCES.pdf)'; pred emits only the bare anchor text 'PERSONAL DETAILS AND PREFERENCES' with the href stripped, so the URL tokens (half of this 205-byte gold) are lost (R=0.536). Pred also prepends stray text 'congtythep' and a dangling 'written by wimpie garbers in'.",
+        "generic_pattern": "Keep hrefs on document/attachment links: an anchor pointing at a file asset (.pdf/.doc/uploads path) inside the content flow should be serialized as [text](url) — bare-text flattening of such links deletes the page's principal payload on WordPress attachment pages."
+      },
+      {
+        "warc_record_id": "8a99122c-2f6e-4732-ab4c-9872b2463ed7",
+        "failure_mode": "under_missed_content",
+        "evidence": "The FAQ TOC is a plain '<UL><LI><a href=\"/p/help.cgi?answer=18&category=ONCE_I_JOIN\">How do I contact members?</a>...' inside the main container 'div#page_main' under heading '<B>Once I Join:</B>'; gold keeps all five question bullets and the 'Top Questions' bullets ('- Forget username / password', ...), but pred drops both link lists while keeping their headings, leaving orphaned empty sections '## Search the Help Pages' and '## Top Questions', and adds the chrome link text 'Back to Help index'. R=0.534.",
+        "generic_pattern": "Heading-list consistency: a link-only <ul> that sits inside the selected main-content container and directly follows a kept heading is an in-content TOC/FAQ index — keep it; if a link list is pruned as nav anyway, prune its now-empty immediately-preceding heading with it (an emitted heading with no body is a reliable sign the pruner cut content, not chrome)."
+      },
+      {
+        "warc_record_id": "407c36a0-a183-42fe-a135-141ea33c87a9",
+        "failure_mode": "engine_missing",
+        "evidence": "Pred is identical to gold except the image: gold has '![if we just spend more money create more govt programs it will solve everything](http://thetaborfoundation.org/wp-content/uploads/2019/04/...-649x325.jpg)' while pred emits nothing — the HTML is '<img loading=\"lazy\" class=\"alignleft size-large wp-image-2336\" src=\"http://...649x325.jpg\" alt=\"\">' inside div.entry-content. P=1.0, R=0.525: the missing image markdown is the entire loss.",
+        "generic_pattern": "Emit in-content images even with empty alt: an <img> with a real src inside the content container (e.g. entry-content, wp-image-* class) should always produce ![alt](src); when alt is empty, derive alt from the filename slug (hyphens to spaces, size suffix stripped) as this gold does — on image-centric posts the image markdown is most of the document."
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Classify"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Synthesize"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "band57:0",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a63ae21e646add3d7",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237917026,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238328256,
+      "tokens": 65668,
+      "toolCalls": 23,
+      "durationMs": 411229,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"87e56e4f-f33c-47ae-aae5-0dfe0b7c04b9\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Pred appends sidebar blocks gold excludes: 'Aggregated Blog' (a feed link) and 'We are a 501c3 non-profit... Consider donating to support our forensic challenges' — in HTML this paragraph sits inside <div class=\\\"block block-block\\\"> directly followed by a PayPal <form action=\\\"https://www.pa…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "band57:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "a3c0f661db16979e4",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237917878,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238417661,
+      "tokens": 69292,
+      "toolCalls": 38,
+      "durationMs": 499783,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"3c050c33-2ce7-4909-a570-9ef66672bd34\",\"failure_mode\":\"engine_missing\",\"evidence\":\"Gold contains 4 content images: '![Schematic_PSU](https://lowpowerlab.com/wp-content/uploads/2016/09/Schematic_PSU-300x177.png)' etc.; pred has none (r=0.355). HTML imgs have empty alt ('class=\\\"aligncenter size-medium wp-image-2206\\\" src=...Schematic_PSU-300x177.png alt') and the engine e…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "band57:2",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "aa6616558ec55de46",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237917575,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238374704,
+      "tokens": 70317,
+      "toolCalls": 40,
+      "durationMs": 457129,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"73a34d39-86a9-476c-9c50-eeeac62c8788\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Gold is just \\\"**Big Windy — 04-25-2008, 08:51 AM**\\\" plus the one-line message; pred (P=0.349) adds the whole vBulletin user panel: \\\"Drives: audi s4\\\", \\\"Location: seatac, wa\\\", \\\"iTrader: (**0**)\\\", \\\"Garage List\\\", \\\"Big Windy's Avatar\\\", \\\"Big Windy is offline United_States\\\", \\\"Apprecia…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "band57:3",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "aa001144f32e53f31",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237917330,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238256979,
+      "tokens": 57108,
+      "toolCalls": 25,
+      "durationMs": 339649,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"70bb15ad-1b8b-4c62-a14a-dd47a3e711bd\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Prediction (P 0.341, R 1.0) appends a full news-teaser rail absent from gold: '**Latest 15 Reports**' followed by 15 alternating pairs like '31.07.15 12:57 Photo' / 'Turkey resumes war against Kurds with US approval'. It also emits a self-referential block '**Find this article at:**  \\\\nhttp:…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "band57:4",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "aca8b1c2bd7beb050",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237917716,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238255078,
+      "tokens": 56436,
+      "toolCalls": 24,
+      "durationMs": 337362,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"6db21f5b-b048-4f0b-9071-cb2ba62011db\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Pred emits registration promo chrome gold excludes: \\\"## Register now to search thousands of members and post your FREE profile!\\\", \\\"## Join ChristianMingle.com ... Ready for a new relationship? Register for FREE today\\\", and the label \\\"Find ChristianMingle.com members by City:\\\" (its city …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "band57:5",
+      "phaseIndex": 1,
+      "phaseTitle": "Classify",
+      "agentId": "abb38dcffc9fa4203",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786237918262,
+      "queuedAt": 1786237915315,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are analyzing mid-band extraction failures for the resiliparse markdown extractor to find GENERIC cross-site patterns (domain-gated site rules are exhausted — do NOT propose them).\n\nWorking dir: /Users/michaelryan/Documents/School/Stanford/Research/chatnoir-resiliparse. Python: /opt/miniconda3/envs/resiliparse/bin/python.\n\nTargets: /private/tmp/claude-501/-Users-michaelryan-Documents-School-St…",
+      "lastProgressAt": 1786238279569,
+      "tokens": 77204,
+      "toolCalls": 34,
+      "durationMs": 361307,
+      "resultPreview": "{\"docs\":[{\"warc_record_id\":\"10270190-17ba-49e6-8c45-3d97dab98580\",\"failure_mode\":\"under_missed_content\",\"evidence\":\"Squarespace category page with 20 structurally identical sibling '<article class=\\\"entry h-entry hentry ...\\\">' posts; pred keeps only 7 (indices 10,12,13,16,17,19,20) and drops 13 interleaved others, e.g. dropped 'Steve Singleton - Bodyguard' (article-index-14) whose body '<div clas…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "synthesize",
+      "phaseIndex": 2,
+      "phaseTitle": "Synthesize",
+      "agentId": "a46aa432bd530623f",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786238421172,
+      "queuedAt": 1786238419462,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Cluster these per-doc failure analyses into generic fix patterns, ranked by (doc_count, low risk). Merge duplicates aggressively. Patterns must be site-agnostic. Input JSON:\n[{\"warc_record_id\":\"87e56e4f-f33c-47ae-aae5-0dfe0b7c04b9\",\"failure_mode\":\"over_chrome\",\"evidence\":\"Pred appends sidebar blocks gold excludes: 'Aggregated Blog' (a feed link) and 'We are a 501c3 non-profit... Consider donating …",
+      "lastProgressAt": 1786238564676,
+      "tokens": 42024,
+      "toolCalls": 1,
+      "durationMs": 143503,
+      "resultPreview": "{\"patterns\":[{\"name\":\"link-and-media-serialization\",\"description\":\"Emitter: never flatten URLs to bare text inside the selected content flow. Emit <img> as ![alt](src) even when alt=\\\"\\\" (derive alt from filename slug: hyphens->spaces, strip -WxH size suffix); resolve lazy images via data-src/data-srcset/data-lazy-src/data-original when src is a data:/1px placeholder; treat imgs with 'attach'/atta…"
+    }
+  ],
+  "totalTokens": 438049,
+  "totalToolCalls": 185
+}

@@ -1384,6 +1384,7 @@ static DISPLAY_CSS: LazyLock<Regex> = regex_ci!(r"(?:^|;\s*)(?:display\s?:\s?non
 // Unrendered client-side template tokens (0105): Velocity `$obj.method()`
 // and Rails `translation_missing` placeholders only surface when the page's
 // JS templating never ran — a rendered page hides these blocks.
+static RENDER_TIMER: LazyLock<Regex> = regex_ci!(r"^(?:page )?generated in [0-9.]+ sec(?:ond)?s?");
 static TEMPLATE_TOKEN: LazyLock<Regex> = regex_ci!(r"\$[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\(\)|translation_missing");
 static MODAL_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|\s)(?:wp-|p-|-l)?(?:modal|popup|lightbox)(?:[_-]*(?:window|pane|box))?(?:$|[\s_-])");
 static GALLERY_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|[\s_-])(?:gallery|carousel)(?:$|[\s_-])");
@@ -8476,6 +8477,10 @@ fn strip_ui_label_lines(text: String) -> String {
         "new schedule b search engine", "newest trade data!",
         "bookmark the permalink.", "bookmark the permalink",
         "linkback",
+        "email this page", "print this page", "email this pageprint this page",
+        "skip to main navigation", "skip all navigation and go directly to page content",
+        "skip top navigation", "skip navigation", "back to article",
+        "save | post a comment |", "\u{ab} back to article",
     ];
     let mut out = String::with_capacity(text.len());
     let mut removed_any = false;
@@ -8552,6 +8557,11 @@ fn strip_ui_label_lines(text: String) -> String {
             && !line.starts_with('\t')
             && regex_search_not_empty(tl.as_bytes(), &TEMPLATE_TOKEN)
         {
+            removed_any = true;
+            continue;
+        }
+        // Render-timer footers (0113): "generated in 0.010506 seconds"
+        if tl.len() < 45 && regex_search_not_empty(tl.as_bytes(), &RENDER_TIMER) {
             removed_any = true;
             continue;
         }
