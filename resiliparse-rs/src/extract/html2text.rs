@@ -2084,7 +2084,14 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
         let mut wp_comments: Option<String> = None;
         if let Some((block, vetoes, authors)) = wp_candidate {
             let missing = authors.iter().filter(|a| !result.contains(a.as_str())).count();
-            if missing * 2 >= authors.len() {
+            // Native-shape override (0150): the authors may all be present
+            // yet rendered in WordPress's own "**Name** says:" form, which
+            // gold rewrites to "**Name – date**". Firing the rebuild only on
+            // MISSING authors left those docs on the inferior shape (68-doc
+            // header-recall census). Treat >=2 native "says:" markers as a
+            // trigger too.
+            let native_says = result.matches("** says:").count() + result.matches("**says:").count();
+            if missing * 2 >= authors.len() || (native_says >= 4 && authors.len() >= 4) {
                 let mut set2 = effective_tpl.clone().unwrap_or_default();
                 for v in &vetoes {
                     set2.insert(*v);
