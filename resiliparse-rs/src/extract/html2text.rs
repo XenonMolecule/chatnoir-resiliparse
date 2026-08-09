@@ -8478,6 +8478,8 @@ fn strip_ui_label_lines(text: String) -> String {
         "bookmark the permalink.", "bookmark the permalink",
         "linkback",
         "email this page", "print this page", "email this pageprint this page",
+        "garage list", "reply with quote", "view options",
+        "report a problem",
         "skip to main navigation", "skip all navigation and go directly to page content",
         "skip top navigation", "skip navigation", "back to article",
         "save | post a comment |", "\u{ab} back to article",
@@ -8545,7 +8547,19 @@ fn strip_ui_label_lines(text: String) -> String {
                 || (tl.starts_with("thanks:")
                     && tl[7..].trim().chars().all(|c| c.is_ascii_digit() || c == ','))
                 || (tl.ends_with(" posts")
-                    && tl[..tl.len() - 6].trim().chars().all(|c| c.is_ascii_digit())));
+                    && tl[..tl.len() - 6].trim().chars().all(|c| c.is_ascii_digit()))
+                // vBulletin per-post user-panel family (0114 band taxonomy):
+                // status/avatar/stat lines gold reduces to author+time+body
+                || tl.ends_with(" is offline")
+                || tl.ends_with(" is online")
+                || tl.ends_with("'s avatar")
+                || tl.starts_with("itrader:")
+                || (tl.starts_with("mentioned:") && tl.ends_with("post(s)"))
+                || (tl.starts_with("tagged:") && tl.ends_with("thread(s)"))
+                || (tl.starts_with("quoted:") && tl.ends_with("post(s)"))
+                || (tl.starts_with("liked ") && tl.contains(" times in "))
+                || (tl.starts_with("appreciate ")
+                    && tl[11..].trim().chars().all(|c| c.is_ascii_digit())));
         if !tl.is_empty() && (postbit || (heading_ok && LABELS.contains(&tl.as_str()))) {
             removed_any = true;
             continue;
