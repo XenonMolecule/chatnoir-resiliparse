@@ -8941,6 +8941,9 @@ fn strip_ui_label_lines(text: String) -> String {
         "email this page", "print this page", "email this pageprint this page",
         "garage list", "reply with quote", "view options",
         "report a problem", "no comments posted for this article.",
+        "post icons", "trackback:",
+        "send trackbacks to (separate multiple urls with spaces) :",
+        "confirm password:", "password:", "user name:",
         "likelike", "please login to remove!", "(permalink)",
         "find all posts by this user", "quote this message in a reply",
         "get adobe flash player",
@@ -9048,6 +9051,19 @@ fn strip_ui_label_lines(text: String) -> String {
         if tl.contains("| adstring:") || tl.contains("| zoneid:") {
             removed_any = true;
             continue;
+        }
+        // Empty-cell table rows (0141, owner-flagged): "| | | | |" carries
+        // zero information — vBulletin post-icon grids and spacer rows.
+        {
+            let tt = line.trim();
+            if tt.len() >= 3
+                && tt.starts_with('|')
+                && tt.ends_with('|')
+                && tt.chars().all(|c| c == '|' || c == ' ')
+            {
+                removed_any = true;
+                continue;
+            }
         }
         // Engine-chrome prefix/skeleton lines (0133, band-79 lexicon batch)
         if !was_heading
