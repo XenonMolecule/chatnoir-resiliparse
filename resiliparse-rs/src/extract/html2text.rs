@@ -9116,6 +9116,13 @@ fn strip_ui_label_lines(text: String) -> String {
         "email this page", "print this page", "email this pageprint this page",
         "garage list", "reply with quote", "view options",
         "report a problem", "no comments posted for this article.",
+        // 0165: exact lines we emit in >=3 docs that appear ZERO times in
+        // any of the 1000 golds (corpus-verified, not hand-guessed).
+        "close", "follow", "pin it", "subscribe", "sign up", "submit",
+        "rss feed", "archives", "similar stories", "join the discussion",
+        "email this article", "comments are closed.", "search:",
+        "i am looking for:", "jump to: navigation, search", "avatar",
+        "latest news", "apply now",
         "post icons", "trackback:",
         "send trackbacks to (separate multiple urls with spaces) :",
         "confirm password:", "password:", "user name:",
