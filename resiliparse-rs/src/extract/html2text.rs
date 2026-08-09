@@ -9123,6 +9123,12 @@ fn strip_ui_label_lines(text: String) -> String {
         "email this article", "comments are closed.", "search:",
         "i am looking for:", "jump to: navigation, search", "avatar",
         "latest news", "apply now",
+        // 0166: second zero-gold pass (>=2 docs). Excluded: bare words that
+        // are plausible content elsewhere (view, search, source, writer,
+        // language, admin, back, next, comment, cancel, logo, hide).
+        "liked by 1 person", "reply \u{2193}", "more...", "related articles",
+        "please reload", "more news", "forum jump", "print article",
+        "email article", "welcome!", "facebook", "twitter", "edit",
         "post icons", "trackback:",
         "send trackbacks to (separate multiple urls with spaces) :",
         "confirm password:", "password:", "user name:",
