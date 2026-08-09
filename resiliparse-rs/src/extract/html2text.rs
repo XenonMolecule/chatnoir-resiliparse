@@ -9078,6 +9078,21 @@ fn strip_ui_label_lines(text: String) -> String {
             removed_any = true;
             continue;
         }
+        // Comment-UI prefix trim (0148): "Reply \u{b7} Report \u{b7} Jane on
+        // Feb 17, 2014" — drop the affordances, keep the attribution.
+        {
+            let tt = line.trim();
+            let low = tt.to_lowercase();
+            if low.starts_with("reply \u{b7} report \u{b7} ") && tt.len() < 120 {
+                let rest = tt["reply \u{b7} report \u{b7} ".len()..].trim();
+                if !rest.is_empty() {
+                    removed_any = true;
+                    out.push_str(rest);
+                    out.push('\n');
+                    continue;
+                }
+            }
+        }
         // Bare separator lines (0147 char census): a line made only of
         // middots/bullets and spaces ("\u{b7} \u{b7}", 42x in dev) is a
         // stripped-out nav bar's leftover punctuation. Deliberately narrow:
