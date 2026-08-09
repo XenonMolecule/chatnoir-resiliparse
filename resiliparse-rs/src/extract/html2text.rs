@@ -8621,6 +8621,11 @@ fn strip_related_sections(text: String) -> String {
             "you may also", "related articles", "related posts", "related stories",
             "related news", "related content", "more from", "recommended for you",
             "see also", "around the web", "popular posts", "popular articles", "trending",
+            "similar tracks",
+            "latest stories", "latest news", "latest headlines", "more stories",
+            "most read", "most popular", "most viewed", "sponsored links",
+            "from our partners", "editor's picks",
+            "gallery links", "related medicine news",
         ];
         if FAMS.iter().any(|f| rest.starts_with(f)) {
             Some(lvl)
