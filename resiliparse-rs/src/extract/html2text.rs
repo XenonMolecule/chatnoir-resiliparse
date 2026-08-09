@@ -8772,11 +8772,16 @@ fn normalize_tabs(text: String) -> String {
 /// annotator's pipeline collapses nbsp to space in 21 of the 22 docs where
 /// we emit one, so normalize in markdown mode.
 fn normalize_nbsp(text: String) -> String {
-    if text.contains('\u{a0}') {
-        text.replace('\u{a0}', " ")
-    } else {
-        text
+    let mut t = if text.contains('\u{a0}') { text.replace('\u{a0}', " ") } else { text };
+    // Zero-width/BOM artifacts (0145 char census): U+FEFF appears in 13 dev
+    // docs of our output and ZERO golds; same for the zero-width family.
+    // They survive from mis-stamped source bytes and are never rendered.
+    for z in ['\u{feff}', '\u{200b}', '\u{200e}', '\u{200f}'] {
+        if t.contains(z) {
+            t = t.replace(z, "");
+        }
     }
+    t
 }
 
 fn md_post_passes(text: String) -> String {
