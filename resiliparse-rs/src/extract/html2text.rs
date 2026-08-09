@@ -8600,6 +8600,7 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // tabs first: plain-rendered table cells join with '\t' and
             // must collapse before the exact-line strip can see them
             // ("Author\tMessage", 0048)
+            text = normalize_nbsp(text);
             text = normalize_tabs(text);
             text = strip_ui_label_lines(text);
             text = strip_related_sections(text);
@@ -8766,7 +8767,20 @@ fn normalize_tabs(text: String) -> String {
 /// Markdown post-passes bundle (0048): engine-handler outputs and
 /// appended rebuild blocks exit before impl2's interior post-passes and
 /// were shipping unstripped chrome lines ("Author Message") and raw tabs.
+/// U+00A0 normalization (0144, owner-review find): forum post headers
+/// render "12-01-2010,\u{a0}12:30 PM" where gold has a plain space. The
+/// annotator's pipeline collapses nbsp to space in 21 of the 22 docs where
+/// we emit one, so normalize in markdown mode.
+fn normalize_nbsp(text: String) -> String {
+    if text.contains('\u{a0}') {
+        text.replace('\u{a0}', " ")
+    } else {
+        text
+    }
+}
+
 fn md_post_passes(text: String) -> String {
+    let text = normalize_nbsp(text);
     let text = normalize_tabs(text);
     let text = strip_ui_label_lines(text);
     let text = strip_related_sections(text);
