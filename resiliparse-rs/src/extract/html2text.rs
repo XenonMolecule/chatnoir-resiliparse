@@ -9078,6 +9078,20 @@ fn strip_ui_label_lines(text: String) -> String {
             removed_any = true;
             continue;
         }
+        // Bare separator lines (0147 char census): a line made only of
+        // middots/bullets and spaces ("\u{b7} \u{b7}", 42x in dev) is a
+        // stripped-out nav bar's leftover punctuation. Deliberately narrow:
+        // '-', '*' and '|' are excluded because gold uses them for rules,
+        // emphasis and tables.
+        {
+            let tt = line.trim();
+            if !tt.is_empty()
+                && tt.chars().all(|c| c == '\u{b7}' || c == '\u{2022}' || c.is_whitespace())
+            {
+                removed_any = true;
+                continue;
+            }
+        }
         // Empty-cell table rows (0141, owner-flagged): "| | | | |" carries
         // zero information — vBulletin post-icon grids and spacer rows.
         {
