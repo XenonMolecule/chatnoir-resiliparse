@@ -9129,6 +9129,9 @@ fn strip_ui_label_lines(text: String) -> String {
         "liked by 1 person", "reply \u{2193}", "more...", "related articles",
         "please reload", "more news", "forum jump", "print article",
         "email article", "welcome!", "facebook", "twitter", "edit",
+        // 0168: bare words held back at 0166, now battery-tested as a batch
+        "view", "search", "print", "next", "back", "cancel", "comment",
+        "source", "writer", "language", "admin", "logo", "hide", "videos",
         "post icons", "trackback:",
         "send trackbacks to (separate multiple urls with spaces) :",
         "confirm password:", "password:", "user name:",
