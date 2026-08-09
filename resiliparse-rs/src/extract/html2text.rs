@@ -5812,6 +5812,11 @@ const SITE_VETOES: &[(&[u8], &[u8])] = &[
     (b"uctv.tv", b"#Form1"),
     (b"wiretotheear.com", b".says"),
     (b"yahoo.com", b".slideshow-figure"),
+
+    (b"theday.com", b".galleryCats"),
+    (b"theday.com", b".verticalbox"),
+    (b"newhampshire.com", b".hover-navigation"),
+    (b"newhampshire.com", b".image-crop"),
 ];
 
 /// Page domain from og:url or canonical link (lowercased, www-stripped).
@@ -8730,6 +8735,7 @@ fn strip_ui_label_lines(text: String) -> String {
         "email this page", "print this page", "email this pageprint this page",
         "garage list", "reply with quote", "view options",
         "report a problem", "no comments posted for this article.",
+        "[buy photo]", "buy photo",
         "there are no comments yet.", "be the first to comment!",
         "be the first to comment", "sort: oldest | newest",
         "skip to main navigation", "skip all navigation and go directly to page content",
@@ -8823,6 +8829,11 @@ fn strip_ui_label_lines(text: String) -> String {
             && !line.starts_with('\t')
             && regex_search_not_empty(tl.as_bytes(), &TEMPLATE_TOKEN)
         {
+            removed_any = true;
+            continue;
+        }
+        // Ad-targeting machine lines (0120): "action:article | category:X | adString:..."
+        if tl.contains("| adstring:") || tl.contains("| zoneid:") {
             removed_any = true;
             continue;
         }
