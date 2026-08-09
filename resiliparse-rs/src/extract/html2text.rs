@@ -504,7 +504,13 @@ unsafe fn extract_cb(extract_nodes: &mut Vec<ExtractNode>, ctx: &mut ExtractCont
                 reference_node: node,
                 depth: ctx.depth,
                 make_block: is_block,
-                make_big_block: matches!(local_name, LXB_TAG_P | LXB_TAG_H1 | LXB_TAG_H2 | LXB_TAG_H3 | LXB_TAG_H4),
+                make_big_block: matches!(local_name, LXB_TAG_P | LXB_TAG_H1 | LXB_TAG_H2 | LXB_TAG_H3 | LXB_TAG_H4)
+                    // Forum quote containers (0142, owner-flagged): a quoted
+                    // post must not run into the reply text — markdown only.
+                    || (ctx.opts.preserve_formatting == FormattingOpts::Markdown
+                        && local_name == LXB_TAG_BLOCKQUOTE)
+                    || (ctx.opts.preserve_formatting == FormattingOpts::Markdown
+                        && regex_search_not_empty(get_node_attr(node, b"class"), &QUOTE_CLS)),
                 tag_id: local_name,
                 pre_depth: last_pre_depth,
                 is_end_tag,
@@ -1384,6 +1390,7 @@ static DISPLAY_CSS: LazyLock<Regex> = regex_ci!(r"(?:^|;\s*)(?:display\s?:\s?non
 // Unrendered client-side template tokens (0105): Velocity `$obj.method()`
 // and Rails `translation_missing` placeholders only surface when the page's
 // JS templating never ran — a rendered page hides these blocks.
+static QUOTE_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|[\s_-])(?:bbcode[_-]?quote|quoteheader|quotecontent|post[_-]?quote|quotebox)(?:$|[\s_-])");
 static RENDER_TIMER: LazyLock<Regex> = regex_ci!(r"^(?:page )?generated in [0-9.]+ sec(?:ond)?s?");
 static TEMPLATE_TOKEN: LazyLock<Regex> = regex_ci!(r"\$[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\(\)|translation_missing");
 static MODAL_CLS: LazyLock<Regex> = regex_ci!(r"(?:^|\s)(?:wp-|p-|-l)?(?:modal|popup|lightbox)(?:[_-]*(?:window|pane|box))?(?:$|[\s_-])");
