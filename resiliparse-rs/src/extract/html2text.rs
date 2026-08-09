@@ -3849,6 +3849,9 @@ const SITE_WHITELIST: &[(&[u8], &[u8])] = &[
     (b"rosko123.wordpress.com", b".entry-content"),
     (b"tablethotels.com", b".room-info-list"),
     (b"westonparkhospitality.com", b".block-nodeblock"),
+
+    (b"devilslakejournal.com", b"#pagination1"),
+    (b"devilslakejournal.com", b"#pagination2"),
 ];
 
 const SITE_VETOES: &[(&[u8], &[u8])] = &[
@@ -5897,6 +5900,13 @@ const SITE_VETOES: &[(&[u8], &[u8])] = &[
     (b"talk.philmusic.com", b".signature"),
     (b"tvtechnology.com", b"#dnn_"),
     (b"yahoo.com", b".slideshow-carousel"),
+
+    (b"devilslakejournal.com", b"#art-byline-pubdate-cont"),
+    (b"devilslakejournal.com", b".gotofbcom"),
+    (b"devilslakejournal.com", b".org"),
+    (b"devilslakejournal.com", b".published"),
+    (b"devilslakejournal.com", b".entry-summary"),
+    (b"devilslakejournal.com", b"#toppage"),
 ];
 
 /// Page domain from og:url or canonical link (lowercased, www-stripped).
