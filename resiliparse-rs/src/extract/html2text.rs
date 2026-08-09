@@ -8579,6 +8579,15 @@ fn strip_ui_label_lines(text: String) -> String {
             removed_any = true;
             continue;
         }
+        // Breadcrumb rows (0115): >=2 '>>'/'\u{bb}' separators between short
+        // tokens, no sentence punctuation — nav trails, not prose.
+        if !was_heading && tl.len() < 100 && !tl.contains('.') && !tl.contains(',') {
+            let n_sep = tl.matches(" >> ").count() + tl.matches(" \u{bb} ").count();
+            if n_sep >= 2 {
+                removed_any = true;
+                continue;
+            }
+        }
         out.push_str(line);
         out.push('\n');
     }
