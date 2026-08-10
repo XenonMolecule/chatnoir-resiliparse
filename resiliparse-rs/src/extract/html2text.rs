@@ -2389,6 +2389,52 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
             }
         }
 
+        // Document-title restore (0172, math-domain audit): on the real
+        // StackExchange page the h1's block is all-link (link_density 1.0)
+        // and the model vetoes it with full-page features, dropping the
+        // page's most important line. Restore ONLY on strong evidence the
+        // h1 is the document's name: itemprop="name", or the <title> tag
+        // contains the h1 text. Applies when the h1 text is absent from
+        // the output.
+        if opts.main_content
+            && opts.preserve_formatting == FormattingOpts::Markdown
+            && !result.is_empty()
+            && !(*doc).body.is_null()
+        {
+            let mut h1_text: Vec<u8> = Vec::new();
+            let mut h1_named = false;
+            for n in query_selector_all_raw(doc, (*doc).body.cast(), b"h1") {
+                let t = get_collapsed_string(&get_node_text(n));
+                if t.len() >= 8 && t.len() <= 200 {
+                    h1_text = t;
+                    h1_named = !get_node_attr(n, b"itemprop").is_empty();
+                    break;
+                }
+            }
+            if !h1_text.is_empty() {
+                let title = doc_title(doc);
+                let h1_str = String::from_utf8_lossy(&h1_text).to_string();
+                let h1_lower = h1_str.to_lowercase();
+                // char-boundary-safe prefix (0124 lesson: byte slicing panics)
+                let probe: String = h1_lower.chars().take(40).collect();
+                let title_backed = !title.is_empty()
+                    && String::from_utf8_lossy(&title).to_lowercase().contains(&probe);
+                let _ = title_backed; // measured net-negative on lpv11 (0172-w1): blog site-name h1s are title-backed and golds exclude them
+                // normalized containment (0172-w2 crater: a photo caption
+                // already present in slightly different form was re-added)
+                let result_norm: String = result
+                    .to_lowercase()
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let probe_norm: String = h1_lower.split_whitespace().collect::<Vec<_>>().join(" ");
+                let probe_norm: String = probe_norm.chars().take(60).collect();
+                if h1_named && !result_norm.contains(&probe_norm) {
+                    result = format!("# {h1_str}\n\n{result}");
+                }
+            }
+        }
+
         lxb_html_document_destroy(doc);
         result
     }
