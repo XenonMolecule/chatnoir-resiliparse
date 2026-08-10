@@ -11,14 +11,13 @@ external benchmarks won vs upstream AND vs Dripper on WMB fine-grained
   golden −0.0064, 28 craters; v5ctrl-120k (66f, more data only, AUC
   0.8581) golden −0.0019, 14 craters. AUC-is-not-a-go-signal at its
   starkest. Shipped model stands; parity re-verified.
-- **OPEN rescue, untested**: threshold recalibration. The fixed
-  MODEL_VETO_THRESHOLD / _BIG / KEEP operating points were calibrated to
-  the shipped model's score distribution; the 120k models shift it (live
-  losses concentrate at the tag/listing veto-keep frontier). Grid the
-  three thresholds for gbr_v5_120k.joblib against golden before
-  declaring the data lever dead. Models + patch preserved under
-  benchmark/experiments/v7_title/ (export model FIRST, then patch, then
-  build).
+- **CLOSED 0179**: threshold recalibration tested (13-point grid). Best
+  point (0.40/0.10/keep 0.65) recovers ⅓ of the deficit via stricter
+  keep (the predicted tag-page mechanism) but stays −0.0014 below
+  shipped; both axes unimodal around incumbents, big axis inert. The
+  120k data lever is measured-closed in all three forms. Surviving idea
+  (mechanism change, not calibration): per-page adaptive thresholds
+  (quantile-of-page-scores) — park behind the next feature idea.
 - 0027-vs-0170 contradiction resolved in 0027's favor at 120k scale:
   more data alone does not transfer under frozen thresholds.
 - **Unused labelled corpora** (general/train 10k, dev2 1k, dev3 2k)
