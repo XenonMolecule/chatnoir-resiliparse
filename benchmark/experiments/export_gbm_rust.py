@@ -9,8 +9,11 @@ base = ["tag","depth","log_text_len","link_density","n_links","page_ld","frac_pa
 v4 = ["page_forms","page_articles","page_comment_cls"]
 v5 = v4 + ["page_nav_share","page_generator","page_n_blocks"]
 v6 = v5 + ["block_pos","dist_center"]
+v7_title = ["title_overlap", "title_cover", "title_len"]   # cycle 0170
 nf = m.n_features_in_
-if nf == 68:
+if nf == 69:
+    names = base + v5 + [f"wb[{i}]" for i in range(32)] + v7_title
+elif nf == 68:
     names = base + v6 + [f"wb[{i}]" for i in range(32)]
 elif nf == 66:
     names = base + v5 + [f"wb[{i}]" for i in range(32)]
