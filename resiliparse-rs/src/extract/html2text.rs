@@ -959,11 +959,26 @@ unsafe fn serialize_extract_nodes(
                                 output.truncate(line_start);
                                 output.extend_from_slice(&collapsed);
                             }
-                            if output.last() == Some(&b'|') {
-                                // empty row: drop the dangling "|"
+                            // 0171 (table-domain audit): distinguish a row
+                            // that is ENTIRELY empty (drop it) from a row
+                            // whose LAST cell is empty. The old code popped
+                            // the dangling '|' in both cases — truncating
+                            // rows ("| Cooling:") and, when the header row
+                            // ended in an &nbsp; cell, skipping the |---|
+                            // delimiter for the whole table so no GFM parser
+                            // saw a table at all (exeter league table).
+                            let row_all_empty = md_cell_index <= 1 && output.last() == Some(&b'|');
+                            if row_all_empty {
                                 output.pop();
                                 rstrip_in_place(&mut output);
+                                // do not consume the delimiter slot on a
+                                // dropped row — the first REAL row gets it
+                                md_row_index = md_row_index.wrapping_sub(1);
                             } else {
+                                if output.last() == Some(&b'|') {
+                                    // last cell empty: keep the row shape
+                                    output.extend_from_slice(b" ");
+                                }
                                 output.extend_from_slice(b" |");
                                 if md_row_index == 0 {
                                     md_row0_cells = md_cell_index.max(1);
@@ -988,6 +1003,24 @@ unsafe fn serialize_extract_nodes(
                                 output.extend_from_slice(b" | ");
                             }
                             md_cell_index += 1;
+                        } else {
+                            // 0171: expand colspan so column counts (and the
+                            // row-0 delimiter) reflect the table's true
+                            // geometry — spanned columns become empty cells.
+                            let span = get_node_attr(current_node.reference_node, b"colspan");
+                            if !span.is_empty() {
+                                if let Ok(n) = std::str::from_utf8(&span)
+                                    .unwrap_or("")
+                                    .trim()
+                                    .parse::<usize>()
+                                {
+                                    for _ in 1..n.min(12) {
+                                        rstrip_in_place(&mut output);
+                                        output.extend_from_slice(b" | ");
+                                        md_cell_index += 1;
+                                    }
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -8591,10 +8624,11 @@ unsafe fn extract_plain_text_from_doc_impl2(
         // The page TITLE encodes purpose — "Register A Child", "Checkout",
         // "Send Page to a Friend" — so gate on title vocabulary plus a
         // modest input count.
+        // 0171 perf: title vocabulary first (nearly free) so the DOM query
+        // only runs on the ~1% of pages whose title suggests a form purpose.
         let form_purpose = opts.main_content
             && opts.preserve_formatting == FormattingOpts::Markdown
             && !(*doc).body.is_null()
-            && query_selector_all_raw(doc, (*doc).body.cast(), b"input").len() >= 5
             && {
                 let t = doc_title(doc).to_ascii_lowercase();
                 let t = String::from_utf8_lossy(&t).to_string();
@@ -8606,7 +8640,8 @@ unsafe fn extract_plain_text_from_doc_impl2(
                 ]
                 .iter()
                 .any(|k| t.contains(k))
-            };
+            }
+            && query_selector_all_raw(doc, (*doc).body.cast(), b"input").len() >= 5;
         let form_fields_eff = opts.form_fields || form_purpose;
         if !form_fields_eff {
             for sel in [b"textarea".as_slice(), b"input", b"button", b"select", b"option", b"label"] {
@@ -9162,7 +9197,21 @@ fn strip_ui_label_lines(text: String) -> String {
             in_similar_table = false;
         }
         let lt_full = line.trim();
-        if lt_full.eq_ignore_ascii_case("| similar threads |") {
+        // 0171: colspan expansion can render the header as
+        // "| Similar Threads | | | |  |" — match on the row's only
+        // non-empty cell instead of the exact single-cell form.
+        let similar_hdr = lt_full.starts_with('|')
+            && lt_full.ends_with('|')
+            && {
+                let mut non_empty = lt_full
+                    .trim_matches('|')
+                    .split('|')
+                    .map(|c| c.trim())
+                    .filter(|c| !c.is_empty());
+                matches!(non_empty.next(), Some(c) if c.eq_ignore_ascii_case("similar threads"))
+                    && non_empty.next().is_none()
+            };
+        if similar_hdr {
             in_similar_table = true;
             removed_any = true;
             continue;
