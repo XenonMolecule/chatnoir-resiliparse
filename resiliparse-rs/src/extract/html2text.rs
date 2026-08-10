@@ -255,6 +255,7 @@ tag_consts!(
     LXB_TAG_P,
     LXB_TAG_PRE,
     LXB_TAG_SECTION,
+    LXB_TAG_SUP,
     LXB_TAG_TABLE,
     LXB_TAG_TD,
     LXB_TAG_TEXTAREA,
@@ -1675,6 +1676,24 @@ unsafe fn is_main_content_node(
             return false;
         }
 
+        // Citation-marker superscripts (0173, science-domain audit):
+        // <sup><a onclick>1</a></sup> reference markers fuse onto adjacent
+        // identifiers (GeneCards: TEL1 -> "TEL11"). Only the sup-wrapping-
+        // an-anchor form is navigation; bare <sup> stays (0124: gold
+        // mirrors source rendering for plain superscripts).
+        if md_chrome && local_name == LXB_TAG_SUP {
+            let first = (*node).first_child;
+            if !first.is_null()
+                && (*first).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                && (*first).local_name == LXB_TAG_A
+                && (*first).next.is_null()
+            {
+                let t = get_collapsed_string(&get_node_text(node));
+                if t.len() <= 4 && t.iter().all(|b| b.is_ascii_digit() || *b == b',') {
+                    return false;
+                }
+            }
+        }
         // Inline anchor-run nav and unrendered template payloads (0105,
         // markdown config only — plain config mirrors the Cython reference)
         if md_chrome {
@@ -8395,6 +8414,19 @@ unsafe fn fence_language(pre: *mut lxb_dom_node_t) -> Option<String> {
             if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT && (*child).local_name == LXB_TAG_CODE {
                 return from_cls(get_node_attr(child, b"class"));
             }
+            // shiki: <div class="language-id">ts</div> (0173)
+            if (*child).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                && contains_subslice(&get_node_attr(child, b"class").to_ascii_lowercase(), b"language-id")
+            {
+                let t = get_collapsed_string(&get_node_text(child));
+                let t = String::from_utf8_lossy(&t).trim().to_lowercase();
+                if !t.is_empty()
+                    && t.len() <= 12
+                    && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '#')
+                {
+                    return Some(t);
+                }
+            }
             child = (*child).next;
         }
         None
@@ -8746,6 +8778,16 @@ unsafe fn extract_plain_text_from_doc_impl2(
         // Select all blacklisted elements and store them in a set
         let mut blacklisted_nodes: HashSet<*mut lxb_dom_node_t> =
             query_selector_all_raw(doc, ctx.root_node, &skip_selector).into_iter().collect();
+        if opts.preserve_formatting == FormattingOpts::Markdown {
+            // Shiki highlighter (0173, code-domain audit): <pre class="shiki">
+            // carries a <div class="language-id">ts</div> whose label leaked
+            // INTO the fence as a content line (42 of 45 blocks on the
+            // TypeScript release notes). The label becomes the fence language
+            // via fence_language; the div itself must not emit.
+            for n in query_selector_all_raw(doc, ctx.root_node, b"pre .language-id") {
+                blacklisted_nodes.insert(n);
+            }
+        }
 
         // Structural template subtraction (cycle 0019; markdown config only):
         // repeated∧link-dense containers join the skip set. The veto set is
@@ -9402,6 +9444,33 @@ fn strip_ui_label_lines(text: String) -> String {
         {
             removed_any = true;
             continue;
+        }
+        // Malformed-emphasis lines (0173, science-domain audit): a bold
+        // element spanning block boundaries strands its markers in empty
+        // blocks -> bare "****" lines ("** **" likewise). "***" alone is a
+        // legitimate horizontal rule and stays.
+        {
+            let t = line.trim();
+            let only_stars = !t.is_empty() && t.chars().all(|c| c == '*' || c == ' ');
+            if only_stars && t != "***" {
+                removed_any = true;
+                continue;
+            }
+        }
+        // Orphaned separator runs (0173, math-domain audit): dropped
+        // rel=tag anchors leave "**Topics:** , ," — strip trailing
+        // comma-only runs (and drop the line if nothing but a label rests).
+        {
+            let t = line.trim_end();
+            let stripped = t.trim_end_matches(|c: char| c == ',' || c.is_whitespace());
+            if stripped.len() < t.len() && t[stripped.len()..].matches(',').count() >= 2 {
+                removed_any = true;
+                if !stripped.is_empty() {
+                    out.push_str(stripped);
+                    out.push('\n');
+                }
+                continue;
+            }
         }
         // Render-timer footers (0113): "generated in 0.010506 seconds"
         if tl.len() < 45 && regex_search_not_empty(tl.as_bytes(), &RENDER_TIMER) {
