@@ -246,6 +246,7 @@ tag_consts!(
     LXB_TAG_I,
     LXB_TAG_IMG,
     LXB_TAG_INPUT,
+    LXB_TAG_LABEL,
     LXB_TAG_LI,
     LXB_TAG_LINK,
     LXB_TAG_MAIN,
@@ -1694,6 +1695,12 @@ unsafe fn is_main_content_node(
                 }
             }
         }
+        // Checkbox/radio widget clusters (0177, table-domain audit): a
+        // container with 4+ direct-child checkbox/radio inputs is a form
+        // widget (ZIP-code area pickers, filter panels). The inputs
+        // themselves are already skip-listed — this vetoes the bare text
+        // nodes interleaved between them ("Alpine-91901<br>…"), which are
+        // widget furniture, not prose.
         // Inline anchor-run nav and unrendered template payloads (0105,
         // markdown config only — plain config mirrors the Cython reference)
         if md_chrome {
@@ -8786,6 +8793,61 @@ unsafe fn extract_plain_text_from_doc_impl2(
             // via fence_language; the div itself must not emit.
             for n in query_selector_all_raw(doc, ctx.root_node, b"pre .language-id") {
                 blacklisted_nodes.insert(n);
+            }
+            // Checkbox/radio widget clusters (0177, table-domain audit): a
+            // container with 4+ direct-child checkbox/radio inputs is a
+            // form widget (ZIP-code area pickers, filter panels). The
+            // inputs themselves are already skip-listed — this drops the
+            // bare text nodes interleaved BETWEEN them ("Alpine-91901<br>…"),
+            // which are widget furniture, not prose. A hard blacklist
+            // (not an is_main_content_node veto) because the block model
+            // whitelists the link-free label run and the near-empty rescue
+            // tiers re-enter with main_content=false — both bypass vetoes,
+            // neither bypasses the blacklist.
+            let inputs = query_selector_all_raw(doc, ctx.root_node, b"input");
+            if inputs.len() >= 4 {
+                let mut counts: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+                for i in inputs {
+                    let t = get_node_attr(i, b"type").to_ascii_lowercase();
+                    if t == b"checkbox" || t == b"radio" {
+                        let p = (*i).parent;
+                        if p.is_null() {
+                            continue;
+                        }
+                        match counts.iter_mut().find(|(n, _)| *n == p) {
+                            Some((_, c)) => *c += 1,
+                            None => counts.push((p, 1)),
+                        }
+                    }
+                }
+                for (p, c) in counts {
+                    if c < 4 {
+                        continue;
+                    }
+                    // CSS-only tab/accordion widgets drive panes with
+                    // radio/checkbox state hacks (iconics: .tabs-wrapper
+                    // radios + label tab heads + DIV content panes as
+                    // siblings) — blacklisting that parent wipes the
+                    // article. A pure picker widget's children are only
+                    // widget furniture: input/label/br plus text.
+                    let mut furniture_only = true;
+                    let mut ch = (*p).first_child;
+                    while !ch.is_null() {
+                        if (*ch).type_ == LXB_DOM_NODE_TYPE_ELEMENT
+                            && !matches!(
+                                (*ch).local_name,
+                                LXB_TAG_INPUT | LXB_TAG_LABEL | LXB_TAG_BR
+                            )
+                        {
+                            furniture_only = false;
+                            break;
+                        }
+                        ch = (*ch).next;
+                    }
+                    if furniture_only {
+                        blacklisted_nodes.insert(p);
+                    }
+                }
             }
         }
 
