@@ -1,0 +1,167 @@
+diff --git a/resiliparse-rs/src/extract/html2text.rs b/resiliparse-rs/src/extract/html2text.rs
+index eddc5a0..2b38db2 100644
+--- a/resiliparse-rs/src/extract/html2text.rs
++++ b/resiliparse-rs/src/extract/html2text.rs
+@@ -2024,7 +2024,8 @@ pub fn extract_plain_text(html: &str, opts: &ExtractOpts) -> String {
+                 if body.is_null() {
+                     None
+                 } else {
+-                    let (mut v, grid, wl, mv, mvm, pld) = tpl_vetoes(generator_kind(doc), body);
++                    let title_toks = title_token_set(doc);
++                    let (mut v, grid, wl, mv, mvm, pld) = tpl_vetoes(&title_toks, generator_kind(doc), body);
+                     // domain-gated site vetoes (0098)
+                     let dom = page_domain(doc);
+                     if !dom.is_empty() {
+@@ -2468,6 +2469,8 @@ pub fn collect_block_features(html: &str) -> String {
+         let mut vetoes = HashSet::new();
+         let mut candidates: Vec<(*mut lxb_dom_node_t, usize)> = Vec::new();
+         let mut blocks: Vec<RawBlock> = Vec::new();
++        let title_toks = title_token_set(doc);
++        let title_toks = &title_toks;
+         let mut coll = Some(&mut blocks);
+         let totals = tpl_scan(body, false, 0, &mut vetoes, &mut candidates, &mut coll);
+         let page_text = totals.text_len.max(1);
+@@ -2497,6 +2500,7 @@ pub fn collect_block_features(html: &str) -> String {
+                 nav_share,
+                 gen_kind,
+                 n_substantial,
++                title_toks,
+             );
+             let text = get_collapsed_string(&get_node_text(b.ptr));
+             let text_snip: String = String::from_utf8_lossy(&text)
+@@ -2549,6 +2553,29 @@ static FEATURE_CLS_SET: LazyLock<regex::bytes::RegexSet> = LazyLock::new(|| {
+     .unwrap()
+ });
+ 
++/// Page-title token set (cycle 0170), hashed identically to the block
++/// scanner: FNV-1a over lowercased bytes of whitespace-delimited runs.
++unsafe fn title_token_set(doc: *mut lxb_html_document_t) -> HashSet<u64> {
++    unsafe {
++        let mut set = HashSet::new();
++        let t = doc_title(doc);
++        let mut wh: u64 = 0xcbf29ce484222325;
++        let mut in_word = false;
++        for &b in t.iter() {
++            if c_isspace(b) {
++                if in_word { set.insert(wh); wh = 0xcbf29ce484222325; }
++                in_word = false;
++            } else {
++                wh ^= b.to_ascii_lowercase() as u64;
++                wh = wh.wrapping_mul(0x100000001b3);
++                in_word = true;
++            }
++        }
++        if in_word { set.insert(wh); }
++        set
++    }
++}
++
+ unsafe fn build_block_features(
+     b: &RawBlock,
+     prev: Option<&RawBlock>,
+@@ -2562,6 +2589,7 @@ unsafe fn build_block_features(
+     page_nav_share: f64,
+     page_generator: u8,
+     page_n_blocks: usize,
++    title_toks: &HashSet<u64>,
+ ) -> block_model::BlockFeatures {
+     unsafe {
+         let cls = get_node_attr(b.ptr, b"class");
+@@ -2610,6 +2638,15 @@ unsafe fn build_block_features(
+             next_ld: next.map(|p| p.link_len as f64 / p.text_len.max(1) as f64).unwrap_or(-1.0),
+             prev_len: prev.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
+             next_len: next.map(|p| ((p.text_len + 1) as f64).ln()).unwrap_or(0.0),
++            title_overlap: {
++                let inter = b.toks.iter().filter(|h| title_toks.contains(h)).count() as f64;
++                inter / (b.toks.len().max(1) as f64)
++            },
++            title_cover: {
++                let inter = b.toks.iter().filter(|h| title_toks.contains(h)).count() as f64;
++                inter / (title_toks.len().max(1) as f64)
++            },
++            title_len: ((title_toks.len() + 1) as f64).ln(),
+             wb: {
+                 let total = b.wordbag.iter().sum::<u32>().max(1) as f64;
+                 let mut wb = [0.0f64; 32];
+@@ -2678,6 +2715,9 @@ struct TplNode {
+     words: usize,
+     n_headings: usize,
+     wordbag: [u32; WORDBAG_DIM],
++    /// distinct FNV-1a hashes of whitespace-delimited lowercased tokens
++    /// (cycle 0170: page-title relationship features)
++    toks: HashSet<u64>,
+     sig1: u64,
+     sig2: u64,
+ }
+@@ -2724,6 +2764,7 @@ struct RawBlock {
+     words: usize,
+     n_headings: usize,
+     wordbag: [u32; WORDBAG_DIM],
++    toks: HashSet<u64>,
+ }
+ 
+ unsafe fn tpl_scan(
+@@ -2757,6 +2798,7 @@ unsafe fn tpl_scan(
+         let mut words = 0usize;
+         let mut n_headings = if matches!(tag, LXB_TAG_H1 | LXB_TAG_H2 | LXB_TAG_H3 | LXB_TAG_H4 | LXB_TAG_H5 | LXB_TAG_H6) { 1 } else { 0 };
+         let mut wordbag = [0u32; WORDBAG_DIM];
++        let mut toks: HashSet<u64> = HashSet::new();
+         let mut child_sig1: Vec<u64> = Vec::new();
+         let mut child_sig2: Vec<u64> = Vec::new();
+         let mut n_children = 0usize;
+@@ -2780,6 +2822,7 @@ unsafe fn tpl_scan(
+                         if c_isspace(b) {
+                             if in_word {
+                                 wordbag[(wh % WORDBAG_DIM as u64) as usize] += 1;
++                                toks.insert(wh);
+                                 wh = 0xcbf29ce484222325;
+                             }
+                             in_word = false;
+@@ -2795,6 +2838,7 @@ unsafe fn tpl_scan(
+                     }
+                     if in_word {
+                         wordbag[(wh % WORDBAG_DIM as u64) as usize] += 1;
++                        toks.insert(wh);
+                     }
+                 }
+                 LXB_DOM_NODE_TYPE_ELEMENT => {
+@@ -2821,6 +2865,7 @@ unsafe fn tpl_scan(
+                         for (a, b) in wordbag.iter_mut().zip(c.wordbag.iter()) {
+                             *a += *b;
+                         }
++                        toks.extend(c.toks.iter().copied());
+                         child_sig1.push(c.sig1);
+                         child_sig2.push(c.sig2);
+                         n_children += 1;
+@@ -2850,6 +2895,7 @@ unsafe fn tpl_scan(
+                     words,
+                     n_headings,
+                     wordbag,
++                    toks: toks.clone(),
+                 });
+             }
+         }
+@@ -2894,6 +2940,7 @@ unsafe fn tpl_scan(
+             words,
+             n_headings,
+             wordbag,
++            toks,
+             sig1,
+             sig2,
+         }
+@@ -2922,6 +2969,7 @@ const MODEL_KEEP_THRESHOLD: f64 = 0.60;
+ /// structure container (>=3000B) — the positive signal that this is a
+ /// listing/card-grid page (cycle 0023 uses it to gate the listing rescue).
+ unsafe fn tpl_vetoes(
++    title_toks: &HashSet<u64>,
+     gen_kind: u8,
+     body: *mut lxb_dom_node_t,
+ ) -> (
+@@ -2971,6 +3019,7 @@ unsafe fn tpl_vetoes(
+                     nav_share,
+                     gen_kind,
+                     n_substantial,
++                    title_toks,
+                 );
+                 let score = block_model::score_block(&f);
+                 // Size-tiered veto authority (0051): the aggressive

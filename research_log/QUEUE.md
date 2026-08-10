@@ -8,9 +8,11 @@ since 0110 and holding. F1 gap to 0.90: **−0.0053**.
   live-neutral at a 10k training budget, but that the budget itself costs
   −0.0094 live. Retrain `benchmark/experiments/v7_title/v7_ship.py` against
   `../jusText/benchmark/datasets_rawhtml/lpv11/big_train.jsonl.gz`, export,
-  battery. The Rust plumbing is written and compiles (see 0170); it was
-  reverted only because the 10k model lost. Recover it from the 0170 commit
-  diff, not from scratch.
+  battery. The Rust plumbing is preserved as
+  `benchmark/experiments/v7_title/rust_title_plumbing.patch` (167 lines,
+  verified to apply cleanly to HEAD). It compiles once a 69-feature model
+  is exported over it — order matters: export the model FIRST (it defines
+  the three struct fields), then `git apply` the patch, then build.
 - **Re-test 0027** ("10× data → live wash") — 0170 measured the opposite
   direction as −0.0094 live for 10× less. One of the two is wrong; the
   100k-vs-10k pair above answers it as a by-product.
