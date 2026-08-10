@@ -27,3 +27,19 @@ audits showed gold-side abridgement also inflates their advantage).
 
 Next levers (precision, no recall risk): Q&A/forum furniture (code-audit
 list), the 4 named negative spans, masthead/footer boilerplate.
+
+## Addendum (post-0175): upstream-resiliparse comparison, same scorer/docs
+
+| benchmark | upstream resiliparse | OUR fork | delta |
+|---|---|---|---|
+| marin devset (420) | 0.8880 (Lev .8234) | **0.9050** (Lev .8383) | **+0.0170** |
+| zyte (181) | 0.8806 | **0.8899** | +0.0093 |
+| WebMainBench en/dev (200) | 0.8309 (Lev .7521) | **0.8633** (Lev .7916) | **+0.0324** |
+| trafilatura evaldata (960) | 0.8104 | **0.8421** | **+0.0317** |
+| unit tests (same 100) | 90/100 (neg 17/24, table 6/7) | **97/100** (neg 23/24, table 7/7) | +7 |
+
+Upstream = the stored baseline predictions (zyte/trafilatura/marin/units)
+and a live run of the Cython extractor (webmainbench). Ours wins all five;
+content categories tie at perfect (code 13/13, math 10/10) and we add the
+7-test margin entirely on negatives + table syntax — i.e., the fork's
+chrome/structure work, with zero content sacrificed.
