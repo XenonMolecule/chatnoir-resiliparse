@@ -1,29 +1,36 @@
-# Queue (updated cycle 0170)
+# Queue (updated cycle 0178)
 
-State: golden v16 **0.89468 F1 / 0.81528 Lev**. Lev goal (0.80–0.85) met
-since 0110 and holding. F1 gap to 0.90: **−0.0053**.
+State: golden **0.89482 F1 / 0.81562 Lev** (0177 basis: 0.8948/0.8156 on
+the w3 battery). Lev goal (0.80–0.85) met since 0110 and holding. F1 gap
+to 0.90: **−0.0052**. All 4 specialized domains ≥0.82 dev (0177); all 5
+external benchmarks won vs upstream AND vs Dripper on WMB fine-grained
+(0176).
 
-## Highest value — needs the sibling repo (blocked on this VM, trivial locally)
-- **v7 title features on the 100k corpus.** 0170 showed the features are
-  live-neutral at a 10k training budget, but that the budget itself costs
-  −0.0094 live. Retrain `benchmark/experiments/v7_title/v7_ship.py` against
-  `../jusText/benchmark/datasets_rawhtml/lpv11/big_train.jsonl.gz`, export,
-  battery. The Rust plumbing is preserved as
-  `benchmark/experiments/v7_title/rust_title_plumbing.patch` (167 lines,
-  verified to apply cleanly to HEAD). It compiles once a 69-feature model
-  is exported over it — order matters: export the model FIRST (it defines
-  the three struct fields), then `git apply` the patch, then build.
-- **Unused labelled corpora (found 0170, never trained on).**
-  `benchmark/datasets_rawhtml/general/train.jsonl.gz` = 10,000 gold docs;
-  `general/dev2` (1,000) and `general/dev3` (2,000) likewise. The model
-  program has only ever trained on lpv11 splits. Combined with the sibling
-  repo's 100k big_train this gives ~113k labelled docs — and 0170 showed
-  the training budget is worth −0.0094 live, so this is the cheapest
-  available lever on the model. Exclude `general/dev` and `general/test`
-  (dev backs the plain-config byte-identity guardrail).
-- **Re-test 0027** ("10× data → live wash") — 0170 measured the opposite
-  direction as −0.0094 live for 10× less. One of the two is wrong; the
-  100k-vs-10k pair above answers it as a by-product.
+## Model lane status after 0178 (both 120k variants live-negative)
+- **MEASURED CLOSED as-trained**: v7-120k (title features, AUC 0.8657)
+  golden −0.0064, 28 craters; v5ctrl-120k (66f, more data only, AUC
+  0.8581) golden −0.0019, 14 craters. AUC-is-not-a-go-signal at its
+  starkest. Shipped model stands; parity re-verified.
+- **OPEN rescue, untested**: threshold recalibration. The fixed
+  MODEL_VETO_THRESHOLD / _BIG / KEEP operating points were calibrated to
+  the shipped model's score distribution; the 120k models shift it (live
+  losses concentrate at the tag/listing veto-keep frontier). Grid the
+  three thresholds for gbr_v5_120k.joblib against golden before
+  declaring the data lever dead. Models + patch preserved under
+  benchmark/experiments/v7_title/ (export model FIRST, then patch, then
+  build).
+- 0027-vs-0170 contradiction resolved in 0027's favor at 120k scale:
+  more data alone does not transfer under frozen thresholds.
+- **Unused labelled corpora** (general/train 10k, dev2 1k, dev3 2k)
+  remain untouched by training; only worth revisiting together with the
+  threshold sweep above. Exclude general/dev and general/test (guardrail
+  backing).
+
+## Runtime ledger (local series)
+0178 clean measure: markdown main_content **3.00 ms/doc**, plain 1.32
+(0116: 2.76/1.30). Cycles 0161–0177 cost +8.7% markdown. Perf pass
+queueable if drift continues (known adds: 0172 title-restore h1 query +
+full-output normalization; 0177 input query).
 
 ## Owner-gated (unchanged)
 - bhagpuss image-in-gold ruling — generalizes to the image-representation
