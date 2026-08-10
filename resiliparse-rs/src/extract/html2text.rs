@@ -9256,6 +9256,13 @@ fn strip_ui_label_lines(text: String) -> String {
         "view", "search", "print", "next", "back", "cancel", "comment",
         "source", "writer", "language", "admin", "logo", "hide", "videos",
         "post icons", "trackback:",
+        // 0175: Q&A/StackExchange furniture (code-audit top recommendation)
+        "share|improve this question", "share|improve this answer",
+        "add a comment\u{a0}|", "add a comment |", "tell me more \u{d7}",
+        "reset to default", "up vote", "down vote",
+        "by posting your answer, you agree to the privacy policy and terms of service.",
+        "\u{ab}\u{a0}previous", "highlighted",
+        // named negative spans from the unit suite
         "send trackbacks to (separate multiple urls with spaces) :",
         "confirm password:", "password:", "user name:",
         "likelike", "please login to remove!", "(permalink)",
@@ -9424,7 +9431,14 @@ fn strip_ui_label_lines(text: String) -> String {
         }
         // Engine-chrome prefix/skeleton lines (0133, band-79 lexicon batch)
         if !was_heading
-            && (tl.starts_with("view full version :")
+            && ((tl.starts_with("brought to you by") && tl.len() < 60)
+                || tl.starts_with("up vote ")
+                || tl.starts_with("thanks for contributing an answer to")
+                || tl.starts_with("not the answer you're looking for? browse other questions")
+                || tl.starts_with("by clicking \u{201c}post your answer\u{201d}")
+                || tl.starts_with("showing slide {")
+                || tl.starts_with("a 6ya expert can help you")
+                || tl.starts_with("view full version :")
                 || tl.starts_with("[date prev][date next]")
                 || (tl.starts_with("quote originally posted by") && tl.ends_with("view post"))
                 || (tl.starts_with("thanked ") && tl.contains(" times in ") && tl.ends_with(" posts"))
