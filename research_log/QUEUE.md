@@ -25,31 +25,38 @@ external benchmarks won vs upstream AND vs Dripper on WMB fine-grained
   threshold sweep above. Exclude general/dev and general/test (guardrail
   backing).
 
-## New lane: SPA state mining (opened post-0179, owner-requested)
-The marin devset's khanacademy conservation-of-energy doc (13d6d6eecd,
-F1 0.204 with P 0.984 / R 0.114) fails because the content was never
-HTML: gold = 87.8k of video transcript + Q&A discussion, and of its 255
-paragraphs only 7 exist in the visible DOM — 153 verified ONLY inside
-<script> React-state JSON (269k of the page's 447k is script), the rest
-behind \uXXXX escaping. No DOM walker can score this doc. The other six
-golded khanacademy docs score 0.92–0.995 (older snapshots server-render
-the transcript), so this is snapshot-era-specific, not site-specific.
+## New lane: SPA state mining (opened post-0179; PoC DE-RISKED same night)
+Target case: marin khanacademy conservation-of-energy (13d6d6eecd),
+DOM-only F1 0.204 (P 0.984 / R 0.114). Corrected diagnosis after
+inspection: the page is React 15 SSR — THIS video's transcript IS in the
+DOM and we extract it fully; the missing 78k of gold is the tutorial's
+SIBLING content, present in the page bytes only as state JSON in two
+encodings: (a) caption-cue arrays `{"startTime":…, "text": "…"}` for the
+other videos' transcripts (cue boundaries split sentences — containment
+probes must join cues before matching), and (b) escaped-JSON markdown
+strings (`\"content\":\"**Exercise 1a:** …\"`) for tutorial articles.
+The other six golded KA docs score 0.92–0.995 DOM-only.
 
-Design constraints for any attempt (this is a NEW PARADIGM, not a tweak):
-- **Hard-gated rescue only.** Script JSON on normal pages is duplication
-  and chrome — 0108 removed complex.com's app-state echoes FROM GOLD.
-  Ungated mining would crater lpv11 and every benchmark we win.
-- Proposed gate (all three): (1) base output tiny relative to visible
-  page text AND relative to total page bytes; (2) a single large
-  (>50–100k) JSON blob in script; (3) the blob contains ARRAYS of long
-  human-text strings (sentence-cased, multi-word, low markup density) —
-  mine only those strings, in document order.
-- Dedup against the DOM output (the 7 visible paras also live in JSON).
-- Battery risk is asymmetric: the gate must provably never fire on any
-  lpv11/general/specialized doc (verify: count gate-fires across all
-  batteries = expected ~0 before shipping).
-- Yield: 1 golded marin doc immediately; the real prize is generic SPA
-  coverage (React/Next/Nuxt hydration payloads) for real-world corpora.
+**PoC measured (40-line Python, regex/scan only, no JS execution):**
+DOM + naive mining of those two shapes = **F1 0.785 / P 0.785 / R 0.786**
+(876 cues + 29 content fields). Remaining gap is ordering/interleaving,
+cue-joining, and prose under other keys — engineering, not research risk.
+
+Two-tier architecture (owner's framing: detect React → route to a
+slightly more expensive path):
+- Tier gate (near-free): data-reactid / __NEXT_DATA__ / __NUXT__
+  substrings, or >50k JSON-shaped script blob. Prevalence measured:
+  4.4% of marin html, 5.9% of WMB, 22 Next + 8 Nuxt pages in marin.
+- Expensive path (gated pages only): mine ordered cue arrays and
+  content/markdown fields; unescape one level; dedupe against DOM
+  output; append in state order. A few ms on a 450k page; amortized
+  corpus cost ≈ nil.
+- Safety: the tier CANNOT fire on non-SPA pages by construction —
+  stronger than the original "rescue" framing. Still verify gate-fire
+  count ≈ 0 across lpv11/general/specialized batteries before shipping
+  (0108: app-state echoes on normal pages are chrome, removed from gold).
+- Yield: this doc 0.204→0.785 immediately; the strategic case is the
+  modern web — React-era pages are a growing share of any fresh crawl.
 
 ## Runtime ledger (local series)
 0178 clean measure: markdown main_content **3.00 ms/doc**, plain 1.32
