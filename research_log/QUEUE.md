@@ -1,99 +1,42 @@
-# Queue (updated cycle 0050)
+# Queue (updated cycle 0170)
 
-## In flight
-- **big-data v3 model retrain** (background): 100k-doc big_train, v3
-  60-dim features, GBR n60d6 → `gbm_v3big_n60d6.joblib`. On completion:
-  export via export_gbm_rust.py, re-eval at veto 0.25 / keep 0.85, and
-  re-sweep thresholds (a better model shifts the optimum).
+State: golden v16 **0.89468 F1 / 0.81528 Lev**. Lev goal (0.80–0.85) met
+since 0110 and holding. F1 gap to 0.90: **−0.0053**.
 
-## Next candidates
-- M1 `--allow-test` checkpoint once Lev ≥ 0.72 (F1 side crossed at 0.8120).
-- Lithium platform comments (shopify/mcafee/lenovo: 2 dev / many train).
-- Drupal comments (uxmag, thefreshloaf, rationalresponders: ~4 dev).
-- phpBB2 murga-family: needs COLUMN-aware pairing (doc-order is an
-  anti-pattern — 0040/0050 both negative).
-- legalinsurrection-style camelCase content classes (postContent):
-  root-restriction interplay, one-doc forensic parked.
-- Criterion speed profiling (~10% markdown-config cost reclaim).
-- Gold-noise exclusion list for sweep hygiene (no official-metric gain).
+## Highest value — needs the sibling repo (blocked on this VM, trivial locally)
+- **v7 title features on the 100k corpus.** 0170 showed the features are
+  live-neutral at a 10k training budget, but that the budget itself costs
+  −0.0094 live. Retrain `benchmark/experiments/v7_title/v7_ship.py` against
+  `../jusText/benchmark/datasets_rawhtml/lpv11/big_train.jsonl.gz`, export,
+  battery. The Rust plumbing is written and compiles (see 0170); it was
+  reverted only because the 10k model lost. Recover it from the 0170 commit
+  diff, not from scratch.
+- **Re-test 0027** ("10× data → live wash") — 0170 measured the opposite
+  direction as −0.0094 live for 10× less. One of the two is wrong; the
+  100k-vs-10k pair above answers it as a by-product.
 
-## Walls (do not build without new evidence)
-1. nav-on-catalog / 2. related-modules / 3. listing pages / 4. generic
-post-streams / 5. dedup / 6. CSS-visual bold / 7. Tags-lines / 8.
-byline-keeping on listing pages / 9. post-byline format / 10.
-comment-convention per-doc variance (Highlander 41/27, old-Blogger) /
-11. blockquote `> ` prefix (41/59) / 12. em-vs-en dash (61/39) /
-plus: hard-breaks beyond BR (bluffcountry), U+2011/U+202F typography,
-md-links/images (base-rate), tweet-wall golds.
+## Owner-gated (unchanged)
+- bhagpuss image-in-gold ruling — generalizes to the image-representation
+  family (0152).
+- Train-gold audit authorization → clean labels for the model.
+- Spot-check pass: owner review has produced 3 real extractor defects per
+  sitting (0141/0142/0144), better than any automated wave.
 
-## Profiling result (cycle 0055 window)
-Markdown-config overhead (~75% over plain) is DIFFUSE: disabling the
-model entirely makes it SLOWER (3.04 vs 2.61 ms/doc) — vetoes shrink
-downstream serialization/rescue work and pay for themselves. No single
-hot lever; criterion micro-profiling deprioritized. Floor-10 quality
-margin stays blocked unless a structural change (e.g., feature reuse
-between tpl scan and model) lands.
+## Measured-closed lanes (do not re-walk; see logs)
+site rules (0123 saturation) · lexicon exact-line (0165/0166/0168 shipped;
+prefix 0169 negative; block-level empty; inverse 0167 unactionable) ·
+emitter hygiene (0124) · convention unification (0093/0129/0142/0167,
+four measurements) · heading adjacency (0121/0122) · formatting-from-style
+(0105/0129/0130/0131) · link & image selection (0011/0113/0137) · form
+emission by DOM density (0160; rescued only by title purpose, 0161) ·
+rescue-ladder gates (0140/0164) · fitted-artifact decay (0156/0157 paid
++0.0017; 0158/0159 showed global points and mechanism-negatives do not
+decay).
 
-## Strategic map after the golden reset (post-0059)
-Scoreboard: original 0.8223/0.7260 · golden 0.8330/0.7450.
-Local rules are exhausted (deficiency ledger = singleton page
-structures; empty-section list family = 3 docs; yahoo-mb = 1).
-
-**Next big swing: MODEL-PRIMARY SELECTION.** Replace the rule cascade
-as the primary keep/drop decision: score EVERY block (floor ~40B),
-keep iff score >= tau (sweep on golden + original-cross-check), rules
-demoted to tie-breakers; engine handlers/rebuilds still run first;
-rescue ladder becomes the safety net for model wipes. Justification:
-AUC 0.86 on 12M blocks, five straight wins from raising model
-authority, walls doctrine (12 confirmations) says only global judgment
-moves the remaining mass. Implementation sketch: new
-SELECTION_MODE=ModelPrimary in tpl_vetoes -> emit veto set = blocks
-below tau (no is_main_content_node gating), whitelist = everything
-else; sweep tau in {0.3..0.6}.
-
-Also queued: learned per-image selection (0059 verdict); v7 features
-gated on live-dev only (0056 lesson); 27 fleet flags for owner review;
-empty-section list drops (3 docs); Yahoo message-board handler.
-
-## Empty-section family diagnosis (0062 window, 3 docs)
-Drupal year-sectioned lists (dartmouth pattern): each section is an
-<article class="text-chunk"> whose item titles are links -> the teaser-
-article rule vetoes them; tier-2 short_articles rescue is blocked by
-ARTICLE_RESCUE_MAX_COUNT=3 (the page has ~15). Correct fix requires
-distinguishing "many small content articles" from "teaser stream" —
-page-type wall instance #13. Not chased at 3-doc scale; unlocks with
-any future page-type capability.
-
-## Next rendering probe: CSS-bold (0063 candidate)
-Reuse the 0062 <style> parser but for `font-weight:bold|700+` classes →
-wrap matching spans' text in ** during markdown serialization. Attacks
-wall #6 (visual bold, 100+ census ops incl. course-header-title,
-span.label families). Unlike 0062 this is ADDITIVE (no veto — worst
-case is wrong bold, small per-instance Lev), so the crater class does
-not apply; still run the full three-target battery and watch for the
-unexplained 0062 parser interaction (verify lawyerfox stays 3277B).
-Gold-side conventions already measured in 0035 (bold-census).
-
-## v5-era loss map (0073 window)
-sub-0.5 golden docs: 81 (0.056 F1 mass). complex.com family = wall #15
-(content in double-escaped JSON script payloads; client-rendered — needs
-a JS layer, not reachable statically). Remaining: 12 forum-misc
-(engines with 1-doc presence), 8 listing/tag (wall), 60 "other" =
-individually-diagnosed singletons at +0.0002-0.0005 each. The grind
-lane remains open but per-cycle yield is now firmly sub-0.001.
-
-## Mid-band family table (0080 fleet, 242 docs — status after 0081)
-| family | docs | status |
-|---|---|---|
-| kept-sidebar-widget | 29 | heterogeneous site CSS — model territory, no generic rule |
-| dropped-list-items | 20 | page-purpose link lists = listing-wall variant |
-| kept-form-chrome | 18 | heterogeneous; no shared classes |
-| dup-content | 15 | CLOSED 0081 (both text + DOM negative) |
-| dropped-images | 15 | CLOSED (27% container-scoped keep; learned-only stands) |
-| kept-footer | 13 | charter keeps copyright; per-doc gold variance |
-| kept-listing-cards/nav/format-links | 30 | walls |
-| gold-noise | 9 | golden v7 candidates (fleet misses) |
-| remainder | ~93 | singletons <=0.3 milli each |
-Verdict: mid-band families resolve into walls, model territory, or
-singletons — matching the 0080 ceiling read. The F1 path at volume
-needs per-doc fleet fixes (owner-gated scale) or new signal classes.
+## Standing protocol
+- Battery is the only arbiter; AUC is not a go-signal (0056, and 0170 is
+  the cleanest instance: +0.0080 AUC → +0.0000 live).
+- Bisect against HEAD, never regex-nuke a domain (0104, 0132).
+- Per-doc rescore gate on every gold edit (0134).
+- Fleets: per-doc JSONL checkpoints, small shards (survived 3 crashes).
+- Runtime numbers are machine-specific; do not mix VM and local series.
