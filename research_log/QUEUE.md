@@ -13,6 +13,14 @@ since 0110 and holding. F1 gap to 0.90: **−0.0053**.
   verified to apply cleanly to HEAD). It compiles once a 69-feature model
   is exported over it — order matters: export the model FIRST (it defines
   the three struct fields), then `git apply` the patch, then build.
+- **Unused labelled corpora (found 0170, never trained on).**
+  `benchmark/datasets_rawhtml/general/train.jsonl.gz` = 10,000 gold docs;
+  `general/dev2` (1,000) and `general/dev3` (2,000) likewise. The model
+  program has only ever trained on lpv11 splits. Combined with the sibling
+  repo's 100k big_train this gives ~113k labelled docs — and 0170 showed
+  the training budget is worth −0.0094 live, so this is the cheapest
+  available lever on the model. Exclude `general/dev` and `general/test`
+  (dev backs the plain-config byte-identity guardrail).
 - **Re-test 0027** ("10× data → live wash") — 0170 measured the opposite
   direction as −0.0094 live for 10× less. One of the two is wrong; the
   100k-vs-10k pair above answers it as a by-product.
