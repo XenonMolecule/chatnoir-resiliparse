@@ -7,6 +7,54 @@
 A collection of robust and fast processing tools for parsing and analyzing web archive data written in Rust and
 Cython/C++ with bindings for Python.
 
+---
+
+## About this fork
+
+This fork develops a **Rust main-content extractor** (`resiliparse._extract_rs`)
+that substantially outperforms upstream resiliparse's extraction quality while
+staying fast (~3 ms/doc markdown extraction, single-threaded). All quality work
+is documented as numbered research cycles in [`research_log/`](research_log/)
+(180 cycles: every change ships with a full regression battery, and negative
+results are logged alongside wins).
+
+**Headline results** (measured by this fork's harness; see
+`research_log/0174`–`0179` for methodology and per-benchmark details):
+
+| Benchmark | This fork | Upstream resiliparse |
+|---|---|---|
+| WebMainBench fine-grained (en-dev, overall) | **0.6150** (beats Dripper 0.5852) | 0.2352 |
+| marin devset (token F1) | **0.9050** | 0.8880 |
+| Zyte article benchmark (token F1) | **0.8899** | 0.8806 |
+| trafilatura eval set (F1) | **0.8421** | 0.8104 |
+| Extraction unit tests | **97/100** | 90/100 |
+
+Domain-focused sets (code / math / science / tables) are audited for content
+fidelity: code blocks, LaTeX, and table structure are preserved (GFM tables
+parse; upstream emits none), and measured failure modes are additive chrome,
+not content loss.
+
+**Using the fork's extractor:** it does **not** build with a plain
+`pip install` — see [`INSTALL_RUST_EXTRACTOR.md`](INSTALL_RUST_EXTRACTOR.md)
+(vcpkg + cargo + one symlink). Note that
+`resiliparse.extract.html2text` remains upstream's Cython implementation;
+the engine benchmarked above is only `resiliparse._extract_rs`:
+
+```python
+from resiliparse._extract_rs import extract_plain_text
+text = extract_plain_text(html, main_content=True, preserve_formatting='markdown')
+```
+
+**Evaluation harness:** `benchmark/eval/run_eval.py` (per-doc ROUGE-L /
+Levenshtein scoring with regression batteries); external benchmarks under
+`benchmark/external/`. The autonomous-research process itself is described in
+[`AUTORESEARCH.md`](AUTORESEARCH.md), with the open work queue in
+[`research_log/QUEUE.md`](research_log/QUEUE.md).
+
+Everything below this line is upstream's original README.
+
+---
+
 ## Usage Instructions
 
 For detailed information about the build process, dependencies, APIs, or usage instructions, please read
