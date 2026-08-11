@@ -34,16 +34,36 @@ fidelity: code blocks, LaTeX, and table structure are preserved (GFM tables
 parse; upstream emits none), and measured failure modes are additive chrome,
 not content loss.
 
-**Using the fork's extractor:** it does **not** build with a plain
-`pip install` — see [`INSTALL_RUST_EXTRACTOR.md`](INSTALL_RUST_EXTRACTOR.md)
-(vcpkg + cargo + one symlink). Note that
-`resiliparse.extract.html2text` remains upstream's Cython implementation;
-the engine benchmarked above is only `resiliparse._extract_rs`:
+### Quick start
+
+Needs Rust, vcpkg (`VCPKG_ROOT` set), cmake, libclang, and Python 3.11+.
+Full notes and troubleshooting: [`INSTALL_RUST_EXTRACTOR.md`](INSTALL_RUST_EXTRACTOR.md).
+
+```bash
+git clone https://github.com/XenonMolecule/chatnoir-resiliparse.git
+cd chatnoir-resiliparse
+export VCPKG_ROOT="$HOME/vcpkg"
+
+# 1. build the Rust extractor (~1 min: vcpkg compiles lexbor)
+cargo build --release -p resiliparse-extract-rs
+
+# 2. link the extension module (gitignored, so a fresh clone must create it)
+#    Linux: swap .dylib for .so
+ln -sf "$(pwd)/target/release/libresiliparse_extract_rs.dylib" \
+       resiliparse-py/resiliparse/_extract_rs.so
+
+# 3. put the Python package on the path
+export PYTHONPATH="$(pwd)/resiliparse-py:$PYTHONPATH"
+```
 
 ```python
 from resiliparse._extract_rs import extract_plain_text
+
 text = extract_plain_text(html, main_content=True, preserve_formatting='markdown')
 ```
+
+⚠️ `resiliparse.extract.html2text` is **upstream's Cython engine**, not this one —
+the results above come from `resiliparse._extract_rs` only.
 
 **Evaluation harness:** `benchmark/eval/run_eval.py` (per-doc ROUGE-L /
 Levenshtein scoring with regression batteries); external benchmarks under
