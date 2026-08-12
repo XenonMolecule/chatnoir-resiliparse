@@ -18,8 +18,8 @@ is documented as numbered research cycles in [`research_log/`](research_log/)
 (180 cycles: every change ships with a full regression battery, and negative
 results are logged alongside wins).
 
-**Headline results** (measured by this fork's harness; see
-`research_log/0174`–`0179` for methodology and per-benchmark details):
+**Headline results** — full tables, per-metric breakdowns, sources and caveats
+in [`BENCHMARKS.md`](BENCHMARKS.md):
 
 | Benchmark | This fork | Upstream resiliparse |
 |---|---|---|
@@ -32,7 +32,9 @@ results are logged alongside wins).
 Domain-focused sets (code / math / science / tables) are audited for content
 fidelity: code blocks, LaTeX, and table structure are preserved (GFM tables
 parse; upstream emits none), and measured failure modes are additive chrome,
-not content loss.
+not content loss. Extraction runs on raw HTML without executing JavaScript,
+so content that exists only in hydration state is out of reach — see the
+known-limitation section of [`BENCHMARKS.md`](BENCHMARKS.md#6-known-limitation-javascript-hydrated-pages).
 
 ### Quick start
 
