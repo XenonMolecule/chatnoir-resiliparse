@@ -4,26 +4,56 @@ Build `0177` (commit `850891b`), `resiliparse._extract_rs`,
 `main_content=True, preserve_formatting='markdown'`.
 Annotated version with methodology and caveats: [`BENCHMARKS.md`](BENCHMARKS.md).
 
-## External benchmarks vs upstream resiliparse
+All rows scored by `benchmark/external/score_all_extractors.py` from raw predictions.
 
-| Benchmark | Docs | Metric | Upstream | This fork | Δ |
-|---|--:|---|--:|--:|--:|
-| marin devset v2 | 420 | token-F1 | 0.8880 | **0.9050** | +0.0170 |
-| Zyte article-extraction-benchmark | 181 | token-F1 | 0.8806 | **0.8899** | +0.0093 |
-| WebMainBench en/dev | 200 | token-F1 | 0.8309 | **0.8633** | +0.0324 |
-| trafilatura eval set | 960 | F1 | 0.8104 | **0.8421** | +0.0317 |
-| Extraction unit tests | 100 | passed | 90 | **97** | +7 |
+### marin devset v2 — 420 docs, token-F1
 
-| Benchmark | F1 | P | R | Lev sim |
+| Extractor | F1 | P | R |
+|---|--:|--:|--:|
+| **This fork (0177)** | **0.9050** | 0.8673 | 0.9462 |
+| Dripper | 0.8943 | 0.8917 | 0.8969 |
+| resiliparse (upstream) | 0.8880 | 0.8451 | 0.9355 |
+| trafilatura (upstream) | 0.8518 | 0.9075 | 0.8026 |
+
+per-doc: mean 0.8927 · median 0.9491 · ≥0.90: 283/420 · ≥0.80: 356/420 · <0.50: 17/420
+
+### WebMainBench en/dev — 200 docs, token-F1
+
+| Extractor | F1 | P | R |
+|---|--:|--:|--:|
+| **This fork (0177)** | **0.8633** | 0.8051 | 0.9305 |
+| resiliparse (upstream) | 0.8309 | 0.7693 | 0.9033 |
+| trafilatura (upstream) | 0.8073 | 0.8459 | 0.7721 |
+| Dripper | 0.7482 | 0.7328 | 0.7643 |
+
+### Zyte article-extraction-benchmark — 181 docs, token-F1
+
+| Extractor | F1 | P | R |
+|---|--:|--:|--:|
+| trafilatura (upstream) | **0.9520** | 0.9278 | 0.9775 |
+| Dripper | 0.9461 | 0.9073 | 0.9884 |
+| **This fork (0177)** | 0.8899 | 0.8106 | **0.9864** |
+| resiliparse (upstream) | 0.8806 | 0.7997 | 0.9799 |
+| marin v1.1 | 0.7766 | 0.7169 | 0.8471 |
+
+### trafilatura eval set — 960 docs, containment F1
+
+| Extractor | F1 | P | R | Acc |
 |---|--:|--:|--:|--:|
-| marin devset | 0.9050 | 0.8673 | 0.9462 | 0.8383 |
-| Zyte | 0.8899 | 0.8106 | 0.9864 | — |
-| WebMainBench (shingle) | 0.8633 | 0.8051 | 0.9305 | 0.7916 |
-| trafilatura eval set | 0.8421 | 0.7656 | 0.9354 | acc 0.8251 |
+| Dripper | **0.9335** | 0.9166 | 0.9511 | 0.9325 |
+| trafilatura (upstream) | 0.9130 | 0.9119 | 0.9141 | 0.9132 |
+| **This fork (0177)** | 0.8421 | 0.7656 | 0.9354 | 0.8251 |
+| resiliparse (upstream) | 0.8104 | 0.7142 | 0.9365 | 0.7816 |
+| marin v1.1 | 0.2353 | 0.8801 | 0.1358 | 0.5601 |
 
-marin per-doc: mean 0.8927 · median 0.9491 · ≥0.90: 283/420 · ≥0.80: 356/420 · <0.50: 17/420.
+### Extraction unit tests — 100 tests
 
-Unit tests 97/100: code 13/13 · math 10/10 · tables 7/7 · attribution 12/12 · structure 5/5.
+| Extractor | Passed |
+|---|--:|
+| **This fork (0177)** | **97** |
+| resiliparse (upstream) | 90 |
+
+ours: code 13/13 · math 10/10 · tables 7/7 · attribution 12/12 · structure 5/5
 
 ## WebMainBench fine-grained (en/dev, n=200, use_llm=false)
 

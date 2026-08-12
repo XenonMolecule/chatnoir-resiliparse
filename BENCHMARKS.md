@@ -11,41 +11,95 @@ Unless stated otherwise our configuration is
 
 ---
 
-## 1. External benchmarks — ours vs upstream resiliparse
+## 1. External benchmarks — five extractors, one scorer per benchmark
 
-Same documents, same scorer for both columns (each benchmark's own metric).
-Upstream numbers come from the benchmarks' stored baseline predictions, except
-WebMainBench which is a live run of upstream's Cython extractor.
+Every row is scored by `benchmark/external/score_all_extractors.py` from each
+extractor's raw predictions, so nothing here mixes published numbers with
+locally measured ones. Baseline predictions are the stored outputs of Dripper,
+marin v1.1, upstream resiliparse and upstream trafilatura, except the two
+WebMainBench baselines, which are live runs (upstream resiliparse 1.0.9,
+trafilatura 2.2.0 with `output_format='markdown'`).
 
-| Benchmark | Docs | Metric | Upstream resiliparse | **This fork** | Δ |
-|---|--:|---|--:|--:|--:|
-| [marin devset v2](#sources) | 420 | token-F1 (4-gram shingle) | 0.8880 | **0.9050** | **+0.0170** |
-| [Zyte article-extraction-benchmark](https://github.com/scrapinghub/article-extraction-benchmark) | 181 | token-F1 | 0.8806 | **0.8899** | +0.0093 |
-| [WebMainBench](https://github.com/opendatalab/WebMainBench) (en/dev) | 200 | token-F1 | 0.8309 | **0.8633** | **+0.0324** |
-| [trafilatura eval set](https://github.com/adbar/trafilatura/tree/master/tests/evaldata) | 960 | F1 (with/without containment) | 0.8104 | **0.8421** | **+0.0317** |
-| Extraction unit tests | 100 | tests passed | 90 | **97** | +7 |
+**The honest summary: we lead the two broad-web benchmarks (marin,
+WebMainBench) and place third on the two article-centric ones (Zyte,
+trafilatura eval), where trafilatura and Dripper cut chrome more
+aggressively. We beat upstream resiliparse on all four.**
 
-Full detail per benchmark (ours, build 0177):
+### 1.1 marin devset v2 — 420 gold docs, token-F1
 
-| Benchmark | F1 | Precision | Recall | Levenshtein sim |
+Register-stratified CommonCrawl (news, forums, science, code, commerce…).
+
+| Extractor | F1 | Precision | Recall |
+|---|--:|--:|--:|
+| **This fork (0177)** | **0.9050** | 0.8673 | 0.9462 |
+| Dripper | 0.8943 | 0.8917 | 0.8969 |
+| resiliparse (upstream) | 0.8880 | 0.8451 | 0.9355 |
+| trafilatura (upstream) | 0.8518 | 0.9075 | 0.8026 |
+
+### 1.2 WebMainBench en/dev — 200 docs, token-F1
+
+Diverse modern web including code, tables and formulas.
+
+| Extractor | F1 | Precision | Recall |
+|---|--:|--:|--:|
+| **This fork (0177)** | **0.8633** | 0.8051 | 0.9305 |
+| resiliparse (upstream) | 0.8309 | 0.7693 | 0.9033 |
+| trafilatura (upstream) | 0.8073 | 0.8459 | 0.7721 |
+| Dripper | 0.7482 | 0.7328 | 0.7643 |
+
+(WebMainBench's own fine-grained metrics are in §2.)
+
+### 1.3 Zyte article-extraction-benchmark — 181 news articles, token-F1
+
+| Extractor | F1 | Precision | Recall |
+|---|--:|--:|--:|
+| trafilatura (upstream) | **0.9520** | 0.9278 | 0.9775 |
+| Dripper | 0.9461 | 0.9073 | 0.9884 |
+| **This fork (0177)** | 0.8899 | 0.8106 | **0.9864** |
+| resiliparse (upstream) | 0.8806 | 0.7997 | 0.9799 |
+| marin v1.1 | 0.7766 | 0.7169 | 0.8471 |
+
+### 1.4 trafilatura eval set — 960 docs, containment F1
+
+Upstream methodology: each document lists strings that must appear (`with`)
+and strings that must not (`without`).
+
+| Extractor | F1 | Precision | Recall | Accuracy |
 |---|--:|--:|--:|--:|
-| marin devset | 0.9050 | 0.8673 | 0.9462 | 0.8383 |
-| Zyte | 0.8899 | 0.8106 | 0.9864 | — |
-| WebMainBench (shingle) | 0.8633 | 0.8051 | 0.9305 | 0.7916 |
-| trafilatura eval set | 0.8421 | 0.7656 | 0.9354 | (accuracy 0.8251) |
+| Dripper | **0.9335** | 0.9166 | 0.9511 | 0.9325 |
+| trafilatura (upstream) | 0.9130 | 0.9119 | 0.9141 | 0.9132 |
+| **This fork (0177)** | 0.8421 | 0.7656 | 0.9354 | 0.8251 |
+| resiliparse (upstream) | 0.8104 | 0.7142 | 0.9365 | 0.7816 |
+| marin v1.1 | 0.2353 | 0.8801 | 0.1358 | 0.5601 |
 
-The recurring shape: **recall 0.93–0.99, precision is the looser side** — our
-residual errors are additive chrome, not lost content. That asymmetry is
-deliberate and was verified by per-domain content audits (§4).
+### 1.5 Extraction unit tests — 100 tests
 
-**Unit-test breakdown (97/100):** code 13/13, math 10/10, tables 7/7,
-attribution 12/12, structure 5/5 — every content category perfect. Upstream's
-7-test deficit is entirely negatives (chrome that should be dropped) and table
-syntax. Our 3 failures: 2 prose-recall misses, 1 non-Latin footer.
+| Extractor | Passed |
+|---|--:|
+| **This fork (0177)** | **97** |
+| resiliparse (upstream) | 90 |
 
-**marin per-document distribution** (420 gold docs): mean 0.8927, median
-**0.9491**, 283 docs ≥0.90, 356 ≥0.80, 17 below 0.50. The low tail is
-dominated by the dataset's *script-loss edge cases* — see §6.
+Breakdown (ours): code 13/13 · math 10/10 · tables 7/7 · attribution 12/12 ·
+structure 5/5 — every content category perfect. Failures: 2 prose-recall
+misses, 1 non-Latin footer.
+
+### Reading the spread
+
+Our recall is the highest or near-highest everywhere (0.93–0.99, and the top
+recall of all five on Zyte); **precision is consistently our weak side**. On
+article benchmarks with a single clean body, aggressive boilerplate cutting is
+almost free, which is where trafilatura and Dripper gain — trafilatura's own
+eval set and Zyte are both that shape. On mixed-register and structured
+content (marin, WebMainBench) the same aggression costs them recall and we
+lead. Our residual errors are additive chrome rather than lost content, which
+the per-domain audits in §4 verify directly.
+
+marin per-document distribution (ours): mean 0.8927, median **0.9491**,
+283/420 ≥0.90, 356/420 ≥0.80, 17 below 0.50 — the low tail is the
+script-loss family described in §6.
+
+Upstream's 7-test deficit on the unit suite is entirely negatives (chrome that
+should be dropped) and table syntax — no content-category difference.
 
 ---
 

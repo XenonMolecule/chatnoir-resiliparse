@@ -21,13 +21,20 @@ results are logged alongside wins).
 **Headline results** — full tables, per-metric breakdowns, sources and caveats
 in [`BENCHMARKS.md`](BENCHMARKS.md):
 
-| Benchmark | This fork | Upstream resiliparse |
-|---|---|---|
-| WebMainBench fine-grained (en-dev, overall) | **0.6150** (beats Dripper 0.5852) | 0.2352 |
-| marin devset (token F1) | **0.9050** | 0.8880 |
-| Zyte article benchmark (token F1) | **0.8899** | 0.8806 |
-| trafilatura eval set (F1) | **0.8421** | 0.8104 |
-| Extraction unit tests | **97/100** | 90/100 |
+| Benchmark | This fork | Upstream resiliparse | Best other extractor |
+|---|---|---|---|
+| marin devset (token F1) | **0.9050** | 0.8880 | Dripper 0.8943 |
+| WebMainBench en/dev (token F1) | **0.8633** | 0.8309 | trafilatura 0.8073 |
+| WebMainBench fine-grained (overall) | **0.6150** | 0.2352 | Dripper 0.5852 |
+| Zyte article benchmark (token F1) | 0.8899 | 0.8806 | **trafilatura 0.9520** |
+| trafilatura eval set (F1) | 0.8421 | 0.8104 | **Dripper 0.9335** |
+| Extraction unit tests | **97/100** | 90/100 | — |
+
+We lead the broad-web benchmarks (marin, WebMainBench) and beat upstream
+resiliparse everywhere, but place third on the two article-centric sets, where
+trafilatura and Dripper cut boilerplate harder. Our recall is the highest or
+near-highest on every benchmark; precision is the weak side. Per-benchmark
+tables with all five extractors: [`BENCHMARKS.md`](BENCHMARKS.md).
 
 Domain-focused sets (code / math / science / tables) are audited for content
 fidelity: code blocks, LaTeX, and table structure are preserved (GFM tables
